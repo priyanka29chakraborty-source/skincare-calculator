@@ -1,0 +1,709 @@
+INCI_Name,Ingredient_Class,Evidence_Strength,Effect_Strength_Weight,Evidence_Quality
+Argireline,Active,3 (Fair),,Limited / Emerging
+Arnica Montana Extract,Active,Limited,0.6,Limited / Emerging
+Callus Culture Extract,Active,Limited,0.7,Limited / Emerging
+DMAE,Active,3 (Fair),,Limited / Emerging
+Exosome Extract,Active,Emerging,0.85,Limited / Emerging
+Fermented Oil,Emollient,3 (Fair),,Limited / Emerging
+Glucosyl Hesperidin,Active,Limited,0.6,Limited / Emerging
+Human Adipose Stem Cell Conditioned Media,Active,Emerging,0.9,Limited / Emerging
+Nicotinamide Mononucleotide,Active,Emerging clinical data,0.75,Limited / Emerging
+Oligopeptide-24,Active,Limited,0.85,Limited / Emerging
+Oligopeptide-68,Active,Limited,0.75,Limited / Emerging
+Retinyl Linoleate,Active,Limited,0.55,Limited / Emerging
+Senolytic Peptide Complex,Active,Pre-clinical and early clinical,0.8,Limited / Emerging
+Vegan Polydeoxyribonucleotide,Active,Emerging data,0.85,Limited / Emerging
+Vitamin K,Active,3 (Fair),,Limited / Emerging
+"1,4-Dioxane",Safety,,,Moderate
+Acai Extract,Active,,,Moderate
+Acetyl Glucosamine,Active,,,Moderate
+Acetyl Tetrapeptide,Active,,,Moderate
+Acetyl Tetrapeptide-5,Active,Peer-reviewed,0.7,Moderate
+Acetyl Tyrosinamide,Active,,,Moderate
+Acetylarginyltryptophyl Diphenylglycine,Active,,,Moderate
+Acrylates/C10-30 Alkyl Acrylate Crosspolymer,Functional,Regulatory,0.2,Moderate
+Ahnfeltia Concinna Extract,Active,,,Moderate
+Alanine,Active,Peer-reviewed,0.55,Moderate
+Alaria Esculenta Extract,Active,,,Moderate
+Alcohol Denat.,Functional,Regulatory,0.15,Moderate
+Algae Exopolysaccharides,Active,,,Moderate
+Algae Extract,Active,,,Moderate
+Algin,Active,,,Moderate
+Alginate,Functional,Regulatory,0.4,Moderate
+Allantoin,Functional,Peer-reviewed,0.6,Moderate
+Aloe Barbadensis Leaf Extract,Active,Peer-reviewed,0.7,Moderate
+Aloe Barbadensis Leaf Juice,Functional,Peer-reviewed,0.6,Moderate
+Aloe Vera,Active,,,Moderate
+Alpha Lipoic,Active,4 (Good),,Moderate
+Alpha-Glucan,Active,4 (Good),,Moderate
+Alpha-Glucan Oligosaccharide,Active,Peer-reviewed,0.65,Moderate
+Aluminum Starch Octenylsuccinate,Functional,Regulatory,0.3,Moderate
+Amino Acids,Active,,,Moderate
+Aminomethyl Propanol,Functional,Regulatory,0.2,Moderate
+Ammonium Lactate,Functional,Peer-reviewed,0.7,Moderate
+Anti-Ageing Peptides,Active,,,Moderate
+Apple Extract,Active,,,Moderate
+Apple Polyphenols,Active,,,Moderate
+Apple Stem Cells,Active,,,Moderate
+Aquagenium,Active,,,Moderate
+Arachidyl Alcohol,Functional,Peer-reviewed,0.6,Moderate
+Arachidyl Glucoside,Functional,Peer-reviewed,0.7,Moderate
+Arbutin,Active,,,Moderate
+Argan Oil,Functional,Peer-reviewed,0.65,Moderate
+Arginine,Active,Peer-reviewed,0.7,Moderate
+Arginine HCL,Active,,,Moderate
+Arginine PCA,Active,,,Moderate
+Arginine/Lysine Polypeptide,Active,,,Moderate
+Ascophyllum Nodosum Extract,Active,,,Moderate
+Ascorbyl Glucoside,Active,Peer-reviewed,0.7,Moderate
+Ascorbyl Palmitate,Active,,,Moderate
+Asparagopsis Armata Extract,Active,,,Moderate
+Avene Thermal Water,Active,,,Moderate
+Avocado Ferment,Active,,,Moderate
+Avocado Oil,Functional,Peer-reviewed,0.7,Moderate
+Azelaoyl Bis-Dipeptide,Active,,,Moderate
+Azelaoyl Glycine,Active,Moderate,0.8,Moderate
+BHA,Functional,Regulatory,0.3,Moderate
+BHT,Functional,Regulatory,0.3,Moderate
+Bakuchiol,Active,Peer-reviewed,0.7,Moderate
+Beeswax,Functional,Peer-reviewed,0.6,Moderate
+Behenyl Alcohol,Functional,Peer-reviewed,0.6,Moderate
+Benzene,Safety,,,Moderate
+Benzyl Alcohol,Functional,Regulatory,0.2,Moderate
+Beta Glucan,Active,,,Moderate
+Betaine,Functional,Peer-reviewed,0.6,Moderate
+Betaine Salicylate,Active,Peer-reviewed,0.7,Moderate
+Bilberry Extract,Active,,,Moderate
+Bio-Active Glucosides,Active,,,Moderate
+Biosaccharide Gum-1,Active,Peer-reviewed,0.7,Moderate
+Biosaccharide Gum-2,Active,Peer-reviewed,0.7,Moderate
+Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine,Active,Regulatory,1.0,Moderate
+Bisphenol S,Safety,,,Moderate
+Blue Lotus Extract,Active,,,Moderate
+Blue Mallow Extract,Active,,,Moderate
+Blueberry Extract,Active,,,Moderate
+Borage Seed Oil,Functional,Peer-reviewed,0.75,Moderate
+Bromelain,Active,Peer-reviewed,0.7,Moderate
+Butyl Methoxydibenzoylmethane,Active,Regulatory,0.9,Moderate
+Butylene Glycol,Functional,Peer-reviewed,0.45,Moderate
+C12-15 Alkyl Benzoate,Functional,Regulatory,0.6,Moderate
+CI 16035,Functional,Regulatory,0.02,Moderate
+CI 19140,Functional,Regulatory,0.02,Moderate
+CI 42090,Functional,Regulatory,0.02,Moderate
+CI 77007,Functional,Regulatory,0.05,Moderate
+CI 77288,Functional,Regulatory,0.05,Moderate
+CI 77491,Functional,Regulatory,0.05,Moderate
+CI 77492,Functional,Regulatory,0.05,Moderate
+CI 77499,Functional,Regulatory,0.05,Moderate
+CI 77742,Functional,Regulatory,0.05,Moderate
+CI 77891,Functional,Regulatory,0.1,Moderate
+Cabbage Leaf Extract,Active,,,Moderate
+Caffeic Acid,Active,Peer-reviewed,0.7,Moderate
+Caffeine,Active,Peer-reviewed,0.6,Moderate
+Calcium Alginate,Functional,Regulatory,0.4,Moderate
+Calcium PCA,Active,Peer-reviewed,0.65,Moderate
+Camellia Seed Oil,Functional,Peer-reviewed,0.65,Moderate
+Camphor,Active,Regulatory,0.2,Moderate
+Candelilla Wax,Functional,Regulatory,0.6,Moderate
+Capric Acid,Functional,Peer-reviewed,0.6,Moderate
+Caprooyl Phytosphingosine,Active,,,Moderate
+Caprooyl Sphingosine,Active,,,Moderate
+Caprylhydroxamic Acid,Functional,Regulatory,0.45,Moderate
+Caprylic Acid,Functional,Peer-reviewed,0.6,Moderate
+Caprylic/Capric Triglyceride,Functional,Peer-reviewed,0.6,Moderate
+Caprylyl Glycol,Functional,Regulatory,0.4,Moderate
+Carbomer,Functional,Regulatory,0.15,Moderate
+Carnauba Wax,Functional,Regulatory,0.55,Moderate
+Carnitine,Active,Peer-reviewed,0.7,Moderate
+Carrageenan,Functional,Regulatory,0.4,Moderate
+Ceresin,Functional,Regulatory,0.65,Moderate
+Ceteareth-20,Functional,Regulatory,0.25,Moderate
+Cetearyl Alcohol,Functional,Peer-reviewed,0.6,Moderate
+Cetearyl Olivate,Functional,Peer-reviewed,0.7,Moderate
+Cetyl Alcohol,Functional,Peer-reviewed,0.55,Moderate
+Chamomile Extract,Active,,,Moderate
+Chemical UV Filters,Active,,,Moderate
+Chitosan,Functional,Peer-reviewed,0.6,Moderate
+Chlorella Protothecoides,Active,,,Moderate
+Chlorella Protothecoides Oil,Active,,,Moderate
+Chlorogenic Acid,Active,Peer-reviewed,0.7,Moderate
+Chlorophyll,Active,,,Moderate
+Chlorphenesin,Functional,Regulatory,0.3,Moderate
+Cholesterol,Functional,Peer-reviewed,0.9,Moderate
+Chondrus Crispus,Active,,,Moderate
+Cinnamon Bark,Active,,,Moderate
+Citral,Functional,Regulatory,0.05,Moderate
+Citramalic Acid,Active,Peer-reviewed,0.6,Moderate
+Citric Acid,Functional,Regulatory,0.2,Moderate
+Clarivine™,Active,4 (Good),,Moderate
+Coal Tar,Safety,,,Moderate
+Cocamidopropyl Betaine,Functional,Peer-reviewed,0.6,Moderate
+Coco Glucoside,Functional,Peer-reviewed,0.7,Moderate
+Coco-Betaine,Functional,Peer-reviewed,0.6,Moderate
+Coco-Caprylate/Caprate,Functional,Regulatory,0.65,Moderate
+Coffee Seed Extract,Active,,,Moderate
+Copper Heptapeptide-14 Pantothenate,Active,,,Moderate
+Copper Lysinate/Prolinate,Active,Moderate,0.85,Moderate
+Copper PCA,Active,Peer-reviewed,0.7,Moderate
+Copper Palmitoyl Heptapeptide,Active,,,Moderate
+Copper Peptide,Active,,,Moderate
+Creatine,Active,Peer-reviewed,0.7,Moderate
+Cucumber Extract,Active,,,Moderate
+Cucumis Sativus Fruit Extract,Active,Peer-reviewed,0.6,Moderate
+Curcuma Longa,Active,4 (Good),,Moderate
+Cyclodextrin,Functional,Peer-reviewed,0.4,Moderate
+Cyclohexasiloxane,Functional,Regulatory,0.6,Moderate
+Cyclopentasiloxane,Functional,Peer-reviewed,0.5,Moderate
+Cysteine,Active,Peer-reviewed,0.65,Moderate
+Decyl Glucoside,Functional,Peer-reviewed,0.7,Moderate
+Dehydroacetic Acid,Functional,Regulatory,0.35,Moderate
+Dicaprylyl Carbonate,Functional,Regulatory,0.65,Moderate
+Diethylamino Hydroxybenzoyl Hexyl Benzoate,Active,Regulatory,0.95,Moderate
+Dihydroxyacetone,Active,Peer-reviewed,0.3,Moderate
+Diisopropyl Sebacate,Functional,Regulatory,0.55,Moderate
+Dimethicone,Functional,Peer-reviewed,0.75,Moderate
+Dimethiconol,Functional,Regulatory,0.65,Moderate
+Dioic Acid,Active,,,Moderate
+Diosmin,Active,Peer-reviewed,0.7,Moderate
+Dipeptide,Active,,,Moderate
+Dipeptide Diaminobutyroyl Benzylamide Diacetate,Active,,,Moderate
+Dipropylene Glycol,Functional,Regulatory,0.5,Moderate
+Disodium Cocoyl Glutamate,Functional,Peer-reviewed,0.8,Moderate
+Disodium EDTA,Functional,Regulatory,0.15,Moderate
+Disodium Laureth Sulfosuccinate,Functional,Peer-reviewed,0.75,Moderate
+Drometrizole Trisiloxane,Active,Regulatory,0.95,Moderate
+Dunaliella Salina (Green Algae) Extract,Active,,,Moderate
+ETERWELL™ YOUTH,Active,4 (Good),,Moderate
+Ecamsule,Active,Regulatory,0.95,Moderate
+Elastin Amino Acids,Functional,Peer-reviewed,0.4,Moderate
+Endothelyol,Active,,,Moderate
+Ensulizole,Active,Regulatory,0.8,Moderate
+Ergosterol,Active,Peer-reviewed,0.7,Moderate
+Erythritol,Functional,Peer-reviewed,0.55,Moderate
+Erythrulose,Active,Peer-reviewed,0.35,Moderate
+Essential Lipids,Active,,,Moderate
+Ethanol,Functional,Regulatory,0.4,Moderate
+Ethylhexyl Salicylate,Active,,,Moderate
+Ethylhexyl Triazone,Active,Regulatory,0.95,Moderate
+Evening Primrose Oil,Functional,Peer-reviewed,0.7,Moderate
+Exosomes,Active,4 (Good),,Moderate
+Fernblock,Active,,,Moderate
+Ferric Hexapeptide,Active,,,Moderate
+Feruloyl Soy Glycerides,Active,Peer-reviewed,0.7,Moderate
+Feverfew Extract,Active,,,Moderate
+Fomes Ofﬁcinalis (Mushroom) Extract,Active,,,Moderate
+Formaldehyde,Safety,,,Moderate
+Fragrance,Functional,Regulatory,0.1,Moderate
+Fructooligosaccharides,Active,Peer-reviewed,0.6,Moderate
+Galguard™,Functional,4 (Good),,Moderate
+Gellan Gum,Functional,Regulatory,0.45,Moderate
+Geraniol,Functional,Regulatory,0.05,Moderate
+Ginkgo Biloba,Active,,,Moderate
+Ginseng Ext,Active,4 (Good),,Moderate
+Gluconic Acid,Active,Peer-reviewed,0.7,Moderate
+Glucose Oxidase,Active,Peer-reviewed,0.7,Moderate
+Glutathione,Active,Peer-reviewed,0.7,Moderate
+Glutathione Ethyl Ester,Active,Moderate,0.75,Moderate
+Glyceryl Caprylate,Functional,Regulatory,0.4,Moderate
+Glyceryl Glucoside,Active,,,Moderate
+Glyceryl Stearate,Functional,Peer-reviewed,0.6,Moderate
+Glycine,Active,Peer-reviewed,0.6,Moderate
+Glycolipids,Active,,,Moderate
+Glycoproteins,Active,,,Moderate
+Glycosphingolipids,Active,,,Moderate
+Golden-Eye Grass Complex,Active,,,Moderate
+Grapeseed Oil,Functional,Peer-reviewed,0.6,Moderate
+Green Tea,Active,,,Moderate
+Green Tea Extract,Active,Peer-reviewed,0.7,Moderate
+Guarana Extract,Active,,,Moderate
+HPR,Active,4 (Good),,Moderate
+Hamamelis Virginiana Leaf Extract,Active,Peer-reviewed,0.6,Moderate
+Hemp Seed Oil,Functional,Peer-reviewed,0.75,Moderate
+Heptapeptide-15 Palmitate,Active,,,Moderate
+Hexapeptide-11,Active,Peer-reviewed,0.7,Moderate
+Hexapeptide-9,Active,Moderate,0.75,Moderate
+Hibiscus Fruit Extract,Active,,,Moderate
+High Molecular Weight HA,Active,Peer-reviewed,0.65,Moderate
+Histidine,Active,Peer-reviewed,0.65,Moderate
+Homosalate,Active,Regulatory,0.7,Moderate
+Horse Chestnut,Active,,,Moderate
+Humectants,Active,,,Moderate
+Hydrogenated Lecithin,Functional,Peer-reviewed,0.85,Moderate
+Hydrogenated Polyisobutene,Functional,Regulatory,0.6,Moderate
+Hydrogenated Vegetable Oil,Functional,Regulatory,0.6,Moderate
+Hydrolyzed Collagen,Functional,Peer-reviewed,0.4,Moderate
+Hydrolyzed Elastin,Functional,Peer-reviewed,0.4,Moderate
+Hydrolyzed F-Fucoidan,Active,,,Moderate
+Hydrolyzed Keratin,Functional,Peer-reviewed,0.45,Moderate
+Hydrolyzed Oat Protein,Functional,Peer-reviewed,0.55,Moderate
+Hydrolyzed Pumpkin Seedcake,Active,,,Moderate
+Hydrolyzed Rice Protein,Functional,Peer-reviewed,0.45,Moderate
+Hydrolyzed Soy Protein,Functional,Peer-reviewed,0.45,Moderate
+Hydrolyzed Wheat Protein,Functional,Peer-reviewed,0.45,Moderate
+Hydroxyacetophenone,Functional,Regulatory,0.35,Moderate
+Hydroxyethylcellulose,Functional,Regulatory,0.15,Moderate
+Hydroxypropyl Chitosan,Functional,Peer-reviewed,0.55,Moderate
+Hydroxypropyl Cyclodextrin,Functional,Peer-reviewed,0.35,Moderate
+Hydroxypropyl Starch Phosphate,Functional,Regulatory,0.25,Moderate
+Hydroxystearic Acid,Functional,Regulatory,0.3,Moderate
+Indian Gooseberry,Active,,,Moderate
+Inulin,Active,Peer-reviewed,0.6,Moderate
+Iron Oxides,Active,Moderate,0.85,Moderate
+Isoamyl Laurate,Functional,Regulatory,0.6,Moderate
+Isododecane,Functional,Regulatory,0.4,Moderate
+Isohexadecane,Functional,Regulatory,0.35,Moderate
+Isoleucine,Active,Peer-reviewed,0.6,Moderate
+Isopropyl Alcohol,Functional,Regulatory,0.2,Moderate
+Isopropyl Myristate,Functional,Peer-reviewed,0.4,Moderate
+Isostearyl Isostearate,Functional,Peer-reviewed,0.55,Moderate
+Jeju Green Tea Water,Active,,,Moderate
+Jojoba Beads,Active,,,Moderate
+Jojoba Oil,Functional,Peer-reviewed,0.7,Moderate
+Kola Seed Extract,Active,,,Moderate
+Konjac Glucomannan,Functional,Peer-reviewed,0.6,Moderate
+Kukui Nut Oil,Functional,Peer-reviewed,0.7,Moderate
+L-Carnitine,Active,,,Moderate
+Lactobacillus Extract Filtrate,Active,,,Moderate
+Lactobacillus Ferment,Active,,,Moderate
+Lactococcus Ferment Lysate,Active,,,Moderate
+Lactoperoxidase,Active,Peer-reviewed,0.7,Moderate
+Lamellar Emulsion Base,Functional,Peer-reviewed,0.8,Moderate
+Laminaria Ochroleuca (Kelp) Extract,Active,,,Moderate
+Lauryl Glucoside,Functional,Peer-reviewed,0.7,Moderate
+Lavandula Angustifolia Oil,Functional,Literature,0.2,Moderate
+Lecithin,Active,,,Moderate
+Leucine,Active,Peer-reviewed,0.6,Moderate
+Leuconostoc/Radish Root Ferment Filtrate,Functional,Peer-reviewed,0.3,Moderate
+Licochalcone A,Active,,,Moderate
+Licorice Extract,Active,,,Moderate
+Licorice Root,Active,4 (Good),,Moderate
+Lily Extract,Active,,,Moderate
+Limonene,Functional,Regulatory,0.05,Moderate
+Linalool,Functional,Regulatory,0.05,Moderate
+Linolenic Acid,Active,,,Moderate
+Lipase,Active,Peer-reviewed,0.65,Moderate
+Low Molecular Weight HA,Active,Peer-reviewed,0.7,Moderate
+Luffa Cylindrica Extract,Active,,,Moderate
+Lysine,Active,,,Moderate
+Macadamia Seed Oil,Functional,Peer-reviewed,0.65,Moderate
+Macrocystis Pyrifera (Kelp) Extract,Active,,,Moderate
+Magnesium PCA,Functional,Peer-reviewed,0.55,Moderate
+Magnesium Sulfate,Active,,,Moderate
+Malic Acid,Active,Peer-reviewed,0.65,Moderate
+Mangifera Ind.,Emollient,4 (Good),,Moderate
+Mango Seed Butter,Active,,,Moderate
+Marine Collagen,Functional,Peer-reviewed,0.4,Moderate
+Marine Extract,Active,,,Moderate
+Marshmallow Root,Active,,,Moderate
+Marula Oil,Functional,Peer-reviewed,0.65,Moderate
+Maslinic Acid,Active,Peer-reviewed,0.7,Moderate
+Matrixyl 3000,Active,4 (Good),,Moderate
+Meadowfoam Seed Oil,Functional,Peer-reviewed,0.7,Moderate
+Melicica™,Active,4 (Good),,Moderate
+Menthol,Active,Regulatory,0.2,Moderate
+Methionine,Active,Peer-reviewed,0.6,Moderate
+Methylene Bis-Benzotriazolyl Tetramethylbutylphenol,Active,Regulatory,1.0,Moderate
+Mica,Functional,Regulatory,0.2,Moderate
+Microcrystalline Wax,Functional,Regulatory,0.7,Moderate
+Milk Thistle Extract,Active,,,Moderate
+Mineral Oil,Functional,Peer-reviewed,0.9,Moderate
+Mineral UV Filters,Active,,,Moderate
+Moringa Seed Extract,Active,,,Moderate
+Mulberry Extract,Active,Moderate,0.75,Moderate
+Mushroom Extract,Active,,,Moderate
+Myristol Hexapeptide,Active,,,Moderate
+Myristol Pentapeptide,Active,,,Moderate
+Myristoyl Nonapeptide,Active,,,Moderate
+Naringenin Chalcone,Active,,,Moderate
+Natural Moisturising Factors,Active,,,Moderate
+Neoglucosamine,Active,,,Moderate
+Neopentyl Glycol Diheptanoate,Functional,Regulatory,0.6,Moderate
+Neurophroline,Active,,,Moderate
+Nordihydroguaiaretic Acid,Active,Peer-reviewed,0.6,Moderate
+Oat Extract,Active,,,Moderate
+Octinoxate,Active,,,Moderate
+Octisalate,Active,Regulatory,0.8,Moderate
+Octocrylene,Active,Regulatory,0.9,Moderate
+Oleic Acid,Functional,Peer-reviewed,0.5,Moderate
+OleoShine Green,Functional,4 (Good),,Moderate
+Oligopeptide,Active,,,Moderate
+Oligopeptide-34,Active,Moderate,0.8,Moderate
+Oligopeptide-51,Active,Moderate,0.8,Moderate
+Ozokerite,Functional,Regulatory,0.65,Moderate
+PEG-100 Stearate,Functional,Regulatory,0.4,Moderate
+PEG-40 Hydrogenated Castor Oil,Functional,Regulatory,0.25,Moderate
+PEG-6 Caprylic/Capric Glycerides,Functional,Regulatory,0.3,Moderate
+PEG-7 Glyceryl Cocoate,Functional,Regulatory,0.5,Moderate
+PRO-LONGEVIA®,Active,4 (Good),,Moderate
+Padina Pavonica Thallus Extract,Active,,,Moderate
+Palmitic Acid,Functional,Peer-reviewed,0.55,Moderate
+Palmitoyl  Tripeptide-1,Active,,,Moderate
+Palmitoyl Decapeptide,Active,,,Moderate
+Palmitoyl Glycine,Active,,,Moderate
+Palmitoyl Heptapeptide,Active,,,Moderate
+Palmitoyl Nonapeptide,Active,,,Moderate
+Palmitoyl Oligopeptide,Active,,,Moderate
+Palmitoyl Tetrapeptide,Active,,,Moderate
+Palmitoyl Tripeptide,Active,,,Moderate
+Papain,Active,Peer-reviewed,0.7,Moderate
+Parachlorella Beijerinckii Exopolysaccharides,Active,,,Moderate
+Pelargonium Graveolens Oil,Functional,Literature,0.2,Moderate
+Pentapeptide,Active,,,Moderate
+Pentapeptide-18,Active,Peer-reviewed,0.7,Moderate
+Pentylene Glycol,Functional,Regulatory,0.45,Moderate
+Perfluorodecalin,Active,,,Moderate
+Phenoxyethanol,Functional,Regulatory,0.2,Moderate
+Phenylalanine,Active,Peer-reviewed,0.6,Moderate
+Phospholipids,Active,,,Moderate
+Phytic Acid,Active,,,Moderate
+PhytoCellTec™,Active,4 (Good),,Moderate
+Phytosphingos.,Barrier,4 (Good),,Moderate
+Plankton Extract,Active,,,Moderate
+Polyacrylate Crosspolymer-6,Functional,Regulatory,0.4,Moderate
+Polyacrylate-13,Functional,Regulatory,0.2,Moderate
+Polyglutamic Ac.,Humectant,4 (Good),,Moderate
+Polyglutamic Acid,Functional,Peer-reviewed,0.65,Moderate
+Polyglyceryl-10 Laurate,Functional,Regulatory,0.35,Moderate
+Polyglyceryl-6 Caprylate,Functional,Regulatory,0.35,Moderate
+Polyhydroxy Acids,Active,,,Moderate
+Polyhydroxybutyrate,Functional,Peer-reviewed,0.45,Moderate
+Polyisobutene,Functional,Regulatory,0.6,Moderate
+Polyporus Umbellatus (Mushroom) Extract,Active,,,Moderate
+Polyquaternium-51,Functional,Peer-reviewed,0.8,Moderate
+Polysorbate 20,Functional,Regulatory,0.3,Moderate
+Polysorbate 80,Functional,Regulatory,0.3,Moderate
+Polyurethane-35,Functional,Regulatory,0.35,Moderate
+Pomegranate Ex,Active,4 (Good),,Moderate
+Porphyridium Cruentum Extract,Active,,,Moderate
+Potassium Azeloyl Diglycinate,Active,,,Moderate
+Potassium Benzoate,Functional,Regulatory,0.25,Moderate
+Potassium Hydroxide,Functional,Regulatory,0.05,Moderate
+Potassium Sorbate,Functional,Regulatory,0.25,Moderate
+Prebiotics,Active,,,Moderate
+Prickly Pear Extract,Active,,,Moderate
+Probiotics,Active,,,Moderate
+Proline,Active,Peer-reviewed,0.7,Moderate
+Propanediol,Functional,Regulatory,0.45,Moderate
+Propylene Glycol,Functional,Peer-reviewed,0.4,Moderate
+Pseudoalteromonas Exopolysaccharides,Active,,,Moderate
+Pullulan,Functional,Peer-reviewed,0.4,Moderate
+Pullulan Crosspolymer,Functional,Peer-reviewed,0.45,Moderate
+Pullulan Gum,Functional,Peer-reviewed,0.45,Moderate
+Pycnogenol,Active,Moderate,0.7,Moderate
+Red Algae,Active,,,Moderate
+Retinyl Acetate,Active,Moderate,0.6,Moderate
+Retinyl Palmitate,Active,Peer-reviewed,0.6,Moderate
+Retinyl Propionate,Active,,,Moderate
+Rhamnose,Active,,,Moderate
+Rice Bran Oil,Functional,Peer-reviewed,0.65,Moderate
+Rosehip Oil,Active,4 (Good),,Moderate
+Rosehip Seed Oil,Functional,Peer-reviewed,0.75,Moderate
+Rosemary Leaf Extract,Active,,,Moderate
+Rubus Idaeus Leaf Extract,Active,Peer-reviewed,0.7,Moderate
+Rutin,Active,Peer-reviewed,0.7,Moderate
+S3D® Reverso,Active,4 (Good),,Moderate
+Saccharomyces Cerevisiae (Yeast) Extract,Active,,,Moderate
+Sacred Lotus Flower Extract,Active,,,Moderate
+Safflower Oil,Functional,Peer-reviewed,0.7,Moderate
+Safflower Seed Oil,Active,,,Moderate
+Saskatoon Berry,Active,,,Moderate
+Sclerotium Gum,Functional,Regulatory,0.45,Moderate
+Sea Buckthorn Oil,Functional,Peer-reviewed,0.8,Moderate
+Sea Buckthorn Water,Active,,,Moderate
+Senolytic Pep,Active,4 (Good),,Moderate
+Serine,Active,Peer-reviewed,0.6,Moderate
+Sesame Seed Oil,Active,,,Moderate
+Sh-Oligopeptide,Active,,,Moderate
+Shea Butter,Functional,Peer-reviewed,0.6,Moderate
+Shea Olein,Functional,Peer-reviewed,0.6,Moderate
+Silica,Functional,Regulatory,0.4,Moderate
+Silk Amino Acids,Functional,Peer-reviewed,0.45,Moderate
+Silk Protein,Active,,,Moderate
+Silver Citrate,Active,Peer-reviewed,0.7,Moderate
+Sinapic Acid,Active,Peer-reviewed,0.7,Moderate
+Snow Mushroom Extract,Active,,,Moderate
+Sodium Alginate,Functional,Regulatory,0.4,Moderate
+Sodium Anisate,Functional,Regulatory,0.3,Moderate
+Sodium Benzoate,Functional,Regulatory,0.25,Moderate
+Sodium Chloride,Functional,Regulatory,0.05,Moderate
+Sodium Citrate,Functional,Regulatory,0.2,Moderate
+Sodium Cocoyl Alaninate,Functional,Peer-reviewed,0.75,Moderate
+Sodium Cocoyl Glutamate,Functional,Peer-reviewed,0.8,Moderate
+Sodium Cocoyl Glycinate,Functional,Peer-reviewed,0.8,Moderate
+Sodium Cocoyl Isethionate,Functional,Peer-reviewed,0.75,Moderate
+Sodium Dehydroacetate,Functional,Regulatory,0.3,Moderate
+Sodium Hydroxide,Functional,Regulatory,0.05,Moderate
+Sodium Lactate,Functional,Peer-reviewed,0.6,Moderate
+Sodium Laureth Sulfate,Functional,Peer-reviewed,0.5,Moderate
+Sodium Lauroamphoacetate,Functional,Peer-reviewed,0.75,Moderate
+Sodium Lauroyl Glutamate,Functional,Peer-reviewed,0.8,Moderate
+Sodium Lauroyl Sarcosinate,Functional,Peer-reviewed,0.7,Moderate
+Sodium Lauryl Sulfate,Functional,Peer-reviewed,0.45,Moderate
+Sodium Levulinate,Functional,Regulatory,0.3,Moderate
+Sodium PCA,Functional,Peer-reviewed,0.6,Moderate
+Sodium PCA Lactate,Functional,Peer-reviewed,0.6,Moderate
+Sodium Phytate,Functional,Peer-reviewed,0.35,Moderate
+Sodium Polyacrylate,Functional,Regulatory,0.35,Moderate
+Sodium Polyglutamate,Active,Peer-reviewed,0.7,Moderate
+Sorbitan Olivate,Functional,Peer-reviewed,0.7,Moderate
+Spent Grain Wax,Active,,,Moderate
+Squalane,Functional,Peer-reviewed,0.7,Moderate
+Squalene,Functional,Peer-reviewed,0.6,Moderate
+Stearic Acid,Functional,Peer-reviewed,0.55,Moderate
+Stearyl Alcohol,Functional,Peer-reviewed,0.55,Moderate
+Subtilisin,Active,Peer-reviewed,0.7,Moderate
+Succinic Acid,Active,Peer-reviewed,0.7,Moderate
+Sugar Cane Extract,Active,,,Moderate
+Sulfur,Active,,,Moderate
+Sunflower Oil,Active,,,Moderate
+Sunflower Seed Oil,Functional,Peer-reviewed,0.75,Moderate
+Sweet Almond Oil,Functional,Peer-reviewed,0.6,Moderate
+Symsitive,Active,,,Moderate
+Syringic Acid,Active,Peer-reviewed,0.7,Moderate
+Tamanu Oil,Functional,Peer-reviewed,0.75,Moderate
+Tartaric Acid,Active,Peer-reviewed,0.6,Moderate
+Tasmanian Pepperberry Extract,Active,,,Moderate
+Taurine,Active,Peer-reviewed,0.6,Moderate
+Tea Tree Oil,Active,,,Moderate
+Teprenone,Active,,,Moderate
+Tetrahexyldecyl Ascorbate,Active,,,Moderate
+Tetrapeptide-21,Active,Moderate,0.75,Moderate
+Thiotic Acid,Antioxidant,4 (Good),,Moderate
+Threonine,Active,,,Moderate
+Tocopheryl Acetate,Functional,Peer-reviewed,0.6,Moderate
+Tomato Stem Cells,Active,,,Moderate
+Trehalose,Functional,Peer-reviewed,0.6,Moderate
+Tremella Fuciformis Polysaccharide,Active,Peer-reviewed,0.65,Moderate
+Triazine Diethyl Butamidotriazone,Active,,,Moderate
+Triethanolamine,Functional,Regulatory,0.1,Moderate
+Tripeptide-10 Citrulline,Active,Moderate,0.7,Moderate
+Tripleurospermum Maritimum Extract,Active,,,Moderate
+Trisodium EDTA,Functional,Regulatory,0.3,Moderate
+Tromethamine,Functional,Regulatory,0.2,Moderate
+Turmeric Root Extract,Active,,,Moderate
+Tyrosine,Active,Peer-reviewed,0.65,Moderate
+VP/VA Copolymer,Functional,Regulatory,0.25,Moderate
+Valine,Active,Peer-reviewed,0.6,Moderate
+Vanillic Acid,Active,Peer-reviewed,0.65,Moderate
+Vibrio Alginolyticus Ferment Filtrate,Active,,,Moderate
+Vitamin A,Active,,,Moderate
+Vitamin B5,Active,,,Moderate
+Vitamin C,Active,,,Moderate
+Vitamin E,Active,,,Moderate
+Vitamin K1,Active,,,Moderate
+Water,Filler,Regulatory,0.1,Moderate
+White Tea,Active,,,Moderate
+Wild Cherry Extract,Active,,,Moderate
+Willow Bark Extract,Active,,,Moderate
+Willow Herb Extract,Active,,,Moderate
+Xanthan Gum,Functional,Regulatory,0.15,Moderate
+Yeast Amino Acids,Active,,,Moderate
+Yerba Mate Extract,Active,,,Moderate
+Zinc,Active,,,Moderate
+Zinc PCA,Active,4 (Good),,Moderate
+Zinc Sulfate,Active,,,Moderate
+,Active,,,Moderate
+3-O-Ethyl Ascorbic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+4-Methoxysalicylic Acid Potassium Salt,Active,Strong,0.85,Strong Clinical
+Acetyl Hexapeptide-8,Active,Peer-reviewed,0.75,Strong Clinical
+Acetyl Octapeptide-3,Active,Peer-reviewed,0.75,Strong Clinical
+Adapalene,Active,5 (High),,Strong Clinical
+Adenosine,Active,Peer-reviewed,0.8,Strong Clinical
+Alpha Arbutin,Active,Peer-reviewed,0.75,Strong Clinical
+Alpha-Lipoic Acid,Active,Peer-reviewed,0.75,Strong Clinical
+Alteromonas Ferment Extract,Active,Peer-reviewed,0.8,Strong Clinical
+Aluminum Chlor,Active,5 (High),,Strong Clinical
+Apigenin,Active,Peer-reviewed,0.75,Strong Clinical
+Arctostaphylos Uva-Ursi Leaf Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Artemisia Capillaris Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Ascorbic Acid,Active,,,Strong Clinical
+Ascorbyl Tetraisopalmitate,Active,Peer-reviewed,0.8,Strong Clinical
+Asiatic Acid,Active,Peer-reviewed,0.85,Strong Clinical
+Asiaticoside,Active,Peer-reviewed,0.8,Strong Clinical
+Astaxanthin,Active,Peer-reviewed,0.9,Strong Clinical
+Avobenzone,Active,5 (High),,Strong Clinical
+Azelaic Acid,Active,5 (High),,Strong Clinical
+Azelaic Acid Derivative,Active,Moderate,0.75,Strong Clinical
+Azelaic Acid Liposome,Active,Moderate,0.85,Strong Clinical
+Azelaic Acid Potassium Salt,Active,Peer-reviewed,0.7,Strong Clinical
+Azelaoyl Diglycinate,Active,Peer-reviewed,0.75,Strong Clinical
+Baicalein,Active,Peer-reviewed,0.8,Strong Clinical
+Baicalin,Active,Peer-reviewed,0.75,Strong Clinical
+Bakuchiol Analog (Babchi Synth),Active,Peer-reviewed,0.8,Strong Clinical
+Bemotrizinol,Active,5 (High),,Strong Clinical
+Benzoyl Perox,Active,5 (High),,Strong Clinical
+Beta-Glucan,Active,Peer-reviewed,0.8,Strong Clinical
+Beta-Glucan Oligosaccharide,Active,Peer-reviewed,0.85,Strong Clinical
+Beta-Sitosterol,Active,Peer-reviewed,0.8,Strong Clinical
+Bifida Ferment Lysate,Active,Peer-reviewed,0.85,Strong Clinical
+Bisabolol,Active,Peer-reviewed,0.8,Strong Clinical
+Calendula Officinalis Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Camellia Sinensis Leaf Extract,Active,Peer-reviewed,0.85,Strong Clinical
+Campesterol,Active,Peer-reviewed,0.75,Strong Clinical
+Capryloyl Salicylic Acid,Active,Peer-reviewed,0.85,Strong Clinical
+Carnosine,Active,Peer-reviewed,0.8,Strong Clinical
+Catalase,Active,Peer-reviewed,0.8,Strong Clinical
+Centella Asiatica,Active,4 (Good),,Strong Clinical
+Centella Asiatica Extract,Active,Peer-reviewed,0.8,Strong Clinical
+Centella Asiatica Leaf Water,Functional,Peer-reviewed,0.4,Strong Clinical
+Ceramide AP,Functional,Peer-reviewed,0.85,Strong Clinical
+Ceramide EOP,Functional,Peer-reviewed,0.9,Strong Clinical
+Ceramide EOS,Active,Strong,0.95,Strong Clinical
+Ceramide NP,Barrier,5 (High),,Strong Clinical
+Ceramide NS,Functional,Peer-reviewed,0.85,Strong Clinical
+Ceramides,Active,,,Strong Clinical
+Chamomilla Recutita Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Chlorella Vulgaris Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Cocamidopropyl,Functional,5 (High),,Strong Clinical
+Coenzyme Q10,Active,Peer-reviewed,0.8,Strong Clinical
+Colloidal Oatmeal,Active,Peer-reviewed,0.85,Strong Clinical
+Copper Tripeptide-1,Active,Peer-reviewed,0.9,Strong Clinical
+Crosslinked Hyaluronic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Cysteamine HCl,Active,Peer-reviewed,0.9,Strong Clinical
+DNA Repair Enzyme,Active,Peer-reviewed,0.9,Strong Clinical
+Dipotassium Glycyrrhizate,Active,Peer-reviewed,0.75,Strong Clinical
+Dunaliella Salina Extract,Active,Peer-reviewed,0.8,Strong Clinical
+EGCG,Active,Peer-reviewed,0.8,Strong Clinical
+Ectoin,Active,Peer-reviewed,0.8,Strong Clinical
+Ellagic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Encapsulated Retinol,Active,Peer-reviewed,0.9,Strong Clinical
+Encapsulated Salicylic Acid,Active,Peer-reviewed,0.85,Strong Clinical
+Endonuclease,Active,Peer-reviewed,0.85,Strong Clinical
+Epidermal Lipid Complex,Active,Peer-reviewed,0.95,Strong Clinical
+Ergothioneine,Active,Peer-reviewed,0.85,Strong Clinical
+Ethyl Ascorbic Acid,Active,,,Strong Clinical
+Ethylhexyl Methoxycinnamate,Active,Strong,0.8,Strong Clinical
+Ethylhexylglyc.,Functional,5 (High),,Strong Clinical
+Ethylhexylglycerin,Functional,Regulatory,0.3,Strong Clinical
+Ethylhexylglycerin Carbonate,Functional,Regulatory,0.3,Strong Clinical
+Exosome-like Vesicles,Active,Peer-reviewed,0.9,Strong Clinical
+Fermented Ceramide NP,Active,Peer-reviewed,0.9,Strong Clinical
+Fermented Hyaluronic Acid,Active,Peer-reviewed,0.75,Strong Clinical
+Ferulic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Ferulic Acid Ethyl Ester,Active,Peer-reviewed,0.75,Strong Clinical
+Fucose-Rich Polysaccharide Complex,Active,Peer-reviewed,0.8,Strong Clinical
+Galactomyces Ferment Filtrate,Active,Peer-reviewed,0.8,Strong Clinical
+Gluconolactone,Active,Peer-reviewed,0.8,Strong Clinical
+Glycerin,Functional,Peer-reviewed,0.65,Strong Clinical
+Glycolic Acid,Active,5 (High),,Strong Clinical
+Glycyrrhiza Glabra Root Extract,Active,Peer-reviewed,0.8,Strong Clinical
+Glycyrrhiza Inflata Root Extract,Active,Peer-reviewed,0.85,Strong Clinical
+Granactive Retinoid,Active,Peer-reviewed,0.85,Strong Clinical
+Haematococcus Pluvialis Extract,Active,Peer-reviewed,0.9,Strong Clinical
+Hesperidin Methyl Chalcone,Active,Peer-reviewed,0.75,Strong Clinical
+Hexylresorcinol,Active,Peer-reviewed,0.8,Strong Clinical
+Hyaluronic Acid,Humectant,5 (High),,Strong Clinical
+Hydrolyzed Hyaluronic Acid,Active,Peer-reviewed,0.7,Strong Clinical
+Hydroquinone,Active,5 (High),,Strong Clinical
+Hydroxyectoin,Active,Peer-reviewed,0.9,Strong Clinical
+Hydroxypinacolone Retinoate,Active,Peer-reviewed,0.85,Strong Clinical
+Hydroxypinacolone Retinoate Complex,Active,Strong,0.9,Strong Clinical
+Hydroxypropyltrimonium Hyaluronate,Active,Peer-reviewed,0.75,Strong Clinical
+Idebenone,Active,Peer-reviewed,0.85,Strong Clinical
+Kojic Acid,Active,Peer-reviewed,0.7,Strong Clinical
+L-Ascorbic Acid,Active,5 (High),,Strong Clinical
+Lactic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Lactobacillus Ferment Lysate,Active,Peer-reviewed,0.8,Strong Clinical
+Lactobionic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Lactoferrin,Active,Peer-reviewed,0.75,Strong Clinical
+Linoleic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Lipochroman-6,Active,Peer-reviewed,0.85,Strong Clinical
+Luceane,Active,5 (High),,Strong Clinical
+Lutein,Active,Peer-reviewed,0.75,Strong Clinical
+Madecassic Acid,Active,Peer-reviewed,0.85,Strong Clinical
+Madecassoside,Active,Peer-reviewed,0.85,Strong Clinical
+Madecassoside Asiatica Complex,Active,Strong,0.8,Strong Clinical
+Magnesium Ascorbyl Phosphate,Active,Peer-reviewed,0.75,Strong Clinical
+Magnesium Ascorbyl Phosphate Phosphate,Active,Peer-reviewed,0.75,Strong Clinical
+Mandelic Acid,Active,Peer-reviewed,0.75,Strong Clinical
+Marine Bioretinol Complex,Active,Emerging peer-reviewed,0.7,Strong Clinical
+Methylparaben,Safety,5 (High),,Strong Clinical
+Morus Alba Root Extract,Active,Peer-reviewed,0.8,Strong Clinical
+N-Acetyl Glucosamine,Active,Peer-reviewed,0.8,Strong Clinical
+Niacinamide,Active,5 (High),,Strong Clinical
+Niacinamide Ascorbate,Active,Peer-reviewed,0.75,Strong Clinical
+Niacinamide Chloride,Active,Peer-reviewed,0.7,Strong Clinical
+Niacinamide Ferulate,Active,Peer-reviewed,0.8,Strong Clinical
+Niacinamide Microcapsules,Active,Peer-reviewed,0.8,Strong Clinical
+Niacinamide PCA,Active,Peer-reviewed,0.7,Strong Clinical
+Niacinamide Polydextrose,Active,Peer-reviewed,0.7,Strong Clinical
+Niacinamide Salicylate,Active,Peer-reviewed,0.75,Strong Clinical
+Oleanolic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Oligopeptide-1,Active,Peer-reviewed,0.9,Strong Clinical
+Oligopeptide-2,Active,Peer-reviewed,0.85,Strong Clinical
+Oligopeptide-20,Active,Peer-reviewed,0.85,Strong Clinical
+PDRN,Active,Peer-reviewed,0.9,Strong Clinical
+Palmitoyl Dipeptide-7,Active,Peer-reviewed,0.75,Strong Clinical
+Palmitoyl Pentapeptide,Active,,,Strong Clinical
+Palmitoyl Pentapeptide-4,Active,Peer-reviewed,0.85,Strong Clinical
+Palmitoyl Tetrapeptide-7,Active,Peer-reviewed,0.8,Strong Clinical
+Palmitoyl Tripeptide-1,Active,Peer-reviewed,0.8,Strong Clinical
+Panthenol,Humectant,5 (High),,Strong Clinical
+Pea Peptide,Active,Peer-reviewed,0.8,Strong Clinical
+Petrolatum,Functional,Peer-reviewed,0.9,Strong Clinical
+Phenylethyl Resorcinol,Active,Peer-reviewed,0.85,Strong Clinical
+Photolyase,Active,Peer-reviewed,0.9,Strong Clinical
+Phytosphingosine,Active,Peer-reviewed,0.9,Strong Clinical
+Phytosterols,Active,Peer-reviewed,0.85,Strong Clinical
+Pickmulse™,Functional,5 (High),,Strong Clinical
+Polydeoxyribonucleotide Sodium,Active,Peer-reviewed,0.9,Strong Clinical
+Polyhydroxy Acid Blend,Active,Peer-reviewed,0.8,Strong Clinical
+Polypodium Leucotomos Extract,Active,Peer-reviewed,0.8,Strong Clinical
+Postbiotic Lactobacillus Metabolite,Active,Peer-reviewed,0.75,Strong Clinical
+Postbiotic Peptide Complex,Active,Peer-reviewed,0.8,Strong Clinical
+Pseudoalteromonas Ferment Extract,Active,Peer-reviewed,0.85,Strong Clinical
+Punica Granatum Extract,Active,Peer-reviewed,0.8,Strong Clinical
+Pyruvic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Quercetin,Active,Peer-reviewed,0.8,Strong Clinical
+Resveratrol,Active,Peer-reviewed,0.75,Strong Clinical
+Retinal,Active,Peer-reviewed,0.95,Strong Clinical
+Retinaldehyde,Active,4 (Good),,Strong Clinical
+Retinol,Active,5 (High),,Strong Clinical
+Retinyl Retinoate,Active,Peer-reviewed,0.95,Strong Clinical
+Retinyl Retinoate Encapsulated,Active,Peer-reviewed,0.9,Strong Clinical
+Rosemary Ext,Active,5 (High),,Strong Clinical
+Rosmarinic Acid,Active,Peer-reviewed,0.8,Strong Clinical
+Rosmarinus Officinalis Leaf Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Saccharide Isom.,Humectant,5 (High),,Strong Clinical
+Saccharide Isomerate,Active,Peer-reviewed,0.75,Strong Clinical
+Saccharomyces Ferment Filtrate,Active,Peer-reviewed,0.75,Strong Clinical
+Salicylic Acid,Active,5 (High),,Strong Clinical
+Salix Alba Bark Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Salmon DNA Fragment,Active,Peer-reviewed,0.85,Strong Clinical
+Scutellaria Baicalensis Root Extract,Active,Peer-reviewed,0.8,Strong Clinical
+Sh-Oligopeptide-1,Active,Peer-reviewed,0.9,Strong Clinical
+Sh-Polypeptide-11,Active,Peer-reviewed,0.85,Strong Clinical
+Sodium Acetylated Hyaluronate,Active,Peer-reviewed,0.8,Strong Clinical
+Sodium Ascorbyl Phosphate,Active,Peer-reviewed,0.8,Strong Clinical
+Sodium Ascorbyl Phosphate Chloride,Active,Peer-reviewed,0.75,Strong Clinical
+Sodium Carboxymethyl Beta-Glucan,Active,Peer-reviewed,0.8,Strong Clinical
+Sodium DNA,Active,Peer-reviewed,0.8,Strong Clinical
+Sodium Hyaluronate Crosspolymer,Active,Peer-reviewed,0.75,Strong Clinical
+Sodium Laureth,Functional,5 (High),,Strong Clinical
+Sodium Retinoyl Hyaluronate,Active,Peer-reviewed,0.85,Strong Clinical
+Spirulina Platensis Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Stem Cell Conditioned Media,Active,Peer-reviewed,0.75,Strong Clinical
+Stigmasterol,Active,Peer-reviewed,0.75,Strong Clinical
+Superoxide Dismutase,Active,Peer-reviewed,0.85,Strong Clinical
+Thiamidol,Active,Peer-reviewed,0.9,Strong Clinical
+Titanium Diox,Active,5 (High),,Strong Clinical
+Titanium Dioxide,Active,Peer-reviewed,1.0,Strong Clinical
+Tocopherol,Active,Peer-reviewed,0.65,Strong Clinical
+Tranexamic Acid,Active,Peer-reviewed,0.85,Strong Clinical
+Tranexamic Acid Cetyl Ester,Active,Peer-reviewed,0.75,Strong Clinical
+Tranexamic Acid Cetyl Phosphate,Active,Strong,0.9,Strong Clinical
+Tranexamic Acid Liposome,Active,Peer-reviewed,0.85,Strong Clinical
+Tranexamic Acid Polymer,Active,Limited,0.85,Strong Clinical
+Tranexamic Acid Stearate,Active,Moderate,0.85,Strong Clinical
+Trehalose Liposomes,Active,Peer-reviewed,0.75,Strong Clinical
+Tripeptide-1,Active,Peer-reviewed,0.85,Strong Clinical
+Ubiquinol,Active,Peer-reviewed,0.85,Strong Clinical
+Undecylenoyl Glycine,Active,Peer-reviewed,0.75,Strong Clinical
+Urea,Functional,Peer-reviewed,0.75,Strong Clinical
+Ursolic Acid,Active,Peer-reviewed,0.75,Strong Clinical
+Vaccinium Myrtillus Fruit Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Vitis Vinifera Fruit Extract,Active,Peer-reviewed,0.75,Strong Clinical
+Zeaxanthin,Active,Peer-reviewed,0.75,Strong Clinical
+Zinc Gluconate,Active,Peer-reviewed,0.75,Strong Clinical
+Zinc Oxide,Active,Peer-reviewed,1.0,Strong Clinical
+Zinc Salicylate,Active,Peer-reviewed,0.75,Strong Clinical

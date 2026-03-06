@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login - Skincare Calculator</title>
+<style>
+:root { --bg: #FAF7F2; --card: #FFFFFF; --accent: #BF8888; --accent-dark: #A06060; --text: #2C2420; --text-sub: #8B7E74; --border: #E8E0D8; --green: #22c55e; --red: #ef4444; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-card { background: var(--card); border-radius: 16px; padding: 48px 40px; box-shadow: 0 4px 24px rgba(44,36,32,0.08); max-width: 400px; width: 90%; text-align: center; }
+.login-card h1 { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--text); margin-bottom: 8px; }
+.login-card p { color: var(--text-sub); font-size: 0.85rem; margin-bottom: 28px; }
+.login-card input { width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 0.95rem; background: var(--bg); outline: none; transition: border-color 0.2s; }
+.login-card input:focus { border-color: var(--accent); }
+.login-card button { width: 100%; margin-top: 16px; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.login-card button:hover { background: var(--accent-dark); }
+.error { color: var(--red); font-size: 0.85rem; margin-top: 12px; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<form class="login-card" method="POST" action="/api/admin/login">
+  <h1>Admin Dashboard</h1>
+  <p>Skincare Worth Calculator</p>
+  <input type="password" name="password" placeholder="Enter admin password" autofocus required>
+  <button type="submit">Enter Admin</button>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+</form>
+</body>
+</html>
