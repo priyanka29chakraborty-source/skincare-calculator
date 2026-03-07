@@ -17,7 +17,6 @@ function App() {
   const [productName, setProductName] = useState("");
   const [brand, setBrand] = useState("");
   const [activeConcentrations, setActiveConcentrations] = useState({});
-  const [fetchAttempted, setFetchAttempted] = useState(false);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,6 +28,7 @@ function App() {
   const [altLoading, setAltLoading] = useState(false);
   const [bestPrice, setBestPrice] = useState(null);
   const [bestPriceLoading, setBestPriceLoading] = useState(false);
+  const [fetchAttempted, setFetchAttempted] = useState(false);
   const resultRef = useRef(null);
   const analyzeTimerRef = useRef(null);
 
@@ -75,7 +75,6 @@ function App() {
         product_name: pName,
         brand: brand || null,
         size_ml: parseFloat(size) || null,
-        category: category || null,
         country, currency,
         user_price: parseFloat(price) || 0,
         user_url: userUrl,
@@ -83,7 +82,7 @@ function App() {
       setBestPrice(data);
     } catch { setBestPrice(null); }
     finally { setBestPriceLoading(false); }
-  }, [productName, brand, ingredients, fetchInput, size, country, currency, price, category]);
+  }, [productName, brand, ingredients, fetchInput, size, country, currency, price]);
 
   const handleAnalyze = useCallback(async () => {
     if (!ingredients.trim()) { setError("Please enter ingredients"); return; }
@@ -118,55 +117,44 @@ function App() {
     return () => { if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current); };
   }, [ingredients, error]);
 
-  const cleanIngredients = (raw) => {
-    if (!raw) return raw;
-    const descKeywords = /\b(synthetic|natural|lab|synthesized|derived|from|benefit|willow|glucose|corn|derivative|humectant|antioxidant|preservative|thickener|emulsifier|solubiliser|brightening|loosens|holds|softens|soothes|fades|spectrum|soothing|nourishment|clearing|pores|hydrates|exfoliates|visible|bumpy|rough|swelling|photoaging|conditioning)\b/i;
-    const lines = raw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
-    const cleaned = lines.map(line => {
-      const words = line.split(/\s+/);
-      let cutAt = words.length;
-      for (let i = 1; i < words.length; i++) {
-        if (descKeywords.test(words[i])) { cutAt = i; break; }
-      }
-      return words.slice(0, cutAt).join(' ').replace(/\.+$/, '').trim();
-    }).filter(n => n.length > 1 && n.length < 60);
-    return cleaned.join(', ');
-  };
-
   const handleFetch = useCallback(async () => {
     if (!fetchInput.trim()) return;
-    setFetchLoading(true); setFetchError(""); setFetchMsg(""); setFetchAttempted(false);
+    setFetchLoading(true); setFetchError(""); setFetchMsg(""); setFetchAttempted(true);
     const isBarcode = /^\d{8,14}$/.test(fetchInput.trim());
     const isUrl = fetchInput.trim().startsWith("http");
     if (!isBarcode && !isUrl) { setFetchError("Enter a valid barcode or product URL"); setFetchLoading(false); return; }
-    setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml");
-    setProductName(""); setBrand(""); setActiveConcentrations({});
-    setResult(null); setAlternatives(null); setBestPrice(null);
+    
+    // Auto-clear fields before fetching new data
+    setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml"); setCategory("Serum");
+    setSkinType(""); setConcerns([]); setCountry("India"); setProductName(""); setBrand("");
+    setResult(null); setError(""); setAlternatives(null); setBestPrice(null); setActiveConcentrations({});
+
     try {
       const body = isBarcode ? { barcode: fetchInput.trim() } : { url: fetchInput.trim() };
       const { data } = await axios.post(`${API}/fetch-product`, body);
-      if (data.ingredients) setIngredients(cleanIngredients(data.ingredients));
-      if (data.price) setPrice(String(data.price));
-      if (data.size) { setSize(String(data.size)); if (data.unit) setSizeUnit(data.unit); }
+      if (data.ingredients && !ingredients.trim()) setIngredients(data.ingredients);
+      else if (data.ingredients && ingredients.trim()) setFetchMsg("Ingredients found but not overwritten.");
+      if (data.price && !price) setPrice(String(data.price));
+      if (data.size && !size) { setSize(String(data.size)); if (data.unit) setSizeUnit(data.unit); }
       if (data.country) setCountry(data.country);
-      if (data.brand) setBrand(data.brand);
-      if (data.product_name) setProductName(data.product_name);
+      if (data.brand && !brand) setBrand(data.brand);
+      if (data.product_name && !productName) setProductName(data.product_name);
       if (data.category) setCategory(data.category);
       if (data.active_concentrations) setActiveConcentrations(data.active_concentrations);
       if (data.message) setFetchMsg(data.message);
       else if (data.price_note) setFetchMsg(data.price_note);
       else if (data.partial) setFetchMsg("Ingredient list not found - please paste manually.");
       else if (!data.partial && data.ingredients) setFetchMsg("Product details fetched successfully!");
-      setFetchAttempted(true);
-    } catch (e) { setFetchError(e.response?.data?.error || "Failed to fetch"); setFetchAttempted(true); }
+    } catch (e) { setFetchError(e.response?.data?.error || "Failed to fetch"); }
     finally { setFetchLoading(false); }
-  }, [fetchInput]);
+  }, [fetchInput, ingredients, price, size, brand, productName]);
 
   const handleClear = () => {
     setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml"); setCategory("Serum");
     setSkinType(""); setConcerns([]); setCountry("India"); setProductName(""); setBrand("");
     setResult(null); setError(""); setFetchInput(""); setFetchError(""); setFetchMsg("");
-    setAlternatives(null); setBestPrice(null); setActiveConcentrations({}); setFetchAttempted(false);
+    setAlternatives(null); setBestPrice(null); setActiveConcentrations({});
+    setFetchAttempted(false);
   };
 
   return (
@@ -194,7 +182,8 @@ function App() {
           skinType={skinType} setSkinType={setSkinType}
           concerns={concerns} toggleConcern={toggleConcern}
           handleAnalyze={handleAnalyze} handleClear={handleClear}
-          loading={loading} error={error} fetchAttempted={fetchAttempted}
+          loading={loading} error={error}
+          fetchAttempted={fetchAttempted}
         />
 
         {result && (

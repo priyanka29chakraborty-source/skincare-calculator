@@ -62,13 +62,13 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         <div className="sc-card result-card card-2" data-testid="card-concern-fit" style={{ "--anim-delay": "0.15s" }}>
           <h2 className="card-title"><i className="fa-solid fa-bullseye"></i> Skin Concern Fit</h2>
           <p className="ampm-label" data-testid="ampm-label"><i className="fa-regular fa-clock"></i> {result.am_pm_recommendation}</p>
-          <p className="concern-fit-subtitle"><i className="fa-solid fa-ranking-star"></i> Ranked by fit score — how well this product addresses each of your concerns</p>
-          {Object.entries(result.skin_concern_fit)
-            .sort(([, a], [, b]) => (typeof b === "object" ? b.score : b) - (typeof a === "object" ? a.score : a))
-            .map(([concern, data], idx) => (
-              <ConcernCard key={concern} concern={concern} data={data} rank={idx} />
-            ))
-          }
+          {(() => {
+            const scores = Object.values(result.skin_concern_fit).map(d => d.score);
+            const maxScore = Math.max(...scores);
+            return Object.entries(result.skin_concern_fit).map(([concern, data]) => (
+              <ConcernCard key={concern} concern={concern} data={data} isBest={data.score === maxScore && scores.length > 1} />
+            ));
+          })()}
         </div>
       )}
 

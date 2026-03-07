@@ -114,6 +114,18 @@ body::before {
 .inline-row .field-select { width: 110px; flex-shrink: 0; }
 .currency-tag { padding: 12px 14px; background: var(--rose); border: 1.5px solid var(--dusty-rose-light); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--dusty-rose-dark); display: flex; align-items: center; }
 
+.field-input.fetch-empty, .field-select.fetch-empty, .field-textarea.fetch-empty {
+  border-color: var(--red);
+  background-color: #fef2f2;
+}
+.fetch-empty-label {
+  color: var(--red);
+  font-size: 10px;
+  margin-top: 2px;
+  display: block;
+  font-weight: 600;
+}
+
 /* Skin Type */
 .skin-type-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
 .skin-chip {
@@ -230,6 +242,11 @@ body::before {
 .ampm-label i { margin-right: 4px; }
 .concern-result { background: var(--cream); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; transition: box-shadow 0.2s; cursor: pointer; user-select: none; }
 .concern-result:hover { box-shadow: 0 2px 12px rgba(44,36,32,0.06); }
+.concern-result.best-fit {
+  border-color: var(--sage);
+  background: #f0fdf4;
+  box-shadow: 0 0 0 1px var(--sage);
+}
 .concern-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 6px; }
 .concern-left { display: flex; align-items: center; gap: 8px; }
 .concern-left i { color: var(--dusty-rose); font-size: 0.88rem; }
@@ -468,41 +485,3 @@ body::before {
 .bp-price { font-weight: 700; font-size: 0.95rem; color: var(--dusty-rose-dark); font-family: 'Playfair Display', serif; display: block; }
 .bp-cheapest-tag { font-size: 0.65rem; font-weight: 700; color: var(--sage); text-transform: uppercase; letter-spacing: 0.5px; }
 .bp-link-icon { color: var(--text-sub); font-size: 0.7rem; flex-shrink: 0; }
-
-/* ── FILL HINT (scraper didn't fetch field) ─────────────────────────── */
-.fill-hint {
-  display: inline-flex; align-items: center; gap: 5px;
-  margin-top: 5px; padding: 4px 10px; border-radius: 20px;
-  background: #fff7ed; border: 1px solid #fed7aa;
-  color: #c2410c; font-size: 0.74rem; font-weight: 600;
-  animation: fadeIn 0.3s ease;
-}
-.fill-hint i { font-size: 0.68rem; }
-
-/* ── CONCERN RANK BADGE ─────────────────────────────────────────────── */
-.concern-rank-badge {
-  display: inline-flex; align-items: center;
-  padding: 2px 8px; border-radius: 20px; border: 1px solid;
-  font-size: 0.68rem; font-weight: 700; margin-left: 4px;
-  text-transform: uppercase; letter-spacing: 0.4px;
-}
-.concern-best .concern-header {
-  background: linear-gradient(90deg, #f0fdf4 0%, transparent 100%);
-  border-radius: 8px;
-}
-.concern-result.concern-best {
-  border-left: 3px solid #22c55e;
-  padding-left: 10px;
-}
-.concern-fit-subtitle {
-  font-size: 0.78rem; color: var(--text-sub); margin: -4px 0 12px 0;
-  display: flex; align-items: center; gap: 6px;
-}
-
-/* ── BEST PRICE SUBTITLE ─────────────────────────────────────────────── */
-.best-price-subtitle {
-  font-size: 0.78rem; color: var(--text-sub); margin: -4px 0 14px 0;
-  display: flex; align-items: center; gap: 6px;
-}
-.best-price-row.no-link { cursor: default; }
-.best-price-row.no-link:hover { box-shadow: none; border-color: var(--border); }

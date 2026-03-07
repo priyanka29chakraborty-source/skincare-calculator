@@ -88,11 +88,13 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
                   <ul className="scored-alt-reasons">{alt.why_better.map((r, j) => <li key={j}>{r}</li>)}</ul>
                 )}
                 {alt.price && <div className="scored-alt-price">{currency} {alt.price}</div>}
-                {alt.link && !alt.link.includes('google.com') && (
+                {alt.buy_links?.length > 0 && (
                   <div className="scored-alt-links">
-                    <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link" data-testid={`scored-alt-link-${i}-0`}>
-                      <i className="fa-solid fa-store"></i> Buy on {alt.source || new URL(alt.link).hostname.replace('www.', '')} <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                    </a>
+                    {alt.buy_links.map((bl, j) => (
+                      <a key={j} href={bl.url} target="_blank" rel="noopener noreferrer" className="scored-alt-link" data-testid={`scored-alt-link-${i}-${j}`}>
+                        {bl.source} <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                      </a>
+                    ))}
                   </div>
                 )}
               </div>
@@ -105,15 +107,13 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
         <>
           <div className="alt-section-label">Found Alternatives:</div>
           <div className="alt-grid" data-testid="basic-alternatives-list">
-            {alternatives.basic_alternatives
-              .filter(alt => alt.link && !alt.link.includes('google.com'))
-              .map((alt, i) => (
+            {alternatives.basic_alternatives.map((alt, i) => (
               <a key={i} href={alt.link} target="_blank" rel="noopener noreferrer" className="alt-card" data-testid={`alt-card-${i}`}>
                 {alt.thumbnail && <img src={alt.thumbnail} alt="" className="alt-thumb" />}
                 <div className="alt-info">
                   <span className="alt-name">{alt.name}</span>
                   <span className="alt-price">{typeof alt.price === 'number' ? `${currency} ${alt.price}` : alt.price}</span>
-                  <span className="alt-source"><i className="fa-solid fa-store"></i> {alt.source} <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.6rem" }}></i></span>
+                  <span className="alt-source">{alt.source} <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.6rem" }}></i></span>
                 </div>
               </a>
             ))}

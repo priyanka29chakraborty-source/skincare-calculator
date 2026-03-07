@@ -52,22 +52,16 @@ export function BreakdownRow({ icon, label, score, max, details }) {
   );
 }
 
-export function ConcernCard({ concern, data, rank }) {
+export function ConcernCard({ concern, data, isBest }) {
   const [open, setOpen] = useState(false);
   const ic = CONCERNS_LIST.find(c => c.key === concern)?.icon || "fa-solid fa-circle";
-  const rankLabels = ["Best Match", "2nd Match", "3rd Match"];
-  const rankColors = ["#22c55e", "#eab308", "#f97316"];
   return (
-    <div className={`concern-result ${rank === 0 ? "concern-best" : ""}`} data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
+    <div className={`concern-result ${isBest ? "best-fit" : ""}`} data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
       <div className="concern-header" onClick={() => setOpen(!open)}>
         <div className="concern-left">
           <i className={ic}></i>
           <span className="concern-cname">{concern}</span>
-          {rank != null && (
-            <span className="concern-rank-badge" style={{ background: rankColors[rank] + "22", color: rankColors[rank], borderColor: rankColors[rank] }}>
-              {rankLabels[rank]}
-            </span>
-          )}
+          {isBest && <span className="bp-cheapest-tag" style={{ marginLeft: 8, color: "var(--sage)" }}>BEST MATCH</span>}
           <span className="concern-pct" style={{ color: getBarColor(data.score) }}>{data.score}%</span>
         </div>
         <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`}></i>

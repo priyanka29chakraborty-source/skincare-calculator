@@ -318,11 +318,7 @@ def _serp_shopping_search(query, country, serp_key, num=10):
             data = resp.json()
             results = []
             for item in data.get('shopping_results', [])[:num]:
-                # Prefer direct shopping site link over Google product page
-                link = item.get('link', '') or item.get('product_link', '')
-                # Skip Google product page links
-                if 'google.com' in link or not link:
-                    link = ''
+                link = item.get('product_link', '') or item.get('link', '') or item.get('serpapi_product_api', '')
                 results.append({
                     'name': item.get('title', ''),
                     'price': item.get('extracted_price', item.get('price', '')),
@@ -330,7 +326,7 @@ def _serp_shopping_search(query, country, serp_key, num=10):
                     'thumbnail': item.get('thumbnail', ''),
                     'source': item.get('source', ''),
                 })
-            return [r for r in results if r['link']]  # only return items with direct links
+            return results
     except Exception as e:
         logger.error(f"SerpAPI search failed: {e}")
     return []
@@ -374,14 +370,14 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
     sites = SITE_MAP.get(req.country, SITE_MAP.get('India', []))
     site_filter = ' OR '.join(f'site:{s}' for s in sites[:3])
 
-    # Step 1: DDG search with country-specific sites (filter out Google links)
+    # Step 1: DDG search with country-specific sites
     ddg_urls = []
     for term in search_terms[:2]:
         ddg_query = f"{term} {req.product_category} {site_filter}"
         results = _ddg_search(ddg_query, max_results=5)
         for r in results:
             url = r.get('href', '')
-            if url and url not in ddg_urls and 'google.com' not in url:
+            if url and url not in ddg_urls and 'google.com/shopping' not in url:
                 ddg_urls.append(url)
 
     # Step 2: Fetch ingredients via Firecrawl → ScrapeDo waterfall
@@ -416,8 +412,6 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
                         ac = analysis['price_analysis']['active_count']
                         if ac > 0:
                             why_better.append(f"{ac} clinically-backed active{'s' if ac != 1 else ''}")
-                        alt_link = fetch_urls[i] if 'google.com' not in fetch_urls[i] else ''
-                        alt_source = alt_link.split('/')[2].replace('www.', '') if alt_link and '/' in alt_link else ''
                         scored_alternatives.append({
                             'name': product_data.get('product_name') or fetch_urls[i].split('/')[-1].replace('-', ' ').title(),
                             'score': alt_score,
@@ -426,9 +420,9 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
                             'safety_score': alt_safety,
                             'active_count': ac,
                             'price': alt_price if alt_price else '',
-                            'link': alt_link,
+                            'link': fetch_urls[i],
                             'thumbnail': '',
-                            'source': alt_source,
+                            'source': fetch_urls[i].split('/')[2] if '/' in fetch_urls[i] else '',
                             'why_better': why_better,
                             'key_actives': [a['name'] for a in analysis.get('identified_actives', [])[:4]],
                             'has_full_analysis': True,
@@ -442,6 +436,8 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
         for term in search_terms[:2]:
             query = f"best {term} skincare"
             results = _serp_shopping_search(query, req.country, serp_key, num=8)
+            # Filter google product pages
+            results = [r for r in results if 'google.com/shopping' not in r.get('link', '')]
             basic_alternatives.extend(results)
 
         # Deduplicate
@@ -533,7 +529,6 @@ class BestPriceRequest(BaseModel):
     product_name: str
     brand: Optional[str] = None
     size_ml: Optional[float] = None
-    category: Optional[str] = None
     country: str = "India"
     currency: str = "INR"
     user_price: Optional[float] = 0
@@ -559,15 +554,28 @@ def _is_same_product(result_title, brand, product_name, size_ml):
         brand_lower = brand.lower()
         if brand_lower not in title_lower:
             return False
+    # Must match product name parts
+    if product_name:
+        p_name_lower = product_name.lower().replace(brand.lower() if brand else '', '').strip()
+        # Check if significant parts of product name are in title
+        # Pick longest word > 3 chars as a proxy for specific product type
+        words = [w for w in p_name_lower.split() if len(w) > 3]
+        match_count = sum(1 for w in words if w in title_lower)
+        if words and match_count / len(words) < 0.5:
+            return False
+
     # Check size match if provided
     if size_ml:
         size_matches = re.findall(r'(\d+\.?\d*)\s*(ml|g)', title_lower)
         if size_matches:
+            found_size = False
             for val_str, unit in size_matches:
                 val = float(val_str)
                 if abs(val - size_ml) <= 5:
-                    return True
-            return False
+                    found_size = True
+                    break
+            if not found_size:
+                return False
     return True
 
 
@@ -576,18 +584,20 @@ def _is_same_product(result_title, brand, product_name, size_ml):
 async def best_price(req: BestPriceRequest, request: Request):
     """Find cheapest price: DDG search → ScrapeDo/Firecrawl fetch → fallback SerpAPI."""
     sites = SITE_MAP.get(req.country, SITE_MAP.get('India', []))
+    # Strict site filter for direct shopping
     site_filter = ' OR '.join(f'site:{s}' for s in sites[:4])
 
-    query = req.product_name or ""
+    query = req.product_name
     if req.brand:
         query = f"{req.brand} {query}"
+    
+    # Strict size matching in query
     size_query = f"{int(req.size_ml)}ml" if req.size_ml else ""
-    category_query = req.category or ""
-
+    
     # Step 1: DDG search for exact product on country-specific sites
-    ddg_query = f"{query} {size_query} {category_query} buy {site_filter}".strip()
+    ddg_query = f"{query} {size_query} buy {site_filter}"
     ddg_results = _ddg_search(ddg_query, max_results=8)
-    ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href')]
+    ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href') and 'google.com/shopping' not in r.get('href', '')]
 
     validated = []
 
@@ -598,23 +608,14 @@ async def best_price(req: BestPriceRequest, request: Request):
         for i, pd_item in enumerate(fetched):
             if pd_item and pd_item.get('price'):
                 source_domain = ddg_urls[i].split('/')[2] if '/' in ddg_urls[i] else ''
-                # Skip Google links entirely
-                if 'google.com' in source_domain:
-                    continue
                 if source_domain in seen_sources:
                     continue
-                # Verify same product - must match brand and product name
+                
+                # Verify same product - Strict Check
                 name = pd_item.get('product_name') or ddg_results[i].get('title', '')
-                if req.brand and req.brand.lower() not in name.lower():
+                if not _is_same_product(name, req.brand, req.product_name, req.size_ml):
                     continue
-                # Also check product name keyword match
-                if req.product_name:
-                    key_words = [w for w in req.product_name.lower().split() if len(w) > 3]
-                    if key_words and not any(w in name.lower() for w in key_words[:2]):
-                        continue
-                # Must be on a known shopping site for the country
-                if not any(s in source_domain for s in sites):
-                    continue
+                    
                 seen_sources.add(source_domain)
                 validated.append({
                     'name': name,
@@ -632,6 +633,11 @@ async def best_price(req: BestPriceRequest, request: Request):
             serp_results = _serp_shopping_search(serp_query, req.country, serp_key, num=10)
             seen_sources = set()
             for item in serp_results:
+                link = item.get('link', '')
+                # Filter out google product pages
+                if 'google.com/shopping' in link or 'google.com/url' in link:
+                    continue
+                    
                 extracted_price = item.get('price')
                 if not extracted_price or not isinstance(extracted_price, (int, float)):
                     continue
@@ -645,7 +651,7 @@ async def best_price(req: BestPriceRequest, request: Request):
                 validated.append({
                     'name': title,
                     'price': extracted_price,
-                    'link': item.get('link', ''),
+                    'link': link,
                     'source': source,
                     'thumbnail': item.get('thumbnail', ''),
                 })
@@ -655,6 +661,9 @@ async def best_price(req: BestPriceRequest, request: Request):
     # Filter out eBay for India results
     if req.country and req.country.lower() == 'india':
         validated = [v for v in validated if 'ebay' not in v.get('source', '').lower()]
+        
+    # Limit to max 2 items as requested
+    validated = validated[:2]
 
     if not validated:
         return {"best_price": None, "all_prices": [], "is_user_cheapest": False, "savings": 0}
@@ -668,7 +677,7 @@ async def best_price(req: BestPriceRequest, request: Request):
             "user_url": req.user_url,
             "user_price": user_price,
             "best_price": None,
-            "all_prices": validated[:2],
+            "all_prices": validated,
             "savings": 0,
         }
     else:
@@ -676,7 +685,7 @@ async def best_price(req: BestPriceRequest, request: Request):
         return {
             "is_user_cheapest": False,
             "best_price": cheapest,
-            "all_prices": validated[:2],
+            "all_prices": validated,
             "savings": savings,
         }
 
@@ -691,7 +700,7 @@ app.add_middleware(
         "https://urancal.com",
         "https://www.urancal.com",
         "https://tool.urancal.com",
-        "https://skincare-calculator.pages.dev",
+        "https://skincare-calculator.pages.dev"
         "http://localhost:3000",
         "http://localhost:5001",
     ],
