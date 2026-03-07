@@ -83,7 +83,7 @@ function App() {
       setBestPrice(data);
     } catch { setBestPrice(null); }
     finally { setBestPriceLoading(false); }
-  }, [productName, brand, ingredients, fetchInput, size, country, currency, price]);
+  }, [productName, brand, ingredients, fetchInput, size, country, currency, price, category]);
 
   const handleAnalyze = useCallback(async () => {
     if (!ingredients.trim()) { setError("Please enter ingredients"); return; }
