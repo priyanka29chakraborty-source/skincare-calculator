@@ -5,9 +5,10 @@ export default function InputForm({
   productName, setProductName, brand, setBrand, price, setPrice,
   size, setSize, sizeUnit, setSizeUnit, category, setCategory, country, setCountry,
   ingredients, setIngredients, skinType, setSkinType, concerns, toggleConcern,
-  handleAnalyze, handleClear, loading, error,
+  handleAnalyze, handleClear, loading, error, fetchAttempted,
 }) {
   const currency = CURRENCY_MAP[country] || "INR";
+  const showHint = (val) => fetchAttempted && !val;
 
   return (
     <>
@@ -28,10 +29,12 @@ export default function InputForm({
           <div className="field-group">
             <label className="field-label">Product Name</label>
             <input className="field-input" data-testid="product-name-input" value={productName} onChange={e => setProductName(e.target.value)} placeholder="e.g. 10% Niacinamide Serum" />
+            {showHint(productName) && <span className="fill-hint">Fill this</span>}
           </div>
           <div className="field-group">
             <label className="field-label">Brand</label>
             <input className="field-input" data-testid="brand-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="e.g. Minimalist" />
+            {showHint(brand) && <span className="fill-hint">Fill this</span>}
           </div>
           <div className="field-group">
             <label className="field-label">Price</label>
@@ -39,6 +42,7 @@ export default function InputForm({
               <input className="field-input" data-testid="price-input" type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="599" min="0" />
               <div className="currency-tag">{currency}</div>
             </div>
+            {showHint(price) && <span className="fill-hint">Fill this</span>}
           </div>
           <div className="field-group">
             <label className="field-label">Size</label>
@@ -48,6 +52,7 @@ export default function InputForm({
                 {SIZE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
+            {showHint(size) && <span className="fill-hint">Fill this</span>}
           </div>
           <div className="field-group">
             <label className="field-label">Category</label>
@@ -65,6 +70,7 @@ export default function InputForm({
             <label className="field-label">Ingredients (INCI List)</label>
             <textarea className="field-textarea" data-testid="ingredients-input" value={ingredients} onChange={e => setIngredients(e.target.value)}
               placeholder="Aqua, Niacinamide, Pentylene Glycol, Zinc PCA, Sodium Hyaluronate..." />
+            {showHint(ingredients) && <span className="fill-hint"><i className="fa-solid fa-triangle-exclamation"></i> Scraper could not fetch ingredients — please paste manually</span>}
           </div>
         </div>
       </div>
