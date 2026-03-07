@@ -70,7 +70,7 @@ export default function InputForm({
             <label className="field-label">Ingredients (INCI List)</label>
             <textarea className="field-textarea" data-testid="ingredients-input" value={ingredients} onChange={e => setIngredients(e.target.value)}
               placeholder="Aqua, Niacinamide, Pentylene Glycol, Zinc PCA, Sodium Hyaluronate..." />
-            {showHint(ingredients) && <span className="fill-hint"><i className="fa-solid fa-triangle-exclamation"></i> Scraper could not fetch ingredients — please paste manually</span>}
+            {showHint(ingredients) && <span className="fill-hint"><i className="fa-solid fa-triangle-exclamation"></i>please paste manually</span>}
           </div>
         </div>
       </div>
