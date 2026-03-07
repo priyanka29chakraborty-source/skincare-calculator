@@ -37,7 +37,7 @@ function App() {
     setConcerns(prev => prev.includes(c) ? prev.filter(x => x !== c) : prev.length >= 3 ? prev : [...prev, c]);
   };
 
-  const fetchAlts = async (res) => {
+  const fetchAlts = useCallback(async (res) => {
     setAltLoading(true);
     try {
       const concernFit = res.skin_concern_fit || {};
@@ -62,9 +62,9 @@ function App() {
       setAlternatives(data);
     } catch { setAlternatives(null); }
     finally { setAltLoading(false); }
-  };
+  }, [category, country, currency, skinType, concerns, price, size]);
 
-  const fetchBestPrice = async () => {
+  const fetchBestPrice = useCallback(async () => {
     const pName = productName || brand || ingredients.substring(0, 40);
     if (!pName.trim()) return;
     setBestPriceLoading(true);
@@ -81,7 +81,7 @@ function App() {
       setBestPrice(data);
     } catch { setBestPrice(null); }
     finally { setBestPriceLoading(false); }
-  };
+  }, [productName, brand, ingredients, fetchInput, size, country, currency, price]);
 
   const handleAnalyze = useCallback(async () => {
     if (!ingredients.trim()) { setError("Please enter ingredients"); return; }
