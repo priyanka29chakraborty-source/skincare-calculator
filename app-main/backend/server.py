@@ -691,11 +691,7 @@ app.add_middleware(
         "https://urancal.com",
         "https://www.urancal.com",
         "https://tool.urancal.com",
-<<<<<<< HEAD
         "https://skincare-calculator.pages.dev",
-=======
-        "https://skincare-calculator.pages.dev"
->>>>>>> c804ce1 (app-mai)
         "http://localhost:3000",
         "http://localhost:5001",
     ],
