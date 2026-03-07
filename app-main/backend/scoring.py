@@ -11,52 +11,22 @@ from config import (
 def parse_ingredients(ingredient_list_str):
     if not ingredient_list_str:
         return []
-    
-    # Strip descriptions inside parentheses if they look like descriptions
-    # e.g. "Water (Aqua)" -> "Water", "Glycerin (Humectant)" -> "Glycerin"
-    # But keep "Polysorbate 20 (and) ..." or chemical names with parens
-    
-    # 1. Remove generic description patterns
-    cleaned_str = re.sub(r'\s*\((?:active|preservative|solvent|surfactant|emollient|humectant|fragrance|source|function|grade|unbleached|organic|natural|certified)[^)]*\)', '', ingredient_list_str, flags=re.IGNORECASE)
-    
-    # 2. Remove simple " (Common Name)" if it's just one or two words
-    # This is risky for chemical names, so be conservative. 
-    # Better strategy: clean individual items after splitting.
-
-    marker = re.search(r'(?:full\s+)?ingred\w*\s*:', cleaned_str, re.IGNORECASE)
+    marker = re.search(r'(?:full\s+)?ingred\w*\s*:', ingredient_list_str, re.IGNORECASE)
     if marker:
-        cleaned_str = cleaned_str[marker.end():]
-        
-    raw_ingredients = [x.strip() for x in cleaned_str.split(',')]
+        ingredient_list_str = ingredient_list_str[marker.end():]
+    raw_ingredients = [x.strip() for x in ingredient_list_str.split(',')]
     cleaned = []
-    
     for ing in raw_ingredients:
         ing = ing.strip().strip('.')
         if not ing:
             continue
-            
-        # Remove parentheses content if it seems to be a description
-        # e.g. "Aloe Barbadensis (Aloe Vera) Leaf Juice" -> "Aloe Barbadensis Leaf Juice"
-        # e.g. "Water (Aqua)" -> "Water"
-        
-        # Strategy: if paren content is short and looks like a synonym or description
-        ing_clean = re.sub(r'\s*\([^)]+\)', '', ing)
-        
-        # If cleaning resulted in empty string (e.g. ingredient was just "(...)"), keep original
-        if not ing_clean.strip():
-            ing_clean = ing
-            
-        ing_clean = ing_clean.strip()
-
-        if len(ing_clean) > 80:
+        if len(ing) > 80:
             continue
-        if ing_clean.count(' ') > 8:
+        if ing.count(' ') > 8:
             continue
-        if '.' in ing_clean and len(ing_clean) > 20:
+        if '.' in ing and len(ing) > 20:
             continue
-            
-        cleaned.append(ing_clean)
-        
+        cleaned.append(ing)
     return cleaned
 
 

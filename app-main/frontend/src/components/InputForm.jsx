@@ -5,13 +5,9 @@ export default function InputForm({
   productName, setProductName, brand, setBrand, price, setPrice,
   size, setSize, sizeUnit, setSizeUnit, category, setCategory, country, setCountry,
   ingredients, setIngredients, skinType, setSkinType, concerns, toggleConcern,
-  handleAnalyze, handleClear, loading, error, fetchAttempted
+  handleAnalyze, handleClear, loading, error,
 }) {
   const currency = CURRENCY_MAP[country] || "INR";
-
-  const getInputClass = (val) => `field-input ${fetchAttempted && !val ? "fetch-empty" : ""}`;
-  const getSelectClass = (val) => `field-select ${fetchAttempted && !val ? "fetch-empty" : ""}`;
-  const getTextareaClass = (val) => `field-textarea ${fetchAttempted && !val ? "fetch-empty" : ""}`;
 
   return (
     <>
@@ -31,31 +27,27 @@ export default function InputForm({
         <div className="form-grid">
           <div className="field-group">
             <label className="field-label">Product Name</label>
-            <input className={getInputClass(productName)} data-testid="product-name-input" value={productName} onChange={e => setProductName(e.target.value)} placeholder="e.g. 10% Niacinamide Serum" />
-            {fetchAttempted && !productName && <span className="fetch-empty-label">fill this</span>}
+            <input className="field-input" data-testid="product-name-input" value={productName} onChange={e => setProductName(e.target.value)} placeholder="e.g. 10% Niacinamide Serum" />
           </div>
           <div className="field-group">
             <label className="field-label">Brand</label>
-            <input className={getInputClass(brand)} data-testid="brand-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="e.g. Minimalist" />
-            {fetchAttempted && !brand && <span className="fetch-empty-label">fill this</span>}
+            <input className="field-input" data-testid="brand-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="e.g. Minimalist" />
           </div>
           <div className="field-group">
             <label className="field-label">Price</label>
             <div className="inline-row">
-              <input className={getInputClass(price)} data-testid="price-input" type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="599" min="0" />
+              <input className="field-input" data-testid="price-input" type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="599" min="0" />
               <div className="currency-tag">{currency}</div>
             </div>
-            {fetchAttempted && !price && <span className="fetch-empty-label">fill this</span>}
           </div>
           <div className="field-group">
             <label className="field-label">Size</label>
             <div className="inline-row">
-              <input className={getInputClass(size)} data-testid="size-input" type="number" value={size} onChange={e => setSize(e.target.value)} placeholder="30" min="0" />
+              <input className="field-input" data-testid="size-input" type="number" value={size} onChange={e => setSize(e.target.value)} placeholder="30" min="0" />
               <select className="field-select" data-testid="size-unit-select" value={sizeUnit} onChange={e => setSizeUnit(e.target.value)} aria-label="Size unit">
                 {SIZE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
-            {fetchAttempted && !size && <span className="fetch-empty-label">fill this</span>}
           </div>
           <div className="field-group">
             <label className="field-label">Category</label>
@@ -71,9 +63,8 @@ export default function InputForm({
           </div>
           <div className="field-group full">
             <label className="field-label">Ingredients (INCI List)</label>
-            <textarea className={getTextareaClass(ingredients)} data-testid="ingredients-input" value={ingredients} onChange={e => setIngredients(e.target.value)}
+            <textarea className="field-textarea" data-testid="ingredients-input" value={ingredients} onChange={e => setIngredients(e.target.value)}
               placeholder="Aqua, Niacinamide, Pentylene Glycol, Zinc PCA, Sodium Hyaluronate..." />
-            {fetchAttempted && !ingredients && <span className="fetch-empty-label">fill this</span>}
           </div>
         </div>
       </div>

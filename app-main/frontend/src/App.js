@@ -28,7 +28,6 @@ function App() {
   const [altLoading, setAltLoading] = useState(false);
   const [bestPrice, setBestPrice] = useState(null);
   const [bestPriceLoading, setBestPriceLoading] = useState(false);
-  const [fetchAttempted, setFetchAttempted] = useState(false);
   const resultRef = useRef(null);
   const analyzeTimerRef = useRef(null);
 
@@ -119,16 +118,10 @@ function App() {
 
   const handleFetch = useCallback(async () => {
     if (!fetchInput.trim()) return;
-    setFetchLoading(true); setFetchError(""); setFetchMsg(""); setFetchAttempted(true);
+    setFetchLoading(true); setFetchError(""); setFetchMsg("");
     const isBarcode = /^\d{8,14}$/.test(fetchInput.trim());
     const isUrl = fetchInput.trim().startsWith("http");
     if (!isBarcode && !isUrl) { setFetchError("Enter a valid barcode or product URL"); setFetchLoading(false); return; }
-    
-    // Auto-clear fields before fetching new data
-    setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml"); setCategory("Serum");
-    setSkinType(""); setConcerns([]); setCountry("India"); setProductName(""); setBrand("");
-    setResult(null); setError(""); setAlternatives(null); setBestPrice(null); setActiveConcentrations({});
-
     try {
       const body = isBarcode ? { barcode: fetchInput.trim() } : { url: fetchInput.trim() };
       const { data } = await axios.post(`${API}/fetch-product`, body);
@@ -154,7 +147,6 @@ function App() {
     setSkinType(""); setConcerns([]); setCountry("India"); setProductName(""); setBrand("");
     setResult(null); setError(""); setFetchInput(""); setFetchError(""); setFetchMsg("");
     setAlternatives(null); setBestPrice(null); setActiveConcentrations({});
-    setFetchAttempted(false);
   };
 
   return (
@@ -183,7 +175,6 @@ function App() {
           concerns={concerns} toggleConcern={toggleConcern}
           handleAnalyze={handleAnalyze} handleClear={handleClear}
           loading={loading} error={error}
-          fetchAttempted={fetchAttempted}
         />
 
         {result && (

@@ -52,16 +52,15 @@ export function BreakdownRow({ icon, label, score, max, details }) {
   );
 }
 
-export function ConcernCard({ concern, data, isBest }) {
+export function ConcernCard({ concern, data }) {
   const [open, setOpen] = useState(false);
   const ic = CONCERNS_LIST.find(c => c.key === concern)?.icon || "fa-solid fa-circle";
   return (
-    <div className={`concern-result ${isBest ? "best-fit" : ""}`} data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
+    <div className="concern-result" data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
       <div className="concern-header" onClick={() => setOpen(!open)}>
         <div className="concern-left">
           <i className={ic}></i>
           <span className="concern-cname">{concern}</span>
-          {isBest && <span className="bp-cheapest-tag" style={{ marginLeft: 8, color: "var(--sage)" }}>BEST MATCH</span>}
           <span className="concern-pct" style={{ color: getBarColor(data.score) }}>{data.score}%</span>
         </div>
         <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`}></i>
