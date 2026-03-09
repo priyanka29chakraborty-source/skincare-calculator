@@ -672,7 +672,7 @@ app.add_middleware(
         "https://urancal.com",
         "https://www.urancal.com",
         "https://tool.urancal.com",
-        "https://skincare-calculator.pages.dev"
+        "https://skincare-calculator.pages.dev",
         "http://localhost:3000",
         "http://localhost:5001",
     ],
