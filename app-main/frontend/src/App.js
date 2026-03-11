@@ -82,7 +82,7 @@ function App() {
       setBestPrice(data);
     } catch { setBestPrice(null); }
     finally { setBestPriceLoading(false); }
-  }, [productName, brand, ingredients, fetchInput, size, country, currency, price]);
+  }, [productName, brand, fetchInput, size, country, currency, price]);
 
   const handleAnalyze = useCallback(async () => {
     if (!ingredients.trim()) { setError("Please enter ingredients"); return; }
@@ -106,7 +106,7 @@ function App() {
       fetchBestPrice();
     } catch (e) { setError(e.response?.data?.error || "Analysis failed"); }
     finally { setLoading(false); }
- }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, activeConcentrations, fetchAlts, fetchBestPrice]);
+ }, [price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, activeConcentrations, fetchAlts, fetchBestPrice]);
 
   // Input debouncing - clear error after typing
   useEffect(() => {
