@@ -2,10 +2,10 @@ INCI_Name,Aliases,Ingredient_Class,Functional_Category,Min_Effective_%,Optimal_%
 Alpha Arbutin,Arbutin;4-Hydroxyphenyl-alpha-D-glucopyranoside,Active,Brightening,0.2,1,2,Brightening,Tyrosinase inhibition,PIH;Melasma,4.5-6.5,Heat sensitive,Low,1.0,Generally safe,Limited,6-12 weeks,Strong acids,Overclaim risk
 Tranexamic Acid,Tranexamic acid,Active,Brightening;Anti-inflammatory,2,3,5,Pigmentation reduction,Plasmin inhibition,Melasma;PIH,5.0-7.0,Stable,Low,0.0,Generally safe,Limited,8-12 weeks,None significant,
 Kojic Acid,Kojic acid,Active,Brightening,0.5,1,2,Pigmentation,Tyrosinase chelation,PIH;Melasma,4.0-5.0,Unstable;oxidizes,Medium,1.0,Caution,Limited,4-8 weeks,Retinoids,High irritation risk
-Ferulic Acid,Ferulic acid,Active,Antioxidant,0.3,0.5,1,Photoprotection,Free radical scavenging,Photoaging,3.0-5.5,Light sensitive,Low,0.0,Safe,Moderate,Immediate,,
-Tocopherol,Vitamin E,Active,Antioxidant,0.2,1,5,Barrier support,Lipid peroxidation inhibition,Dryness;Aging,5.0-7.0,Oxidizes,Low,2.0,Safe,Moderate,4-8 weeks,,Overuse greasiness
+Ferulic Acid,Ferulic acid,Active,Antioxidant,0.3,0.5,1,Photoprotection,Free radical scavenging,Photoaging,3.0-5.5,Light sensitive,Low,0.0,Safe,Moderate Clinical,Immediate,,
+Tocopherol,Vitamin E,Active,Antioxidant,0.2,1,5,Barrier support,Lipid peroxidation inhibition,Dryness;Aging,5.0-7.0,Oxidizes,Low,2.0,Safe,Moderate Clinical,4-8 weeks,,Overuse greasiness
 Tocopheryl Acetate,Vitamin E Acetate,Functional,Antioxidant,0.5,1,5,Barrier protection,Enzymatic conversion to tocopherol,Dryness,5.0-7.0,Stable,Low,2.0,Safe,Moderate,6-10 weeks,,Slower efficacy
-Resveratrol,Resveratrol,Active,Antioxidant,0.3,1,3,Anti-aging,SIRT1 activation,Aging;Redness,5.0-6.5,Light sensitive,Medium,1.0,Safe,Moderate,6-12 weeks,,Stability issues
+Resveratrol,Resveratrol,Active,Antioxidant,0.3,1,3,Anti-aging,SIRT1 activation,Aging;Redness,5.0-6.5,Light sensitive,Medium,1.0,Safe,Moderate Clinical,6-12 weeks,,Stability issues
 Green Tea Extract,Camellia Sinensis Leaf Extract,Active,Antioxidant;Soothing,1,3,5,Anti-inflammatory,Polyphenol activity,Acne;Redness,5.0-7.0,Stable,Low,1.0,Safe,Moderate,4-8 weeks,,
 Centella Asiatica Extract,Cica;Gotu Kola,Active,Soothing;Repair,0.1,1,5,Barrier repair,TGF-beta stimulation,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-6 weeks,,
 Madecassoside,Madecassoside,Active,Barrier repair,0.05,0.2,1,Soothing,Anti-inflammatory signaling,Redness;Barrier damage,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
@@ -86,20 +86,20 @@ Colloidal Oatmeal,Avena Sativa Kernel Flour,Active,Soothing,0.5,1,2,Anti-itch,Av
 Allantoin,Allantoin,Functional,Soothing,0.1,0.5,2,Skin protectant,Keratoplastic,Irritation,4.0-7.0,Stable,Low,0.0,Safe,Limited,1-3 weeks,,
 N-Acetyl Glucosamine,NAG,Active,Brightening,2,4,6,Tone evening,Melanin transfer inhibition,Pigmentation,5.0-7.0,Stable,Low,0.0,Safe,Limited,6-12 weeks,,
 Tranexamic Acid Cetyl Ester,TXA ester,Active,Brightening,0.3,1,3,Pigmentation reduction,Enhanced skin penetration,Melasma,5.0-7.0,Stable,Low,0.0,Safe,Limited,8-12 weeks,,Limited data
-Niacinamide Ascorbate,Vitamin B3 + C complex,Active,Brightening;Antioxidant,1,3,5,Tone correction,Synergistic antioxidant action,Dullness;PIH,5.0-6.0,Moderate stability,Low,0.0,Safe,Moderate,6-10 weeks,Low pH acids,Stability dependent
+Niacinamide Ascorbate,Vitamin B3 + C complex,Active,Brightening;Antioxidant,1,3,5,Tone correction,Synergistic antioxidant action,Dullness;PIH,5.0-6.0,Moderate stability,Low,0.0,Safe,Moderate Clinical,6-10 weeks,Low pH acids,Stability dependent
 Ascorbyl Glucoside,Vitamin C derivative,Active,Brightening;Antioxidant,2,5,10,Brightening,Enzymatic conversion to AA,Pigmentation,5.5-7.0,Very stable,Low,0.0,Safe,Moderate,8-12 weeks,,Slower results
 3-O-Ethyl Ascorbic Acid,Ethylated Vitamin C,Active,Brightening,1,3,5,Brightening,Direct antioxidant,PIH;Dullness,4.5-6.5,Stable,Low,0.0,Safe,Limited,6-10 weeks,,Overpricing risk
-Magnesium Ascorbyl Phosphate,MAP,Active,Brightening;Antioxidant,3,5,10,Tone correction,Phosphatase conversion,Acne;PIH,6.0-7.5,Highly stable,Low,0.0,Safe,Moderate,8-12 weeks,Low pH acids,Slow activation
+Magnesium Ascorbyl Phosphate,MAP,Active,Brightening;Antioxidant,3,5,10,Tone correction,Phosphatase conversion,Acne;PIH,6.0-7.5,Highly stable,Low,0.0,Safe,Moderate Clinical,8-12 weeks,Low pH acids,Slow activation
 Sodium Ascorbyl Phosphate,SAP,Active,Brightening;Anti-acne,1,3,5,Acne reduction,Antimicrobial,Acne;PIH,6.0-7.0,Highly stable,Low,0.0,Safe,Limited,6-10 weeks,Low pH acids,
 Retinal,Retinaldehyde,Active,Retinoid,0.05,0.1,0.3,Anti-aging;Acne,RAR activation (indirect),Aging;Acne,5.0-6.0,Light sensitive,High,1.0,Avoid pregnancy,Limited,6-10 weeks,Benzoyl Peroxide,Irritation risk
 Hydroxypinacolone Retinoate,HPR,Active,Ester retinoid,0.1,0.3,1,Anti-aging,RAR binding,Aging,5.0-7.0,Light sensitive,Medium,1.0,Avoid pregnancy,Limited,8-12 weeks,Strong acids,Marketing exaggeration
 Bakuchiol,Bakuchiol,Active,Retinol-like,0.5,1,2,Anti-aging,Gene expression modulation,Sensitive aging skin,5.0-7.0,Light stable,Low,0.0,Safe,Limited,8-12 weeks,,Retinol-equivalent claims
 Azelaoyl Diglycinate,PAD,Active,Sebum control,3,5,10,Oil balance,Azelaic derivative action,Acne;Redness,5.0-7.0,Stable,Low,0.0,Safe,Limited,6-10 weeks,,
-Lipochroman-6,Dimethylmethoxy Chromanol,Active,Antioxidant,0.05,0.1,0.5,Anti-aging,Broad-spectrum antioxidant,Photoaging,4.0-7.0,Very stable,Low,0.0,Safe,Moderate,4-8 weeks,,Premium pricing
-Astaxanthin,Astaxanthin,Active,Antioxidant,0.01,0.05,0.2,Anti-aging,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Color staining risk
-Coenzyme Q10,Ubiquinone,Active,Antioxidant,0.1,0.5,1,Anti-aging,Mitochondrial electron transport,Aging;Photoaging,5.0-7.0,Light sensitive,Low,1.0,Safe,Moderate,8-12 weeks,,Overpricing risk
-Idebenone,Hydroxydecyl Ubiquinone,Active,Antioxidant,0.05,0.5,1,Anti-aging,Free radical scavenging,Photoaging,5.0-7.0,Light sensitive,Low,1.0,Safe,Moderate,6-10 weeks,,Marketing exaggeration
-Alpha-Lipoic Acid,Thioctic Acid,Active,Antioxidant,0.1,0.5,1,Anti-aging,Redox cycling,Aging;Acne,3.0-4.0,Unstable,Medium,1.0,Safe,Moderate,4-8 weeks,Retinoids,Irritation risk
+Lipochroman-6,Dimethylmethoxy Chromanol,Active,Antioxidant,0.05,0.1,0.5,Anti-aging,Broad-spectrum antioxidant,Photoaging,4.0-7.0,Very stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Premium pricing
+Astaxanthin,Astaxanthin,Active,Antioxidant,0.01,0.05,0.2,Anti-aging,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Color staining risk
+Coenzyme Q10,Ubiquinone,Active,Antioxidant,0.1,0.5,1,Anti-aging,Mitochondrial electron transport,Aging;Photoaging,5.0-7.0,Light sensitive,Low,1.0,Safe,Moderate Clinical,8-12 weeks,,Overpricing risk
+Idebenone,Hydroxydecyl Ubiquinone,Active,Antioxidant,0.05,0.5,1,Anti-aging,Free radical scavenging,Photoaging,5.0-7.0,Light sensitive,Low,1.0,Safe,Moderate Clinical,6-10 weeks,,Marketing exaggeration
+Alpha-Lipoic Acid,Thioctic Acid,Active,Antioxidant,0.1,0.5,1,Anti-aging,Redox cycling,Aging;Acne,3.0-4.0,Unstable,Medium,1.0,Safe,Moderate Clinical,4-8 weeks,Retinoids,Irritation risk
 Glutathione,Glutathione,Active,Brightening;Antioxidant,0.1,0.5,2,Tone evening,Melanin pathway modulation,Pigmentation,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate,8-12 weeks,,Stability issues
 Cysteamine HCl,Cysteamine Hydrochloride,Active,Brightening,5,5,5,Melasma treatment,Tyrosinase inhibition,Melasma,7.0-8.0,Odor instability,High,0.0,Avoid pregnancy,Limited,8-16 weeks,Acids,Odor; irritation
 Thiamidol,Isobutylamido Thiazolyl Resorcinol,Active,Brightening,0.1,0.2,0.2,Hyperpigmentation,Tyrosinase inhibition,Melasma;PIH,5.0-6.0,Stable,Low,0.0,Safe,Limited,8-12 weeks,,Proprietary cost
@@ -119,7 +119,7 @@ Pullulan,Pullulan,Functional,Film former,0.1,1,5,Skin tightening,Polysaccharide 
 Biosaccharide Gum-1,Fucose polymer,Active,Soothing;Hydrating,0.1,1,5,Long-lasting hydration,Bioadhesive polymer,Sensitive skin,4.0-7.0,Stable,Low,0.0,Safe,Limited,Immediate,,
 Sodium Hyaluronate Crosspolymer,Crosslinked HA,Active,Long-term hydration,0.05,0.2,1,Sustained hydration,Reservoir effect,Dehydration,4.0-7.0,Stable,Low,0.0,Safe,Limited,Immediate,,
 Polyquaternium-51,Phospholipid polymer,Functional,Barrier mimetic,0.1,0.5,2,Barrier hydration,Cell-mimetic polymer,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
-Niacinamide Ferulate,Vitamin B3 + Ferulic complex,Active,Antioxidant;Brightening,1,3,5,Tone correction,Synergistic antioxidant stabilization,Dullness;PIH,5.0-6.5,Stable,Low,0.0,Safe,Moderate,6-10 weeks,Strong acids,Limited adoption
+Niacinamide Ferulate,Vitamin B3 + Ferulic complex,Active,Antioxidant;Brightening,1,3,5,Tone correction,Synergistic antioxidant stabilization,Dullness;PIH,5.0-6.5,Stable,Low,0.0,Safe,Moderate Clinical,6-10 weeks,Strong acids,Limited adoption
 Sodium Retinoyl Hyaluronate,Retinoid-HA complex,Active,Anti-aging,0.01,0.05,0.1,Wrinkle reduction,Controlled retinoid release,Aging,5.0-7.0,Light sensitive,Medium,0.0,Avoid pregnancy,Limited,8-12 weeks,Benzoyl Peroxide,Premium pricing
 Hydroxystearic Acid,12-Hydroxystearic acid,Functional,Structurant,0.2,1,3,Texture stabilization,Gel network formation,Formula stability,4.0-8.0,Stable,Low,1.0,Safe,Limited,?,,
 Polyhydroxybutyrate,Biopolymer,Functional,Film former,0.1,0.5,2,Skin smoothing,Biodegradable polymer,Texture,4.0-7.0,Stable,Low,0.0,Safe,Limited,Immediate,,Emerging data
@@ -153,10 +153,10 @@ Phenylethyl Resorcinol,377,Active,Brightening,0.1,0.5,1,Hyperpigmentation,Tyrosi
 Dihydroxyacetone,DHA,Active,Self-tanner,1,5,10,Temporary tan,Maillard reaction,Cosmetic tan,4.0-5.5,Heat sensitive,Medium,0.0,Safe,Limited,Immediate,,Streaking risk
 Erythrulose,Erythrulose,Active,Self-tanner,1,3,7,Natural-looking tan,Maillard reaction (slow),Cosmetic tan,4.0-5.5,Heat sensitive,Low,0.0,Safe,Limited,24-72 hours,,Patchiness risk
 Caffeine,Caffeine,Active,De-puffing;Antioxidant,0.1,0.3,1,De-puffing,Vasoconstriction,Dark circles,4.5-7.0,Stable,Low,1.0,Safe,Moderate,2-4 weeks,,Temporary effect
-EGCG,Epigallocatechin Gallate,Active,Antioxidant;Anti-inflammatory,0.1,0.5,1,Redness reduction,NF-kB inhibition,Acne;Redness,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Stability issues
+EGCG,Epigallocatechin Gallate,Active,Antioxidant;Anti-inflammatory,0.1,0.5,1,Redness reduction,NF-kB inhibition,Acne;Redness,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Stability issues
 Niacinamide PCA,Niacinamide + PCA salt,Active,Hydration;Barrier,1,3,5,Barrier support,NMF enhancement,Dehydration,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,Limited adoption
 Sodium DNA,Deoxyribonucleic acid sodium salt,Active,Repair;Hydration,0.05,0.2,1,Skin regeneration,Cell signaling support,Post-procedure,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,Emerging data
-PDRN,Polydeoxyribonucleotide,Active,Regenerative,0.1,0.5,2,Tissue repair,A2 receptor activation,Post-acne;Aging,6.0-7.5,Heat sensitive,Low,0.0,Avoid pregnancy caution,Limited,4-8 weeks,Acids,Injectable-origin bias
+PDRN,Polydeoxyribonucleotide,Active,Regenerative,0.1,0.5,2,Tissue repair,A2 receptor activation,Post-acne;Aging,6.0-7.5,Heat sensitive,Low,0.0,Avoid pregnancy caution,Moderate Clinical,4-8 weeks,Acids,Injectable-origin bias
 Sh-Oligopeptide-1,EGF (recombinant),Active,Growth factor,0.0001,0.001,0.01,Cell renewal,EGFR activation,Aging;Post-procedure,6.0-7.0,Heat sensitive,Low,0.0,Avoid pregnancy caution,Limited,4-8 weeks,Acids,Cost inflation
 Sh-Polypeptide-11,FGF,Active,Growth factor,0.0001,0.001,0.01,Repair,Fibroblast stimulation,Barrier damage,6.0-7.0,Heat sensitive,Low,0.0,Avoid pregnancy caution,Limited,4-8 weeks,Acids,Regulatory caution
 Acetyl Tetrapeptide-5,Eyeseryl,Active,De-puffing peptide,0.01,0.05,0.1,Under-eye de-puffing,Lymphatic modulation,Eye bags,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-6 weeks,,Temporary effect
@@ -186,13 +186,13 @@ Tartaric Acid,AHA,Active,pH adjuster;Exfoliant,1,3,10,Texture smoothing,Chelatio
 Citramalic Acid,Citramalic acid,Active,Exfoliant,1,3,8,Gentle exfoliation,Keratolysis,Sensitive skin,3.5-4.5,Stable,Low,0.0,Safe,Limited,4-8 weeks,Strong acids,Emerging data
 Pyruvic Acid,Pyruvic acid,Active,Exfoliant,2,5,10,Acne resurfacing,Sebum solubilization,Acne;Texture,2.5-3.5,Unstable,High,1.0,Medical use caution,Limited,4-8 weeks,Retinoids,Irritation risk
 Azelaic Acid Potassium Salt,Potassium Azelate,Active,Sebum control,3,5,10,Oil balance,Azelaic derivative action,Acne,5.0-7.0,Stable,Low,0.0,Safe,Limited,6-10 weeks,,Limited adoption
-Ferulic Acid Ethyl Ester,Ethyl Ferulate,Active,Antioxidant,0.3,1,3,Photoprotection,Enhanced lipid solubility antioxidant,Photoaging,4.0-7.0,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Emerging use
+Ferulic Acid Ethyl Ester,Ethyl Ferulate,Active,Antioxidant,0.3,1,3,Photoprotection,Enhanced lipid solubility antioxidant,Photoaging,4.0-7.0,Light sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Emerging use
 Carnosine,Carnosine,Active,Anti-glycation,0.1,0.5,2,Anti-aging,Glycation inhibition,Aging,5.0-7.0,Stable,Low,0.0,Safe,Limited,6-12 weeks,,
-Ergothioneine,Ergothioneine,Active,Antioxidant,0.01,0.1,0.5,Cell protection,Mitochondrial protection,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,Premium pricing
-Lutein,Lutein,Active,Antioxidant,0.05,0.2,1,Blue-light defense,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Coloring effect
-Zeaxanthin,Zeaxanthin,Active,Antioxidant,0.05,0.2,1,Blue-light defense,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Coloring effect
+Ergothioneine,Ergothioneine,Active,Antioxidant,0.01,0.1,0.5,Cell protection,Mitochondrial protection,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Premium pricing
+Lutein,Lutein,Active,Antioxidant,0.05,0.2,1,Blue-light defense,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Coloring effect
+Zeaxanthin,Zeaxanthin,Active,Antioxidant,0.05,0.2,1,Blue-light defense,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Coloring effect
 Baicalin,Baicalin,Active,Anti-inflammatory,0.1,0.5,2,Calming,NF-kB modulation,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
-Baicalein,Baicalein,Active,Antioxidant,0.05,0.2,1,Anti-aging,Free radical scavenging,Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,
+Baicalein,Baicalein,Active,Antioxidant,0.05,0.2,1,Anti-aging,Free radical scavenging,Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,
 Madecassic Acid,Madecassic acid,Active,Barrier repair,0.05,0.2,1,Soothing,Centella triterpenoid,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-6 weeks,,
 Asiatic Acid,Asiatic acid,Active,Repair,0.05,0.2,1,Wound healing,Collagen modulation,Post-acne,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,
 Hesperidin Methyl Chalcone,HMC,Active,Vascular support,0.1,0.5,2,Dark circle reduction,Capillary strengthening,Under-eye circles,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,
@@ -215,9 +215,9 @@ Cysteine,Cysteine,Active,Antioxidant precursor,0.05,0.3,1,Barrier protection,Glu
 Taurine,Taurine,Active,Osmoprotection,0.1,0.5,2,Hydration support,Cell volume regulation,Dehydration,5.0-7.0,Stable,Low,0.0,Safe,Limited,Immediate,,
 Carnitine,L-Carnitine,Active,Sebum regulation,0.1,0.5,2,Oil control,Fatty acid transport,Oily skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-6 weeks,,
 Creatine,Creatine,Active,Cell energy support,0.1,0.5,2,Skin vitality,ATP regeneration,Aging,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,
-Ubiquinol,Reduced CoQ10,Active,Antioxidant,0.05,0.3,1,Anti-aging,Enhanced mitochondrial protection,Photoaging,5.0-7.0,Light sensitive,Low,1.0,Safe,Moderate,6-10 weeks,,Oxidation risk
+Ubiquinol,Reduced CoQ10,Active,Antioxidant,0.05,0.3,1,Anti-aging,Enhanced mitochondrial protection,Photoaging,5.0-7.0,Light sensitive,Low,1.0,Safe,Moderate Clinical,6-10 weeks,,Oxidation risk
 Sodium Ascorbyl Phosphate Chloride,SAP salt variant,Active,Brightening;Anti-acne,1,3,5,Acne control,Antimicrobial action,Acne,6.0-7.0,Stable,Low,0.0,Safe,Limited,6-10 weeks,Low pH acids,Limited adoption
-Ascorbyl Tetraisopalmitate,Lipid-soluble Vitamin C,Active,Brightening;Antioxidant,1,3,5,Tone improvement,Lipid-phase antioxidant,PIH;Aging,5.0-7.0,Highly stable,Low,1.0,Safe,Moderate,8-12 weeks,,Slow results
+Ascorbyl Tetraisopalmitate,Lipid-soluble Vitamin C,Active,Brightening;Antioxidant,1,3,5,Tone improvement,Lipid-phase antioxidant,PIH;Aging,5.0-7.0,Highly stable,Low,1.0,Safe,Moderate Clinical,8-12 weeks,,Slow results
 Hydroxyacetophenone,p-Hydroxyacetophenone,Functional,Antioxidant;Preservative booster,0.1,0.5,1,Formula stabilization,Free radical scavenging,Product stability,4.0-8.0,Highly stable,Low,0.0,Safe,Moderate,?,,
 Ethylhexylglycerin Carbonate,Ethylhexylglycerin derivative,Functional,Preservative booster,0.1,0.3,0.5,Preservation enhancement,Membrane destabilization,Product safety,4.0-8.0,Stable,Low,0.0,Safe,Limited,?,,
 Caprylyl Glycol,"1,2-Octanediol",Functional,Humectant;Preservative booster,0.3,1,3,Microbial control,Cell membrane disruption,Product safety,4.0-8.0,Stable,Low,1.0,Safe,Limited,?,,
@@ -230,7 +230,7 @@ Polyurethane-35,Film former polymer,Functional,Film former,0.5,2,5,Long-wear,Fle
 VP/VA Copolymer,Vinyl polymer,Functional,Film former,0.5,3,10,Hold;film formation,Polymer network,Makeup fixation,4.0-8.0,Stable,Low,0.0,Safe,Limited,?,,Dry feel
 Sodium Chloride,Salt,Functional,Viscosity adjuster,0.1,1,5,Texture control,Ionic thickening,Formula viscosity,4.0-8.0,Highly stable,Low,0.0,Safe,Limited,?,,Drying in leave-on
 Calcium PCA,Calcium salt of PCA,Active,Hydration;Barrier support,0.1,0.5,2,Barrier strengthening,NMF mineral support,Dehydration;Barrier damage,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
-Magnesium Ascorbyl Phosphate Phosphate,MAP variant,Active,Brightening;Antioxidant,3,5,10,Tone correction,Enzymatic AA conversion,PIH;Acne,6.0-7.5,Highly stable,Low,0.0,Safe,Moderate,8-12 weeks,Low pH acids,Slow onset
+Magnesium Ascorbyl Phosphate Phosphate,MAP variant,Active,Brightening;Antioxidant,3,5,10,Tone correction,Enzymatic AA conversion,PIH;Acne,6.0-7.5,Highly stable,Low,0.0,Safe,Moderate Clinical,8-12 weeks,Low pH acids,Slow onset
 Sodium Cocoyl Alaninate,Amino-acid surfactant,Functional,Mild surfactant,2,5,10,Gentle cleansing,Low-irritation surfactant,Sensitive skin,5.0-7.0,Stable,Low,1.0,Safe,Limited,Immediate,,
 Sodium Cocoyl Glycinate,Amino-acid surfactant,Functional,Mild surfactant,2,5,10,Gentle cleansing,Skin-identical amino acid surfactant,Sensitive skin,5.0-7.0,Stable,Low,1.0,Safe,Limited,Immediate,,
 Disodium Cocoyl Glutamate,Amino-acid surfactant,Functional,Mild surfactant,2,5,10,Gentle cleansing,Low irritation cleansing,Sensitive skin,5.0-6.5,Stable,Low,1.0,Safe,Limited,Immediate,,
@@ -251,17 +251,17 @@ Sodium Dehydroacetate,Dehydroacetic acid sodium salt,Functional,Preservative,0.3
 Undecylenoyl Glycine,Sebum regulator,Active,Anti-acne,0.5,2,5,Oil control,Sebum normalization,Acne,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-6 weeks,,
 Oleanolic Acid,Oleanolic acid,Active,Sebum regulation,0.1,0.3,1,Oil control,5a-reductase inhibition,Acne;Oily skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,
 Nordihydroguaiaretic Acid,NDGA,Active,Antioxidant,0.05,0.1,0.3,Anti-inflammatory,Lipoxygenase inhibition,Inflammation,5.0-7.0,Stable,Medium,1.0,Restricted use,Moderate,4-8 weeks,,Safety scrutiny
-Apigenin,Apigenin,Active,Soothing;Antioxidant,0.05,0.2,1,Calming,NF-?B inhibition,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate,2-4 weeks,,
-Quercetin,Quercetin,Active,Antioxidant,0.05,0.2,1,Anti-aging,Free radical scavenging,Photoaging,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Stability dependent
+Apigenin,Apigenin,Active,Soothing;Antioxidant,0.05,0.2,1,Calming,NF-?B inhibition,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,2-4 weeks,,
+Quercetin,Quercetin,Active,Antioxidant,0.05,0.2,1,Anti-aging,Free radical scavenging,Photoaging,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Stability dependent
 Rutin,Rutin,Active,Capillary support,0.1,0.5,2,Redness reduction,Vascular strengthening,Rosacea,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,
-Ellagic Acid,Ellagic acid,Active,Brightening;Antioxidant,0.05,0.2,1,Pigmentation control,Tyrosinase inhibition,PIH;Melasma,4.5-6.5,Light sensitive,Low,0.0,Safe,Moderate,6-10 weeks,,Low solubility
+Ellagic Acid,Ellagic acid,Active,Brightening;Antioxidant,0.05,0.2,1,Pigmentation control,Tyrosinase inhibition,PIH;Melasma,4.5-6.5,Light sensitive,Low,0.0,Safe,Moderate Clinical,6-10 weeks,,Low solubility
 Feruloyl Soy Glycerides,Feruloyl soy glycerides,Active,Antioxidant,0.5,1,3,Photoprotection,Ferulic derivative action,Photoaging,4.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,Limited adoption
 Syringic Acid,Syringic acid,Active,Antioxidant,0.05,0.2,1,Anti-aging,Phenolic scavenging,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,Emerging data
 Vanillic Acid,Vanillic acid,Active,Antioxidant,0.05,0.2,1,Skin protection,Phenolic antioxidant,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,Emerging data
 Sinapic Acid,Sinapic acid,Active,Antioxidant,0.05,0.2,1,Photoprotection,Phenolic radical scavenging,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,Emerging data
 Caffeic Acid,Caffeic acid,Active,Antioxidant,0.05,0.2,1,UV defense support,ROS scavenging,Photoaging,4.5-6.5,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Stability dependent
 Chlorogenic Acid,Chlorogenic acid,Active,Antioxidant,0.05,0.2,1,Anti-aging,Polyphenol antioxidant,Photoaging,4.5-6.5,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,
-Rosmarinic Acid,Rosmarinic acid,Active,Soothing;Antioxidant,0.05,0.3,1,Redness reduction,Anti-inflammatory polyphenol,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate,2-4 weeks,,
+Rosmarinic Acid,Rosmarinic acid,Active,Soothing;Antioxidant,0.05,0.3,1,Redness reduction,Anti-inflammatory polyphenol,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,2-4 weeks,,
 Ursolic Acid,Ursolic acid,Active,Anti-aging,0.05,0.2,1,Firming,Collagen synthesis stimulation,Aging,5.0-7.0,Low solubility,Medium,1.0,Safe,Limited,6-10 weeks,,Formulation difficulty
 Maslinic Acid,Maslinic acid,Active,Anti-inflammatory,0.05,0.2,1,Calming,NF-?B modulation,Sensitive skin,5.0-7.0,Low solubility,Low,0.0,Safe,Limited,4-8 weeks,,Emerging data
 Beta-Sitosterol,Beta-sitosterol,Active,Barrier repair,0.1,0.5,2,Barrier strengthening,Plant sterol lipid support,Barrier damage,5.0-7.0,Stable,Low,1.0,Safe,Limited,4-8 weeks,,
@@ -354,14 +354,14 @@ Papain,Papain enzyme,Active,Enzymatic exfoliant,0.1,0.5,1,Gentle exfoliation,Pro
 Bromelain,Bromelain enzyme,Active,Enzymatic exfoliant,0.1,0.5,1,Skin smoothing,Protease activity,Sensitive exfoliation,5.0-7.0,Heat sensitive,Medium,0.0,Safe,Limited,2-4 weeks,Strong acids,Allergy risk
 Subtilisin,Protease enzyme,Active,Enzymatic exfoliant,0.05,0.2,0.5,Cell turnover,Protein hydrolysis,Dull skin,5.0-7.0,Heat sensitive,Medium,0.0,Safe,Limited,2-4 weeks,Strong acids,Limited cosmetic use
 Lipase,Lipase enzyme,Active,Sebum modulation,0.01,0.05,0.2,Oil balance,Triglyceride breakdown,Oily skin,5.0-7.0,Heat sensitive,Low,0.0,Safe,Limited,4-6 weeks,,Niche use
-Superoxide Dismutase,SOD,Active,Antioxidant enzyme,0.01,0.05,0.2,Oxidative defense,ROS dismutation,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Stability challenge
-Catalase,Catalase,Active,Antioxidant enzyme,0.01,0.05,0.2,Peroxide neutralization,H2O2 breakdown,Oxidative stress,5.0-7.0,Heat sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Stability challenge
+Superoxide Dismutase,SOD,Active,Antioxidant enzyme,0.01,0.05,0.2,Oxidative defense,ROS dismutation,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Stability challenge
+Catalase,Catalase,Active,Antioxidant enzyme,0.01,0.05,0.2,Peroxide neutralization,H2O2 breakdown,Oxidative stress,5.0-7.0,Heat sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Stability challenge
 Glucose Oxidase,Glucose oxidase,Active,Antimicrobial enzyme,0.01,0.05,0.2,Microbial control,H2O2 generation,Acne,5.0-7.0,Heat sensitive,Low,0.0,Safe,Limited,4-6 weeks,,Formulation complexity
 Lactoperoxidase,Lactoperoxidase,Active,Antimicrobial enzyme,0.01,0.05,0.2,Microbial balance,Peroxidase system,Acne,5.0-7.0,Heat sensitive,Low,0.0,Safe,Limited,4-6 weeks,,Niche systems
-Chlorella Vulgaris Extract,Chlorella extract,Active,Detox;Antioxidant,0.5,1,3,Pollution defense,Heavy metal chelation,Urban skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,
-Spirulina Platensis Extract,Spirulina extract,Active,Antioxidant;Firming,0.5,1,3,Skin vitality,Phycocyanin antioxidants,Dull skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,Color risk
-Haematococcus Pluvialis Extract,Astaxanthin source,Active,Antioxidant,0.05,0.2,0.5,Photoprotection,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Color staining
-Dunaliella Salina Extract,Beta-carotene algae,Active,Antioxidant,0.1,0.3,1,UV defense,Carotenoid activity,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Coloring
+Chlorella Vulgaris Extract,Chlorella extract,Active,Detox;Antioxidant,0.5,1,3,Pollution defense,Heavy metal chelation,Urban skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,
+Spirulina Platensis Extract,Spirulina extract,Active,Antioxidant;Firming,0.5,1,3,Skin vitality,Phycocyanin antioxidants,Dull skin,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Color risk
+Haematococcus Pluvialis Extract,Astaxanthin source,Active,Antioxidant,0.05,0.2,0.5,Photoprotection,Carotenoid quenching,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Color staining
+Dunaliella Salina Extract,Beta-carotene algae,Active,Antioxidant,0.1,0.3,1,UV defense,Carotenoid activity,Photoaging,5.0-7.0,Light sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Coloring
 Aloe Barbadensis Leaf Juice,Aloe vera juice,Functional,Soothing;Humectant,1,10,100,Calming,Polysaccharide hydration,Irritation,4.0-7.0,Microbial risk,Low,0.0,Safe,Limited,Immediate,,Preservation dependent
 Aloe Barbadensis Leaf Extract,Aloe extract,Active,Soothing,0.1,1,5,Redness reduction,Anti-inflammatory polysaccharides,Sensitive skin,4.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
 Calendula Officinalis Extract,Calendula extract,Active,Soothing;Repair,0.1,1,5,Calming,Triterpenoid anti-inflammatory,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
@@ -369,18 +369,18 @@ Chamomilla Recutita Extract,Chamomile extract,Active,Soothing,0.1,1,5,Anti-redne
 Bisabolol,Alpha-bisabolol,Active,Soothing,0.1,0.5,2,Redness reduction,COX inhibition,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
 Centella Asiatica Leaf Water,Centella hydrosol,Functional,Soothing,5,20,100,Calming,Hydrosol actives,Sensitive skin,5.0-7.0,Microbial risk,Low,0.0,Safe,Limited,Immediate,,Needs preservation
 Glycyrrhiza Inflata Root Extract,Licorice flavonoid extract,Active,Brightening;Soothing,0.1,0.5,2,Redness & pigmentation reduction,Licochalcone A anti-inflammatory action,PIH;Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,4-8 weeks,,
-Scutellaria Baicalensis Root Extract,Baikal skullcap extract,Active,Antioxidant;Brightening,0.1,0.5,2,Tone evening,Baicalin flavonoids,Pigmentation;Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,
+Scutellaria Baicalensis Root Extract,Baikal skullcap extract,Active,Antioxidant;Brightening,0.1,0.5,2,Tone evening,Baicalin flavonoids,Pigmentation;Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,
 Morus Alba Root Extract,Mulberry root extract,Active,Brightening,0.1,0.5,2,Hyperpigmentation reduction,Tyrosinase inhibition,PIH;Melasma,5.0-7.0,Stable,Low,0.0,Safe,Limited,6-10 weeks,,
 Arctostaphylos Uva-Ursi Leaf Extract,Bearberry extract,Active,Brightening,0.1,0.5,1,Pigment suppression,Arbutin content,PIH,5.0-6.5,Stable,Low,0.0,Safe,Limited,6-10 weeks,,Hydroquinone association myth
-Punica Granatum Extract,Pomegranate extract,Active,Antioxidant,0.1,0.5,2,Anti-aging,Ellagic acid polyphenols,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,
-Camellia Sinensis Leaf Extract,Green tea extract,Active,Antioxidant;Soothing,0.1,1,5,Oil & redness control,EGCG polyphenols,Acne;Redness,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate,4-8 weeks,,Stability dependent
-Vitis Vinifera Fruit Extract,Grape extract,Active,Antioxidant,0.1,0.5,2,Anti-aging,Resveratrol polyphenols,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,
-Vaccinium Myrtillus Fruit Extract,Bilberry extract,Active,Antioxidant,0.1,0.5,2,Blue-light defense,Anthocyanins,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,,
+Punica Granatum Extract,Pomegranate extract,Active,Antioxidant,0.1,0.5,2,Anti-aging,Ellagic acid polyphenols,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,
+Camellia Sinensis Leaf Extract,Green tea extract,Active,Antioxidant;Soothing,0.1,1,5,Oil & redness control,EGCG polyphenols,Acne;Redness,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,Stability dependent
+Vitis Vinifera Fruit Extract,Grape extract,Active,Antioxidant,0.1,0.5,2,Anti-aging,Resveratrol polyphenols,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,
+Vaccinium Myrtillus Fruit Extract,Bilberry extract,Active,Antioxidant,0.1,0.5,2,Blue-light defense,Anthocyanins,Photoaging,5.0-7.0,Stable,Low,0.0,Safe,Moderate Clinical,4-8 weeks,,
 Rubus Idaeus Leaf Extract,Raspberry leaf extract,Active,Soothing,0.1,0.5,2,Calming,Flavonoid anti-inflammatory,Sensitive skin,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-4 weeks,,
 Cucumis Sativus Fruit Extract,Cucumber extract,Active,Soothing;Hydrating,0.5,2,5,Cooling hydration,Polysaccharides,Irritation,5.0-7.0,Stable,Low,0.0,Safe,Limited,Immediate,,
 Hamamelis Virginiana Leaf Extract,Witch hazel extract,Active,Astringent,0.1,1,5,Pore tightening,Tannins,Oily skin,4.5-6.5,Stable,Medium,1.0,Safe alcohol-free,Limited,2-4 weeks,Strong acids,Alcohol base concern
 Salix Alba Bark Extract,Willow bark extract,Active,Anti-acne,0.1,0.5,2,Pore clearing,Salicylate derivatives,Acne,4.0-6.0,Stable,Low,1.0,Safe,Limited,4-6 weeks,Retinoids,Salicylate sensitivity
-Rosmarinus Officinalis Leaf Extract,Rosemary extract,Active,Antioxidant,0.05,0.3,1,Skin protection,Rosmarinic acid,Photoaging,5.0-7.0,Stable,Low,1.0,Safe,Moderate,4-8 weeks,,Fragrance allergen
+Rosmarinus Officinalis Leaf Extract,Rosemary extract,Active,Antioxidant,0.05,0.3,1,Skin protection,Rosmarinic acid,Photoaging,5.0-7.0,Stable,Low,1.0,Safe,Moderate Clinical,4-8 weeks,,Fragrance allergen
 Lavandula Angustifolia Oil,Lavender oil,Functional,Fragrance;Soothing,0.01,0.1,0.5,Aromatherapy,Linalool content,Relaxation,4.5-7.0,Oxidation sensitive,Medium,2.0,Avoid sensitive skin,Limited,?,Retinoids,Fragrance allergen
 Pelargonium Graveolens Oil,Geranium oil,Functional,Fragrance,0.01,0.1,0.5,Scent,Terpenoid fragrance,Cosmetic only,4.5-7.0,Oxidation sensitive,Medium,2.0,Avoid sensitive skin,Limited,?,Retinoids,Fragrance allergen
 Limonene,Limonene,Functional,Fragrance allergen,0.001,0.01,0.1,Scent,Terpene oxidation,Fragrance only,4.0-8.0,Oxidizes,High,2.0,Avoid sensitive skin,Limited,?,,High sensitization
@@ -412,10 +412,10 @@ Aminomethyl Propanol,AMP,Functional,pH adjuster,0.1,0.5,2,Neutralization,Amine b
 Sodium Polyacrylate,Polyacrylate,Functional,Thickener,0.2,1,5,Viscosity,Water absorption,Texture,4.0-8.0,Stable,Low,0.0,Safe,Limited,?,,
 Polyacrylate Crosspolymer-6,Acrylate polymer,Functional,Gel former,0.1,0.5,2,Clear gels,Polymer network,Serums,4.0-8.0,Stable,Low,0.0,Safe,Limited,?,,
 Chlorphenesin,Chlorphenesin,Functional,Preservative,0.1,0.3,0.5,Preservation,Protein synthesis inhibition,Product safety,4.0-7.0,Stable,Low,1.0,Safe limits,Limited,?,,
-Polydeoxyribonucleotide Sodium,PDRN sodium salt,Active,Regenerative,0.1,0.5,2,Tissue repair,A2A receptor activation,Post-acne;Aging,6.0-7.5,Heat sensitive,Low,0.0,Avoid pregnancy caution,Limited,4-8 weeks,Strong acids,Medical-origin bias
+Polydeoxyribonucleotide Sodium,PDRN sodium salt,Active,Regenerative,0.1,0.5,2,Tissue repair,A2A receptor activation,Post-acne;Aging,6.0-7.5,Heat sensitive,Low,0.0,Avoid pregnancy caution,Moderate Clinical,4-8 weeks,Strong acids,Medical-origin bias
 Salmon DNA Fragment,Marine DNA fragments,Active,Repair;Hydration,0.05,0.2,1,Skin regeneration,Cell signaling,Barrier damage,6.0-7.5,Heat sensitive,Low,0.0,Safe topical,Limited,4-8 weeks,Acids,Premium pricing
-Exosome-like Vesicles,Plant-derived exosomes,Active,Cell communication,0.01,0.05,0.2,Regeneration,Paracrine signaling,Aging,6.0-7.5,Highly sensitive,Low,0.0,Avoid pregnancy caution,Limited,6-12 weeks,Acids,Regulatory gray zone
-Stem Cell Conditioned Media,Plant stem cell media,Active,Repair;Antioxidant,0.05,0.2,1,Skin resilience,Growth factor remnants,Aging,5.0-7.0,Unstable,Low,0.0,Safe topical,Moderate,6-10 weeks,,Marketing misuse
+Exosome-like Vesicles,Plant-derived exosomes,Active,Cell communication,0.01,0.05,0.2,Regeneration,Paracrine signaling,Aging,6.0-7.5,Highly sensitive,Low,0.0,Avoid pregnancy caution,Emerging Clinical,6-12 weeks,Acids,Regulatory gray zone
+Stem Cell Conditioned Media,Plant stem cell media,Active,Repair;Antioxidant,0.05,0.2,1,Skin resilience,Growth factor remnants,Aging,5.0-7.0,Unstable,Low,0.0,Safe topical,Moderate Clinical,6-10 weeks,,Marketing misuse
 Bakuchiol Analog (Babchi Synth),Synthetic bakuchiol,Active,Anti-aging,0.3,1,2,Wrinkle reduction,RAR pathway modulation,Aging,5.0-7.0,Stable,Low,0.0,Avoid pregnancy caution,Limited,8-12 weeks,,?Retinol-like? claims
 Retinyl Retinoate Encapsulated,Encapsulated RR,Active,Anti-aging,0.03,0.1,0.3,Wrinkle smoothing,Dual retinoid delivery,Aging,5.5-6.5,Light sensitive,Medium,1.0,Avoid pregnancy,Limited,8-12 weeks,BPO,Irritation risk
 Hydroxyectoin,Hydroxyectoin,Active,Advanced barrier repair,0.3,1,2,Stress protection,Protein stabilization,Sensitive skin,5.0-7.0,Highly stable,Low,0.0,Safe,Limited,2-4 weeks,,Premium cost
@@ -449,7 +449,7 @@ Argireline,Hexapeptide-8,Active,Active,3.0-10.0%,0.05,,Expression,Neurotransmit,
 Centella Asiatica,Cica,Active,Active,1.0-10.0%,0.05,,Soothing,Triterpene,Soothing,5.0-7.0,,,,Barrier Support,Strong,1 week,,
 Ethylhexylglycerin,EHG,Functional,Functional,0.1-1.0%,0.005,,Preserv,Antimicrobial,Preserv,3.0-12.0,,,,Contact Allergy,Strong,,,
 Fermented Oil,Biotech Oil,Emollient,Emollient,1.0-5.0%,0.02,,Absorption,Lipase Process,Absorption,,,,,2026 Trend,Moderate,1 week,,
-Exosomes,Vesicles,Active,Active,0.001-0.1%,0.0001,,Regenerat,mRNA Signal,Regenerat,6.0-7.5,,,,2026 Innovation,Strong,4-8 weeks,Strong Acids,
+Exosomes,Vesicles,Active,Active,0.001-0.1%,0.0001,,Regenerat,mRNA Signal,Regenerat,6.0-7.5,,,,2026 Innovation,Emerging Clinical,4-8 weeks,Strong Acids,
 Senolytic Pep,Zombie Cell,Active,Active,0.1-3.0%,0.01,,Youth,Apoptosis Reg,Youth,5.0-6.0,,,,2026 Innov (E),Strong,12 weeks,,
 Licorice Root,Glycyrrhiza,Active,Active,0.5-2.0%,0.01,,Soothing,Tyrosinase Inh,Soothing,5.0-7.0,,,,Natural,Strong,4 weeks,,
 Polyglutamic Acid,PGA,Humectant,Humectant,0.1-1.0%,0.002,,Hydration,Film Former,Hydration,4.0-6.0,,,,High Moisture,Strong,Immediate,,
@@ -457,14 +457,14 @@ Thiotic Acid,Alpha Lipoic,Antioxidant,Antioxidant,0.1-1.0%,0.005,,Repair,Metabol
 Retinaldehyde,Retinal,Active,Active,0.01-0.1%,0.0005,,Anti-aging,One-step ATRA,Anti-aging,6.0-7.0,,,,Faster Retinol,Strong,8-12 weeks,AHA/BHA,
 HPR,Granactive,Active,Active,0.1-2.0%,0.01,,Anti-aging,Direct Bind,Anti-aging,5.0-6.5,,,,Low Irritation,Strong,12 weeks,Benzoyl Perox,
 Zinc PCA,Zinc Salt,Active,Active,0.1-1.0%,0.005,,Oil Control,Sebum Inhib,Oil Control,4.0-6.0,,,,Anti-acne,Strong,2 weeks,,
-Phytosphingosine,Sphingoid,Barrier,Barrier,0.01-0.2%,0.001,,Repair,Antimicrobial,Repair,5.0-7.0,,,,Acne-Barrier,Strong,4 weeks,,
-Saccharide Isomerate,Pentavitin,Humectant,Humectant,1.0-5.0%,0.03,,Magnet,Keratin Bind,Magnet,4.0-7.0,,,,72h Hydration,Strong,Immediate,,
+Phytosphingosine,Sphingoid,Barrier,Barrier,0.01-0.2%,0.001,,Repair,Antimicrobial,Repair,5.0-7.0,,,,Acne-Barrier,Limited,4 weeks,,
+Saccharide Isomerate,Pentavitin,Humectant,Humectant,1.0-5.0%,0.03,,Magnet,Keratin Bind,Magnet,4.0-7.0,,,,72h Hydration,Limited,Immediate,,
 ETERWELL YOUTH,Senolytic,Active,Active,0.1-3.0%,0.01,,Aging,Zombie Cell Clr,Aging,5.0-6.0,,,,2024 Gold  4,Strong,12 weeks,,
 Pickmulse,Emulsifier,Functional,Functional,0.5-3.0%,0.01,,Sensory,Micellar Tech,Sensory,4.0-8.0,,,,2025 Gold  6,Strong,Immediate,,
 Galguard,Prebiotive,Functional,Functional,0.1-1.0%,0.005,,Microbe,Antimicrobial,Microbe,4.5-6.5,,,,2025 Silver  6,Strong,,,
 PRO-LONGEVIA,Biotech,Active,Active,0.5-2.0%,0.01,,Longevity,Cellular Fasting,Longevity,5.0-7.0,,,,2025 Gold  6,Strong,4-8 weeks,,
 Clarivine,Botanical,Active,Active,0.1-1.0%,0.005,,Longevity,Autophagy,Longevity,5.5-6.5,,,,2025 Silver  6,Strong,8 weeks,,
-PhytoCellTec,Exosomes,Active,Active,0.01-2.0%,0.01,,Repair,Stem Cell Sign,Repair,6.0-7.5,,,,2025 Bronze  6,Strong,12 weeks,Strong Acids,
+PhytoCellTec,Exosomes,Active,Active,0.01-2.0%,0.01,,Repair,Stem Cell Sign,Repair,6.0-7.5,,,,2025 Bronze  6,Emerging Clinical,12 weeks,Strong Acids,
 Luceane,Marine Ext,Active,Active,1.0-3.0%,0.02,,Fatigue,Metabolic Reg,Fatigue,5.0-7.0,,,,2025 Award  7,Strong,4 weeks,,
 OleoShine Green,Polymer,Functional,Functional,1.0-5.0%,0.02,,Radiance,Film Former,Radiance,5.0-8.0,,,,2025 Award  7,Strong,Immediate,,
 Bemotrizinol,Tinosorb S,Active,Active,1.0-6.0%,0.05,,UV Filter,Photostable,UV Filter,5.0-7.5,,,,2026 FDA,Strong,Immediate,,
@@ -517,7 +517,7 @@ Aquagenium,,Active,"A Bioderma exclusive ingredient, which is a blend of niacina
 - Strengthens the skin's moisture barrier and prevent dehydratio",Aquagenium is a patented complex used in skincare products to enhance the skin's natural hydration and moisture retention abilities. It is designed to,"[' ', 'Dry and dehydrated skin', ' ', 'Pregnancy', ' ', 'Texture']",,,,,"[' ', 'Related Allergy']",Limited,,"[' ', 'Related Allergy']",
 Apple Stem Cells,,Active,"Apple stem cells, also known as malus domestica fruit cell culture extract, occur naturally within p",,,,"Apple stem cells offer potential benefits for the skin: 
 - Believed to have anti-aging properties and may help stimulate the renewal and vitality of ",Apple stem cells are derived from the stem cells of apple plants. They are used in skincare for their potential to promote skin rejuvenation and suppo,"[' ', 'Elasticity', ' ', 'Fine Lines', ' ', 'Pregnancy', ' ', 'Wrinkles']",,,,,"[' ', 'Related Allergy']",Limited,,"[' ', 'Related Allergy']",
-nan,Euterpe Oleracea Fruit Extract,Active,,,,,,,[],,,,,[],Limited,,[],
+,Euterpe Oleracea Fruit Extract,Active,,,,,,,[],,,,,[],Limited,,[],
 Apple Polyphenols,,Active,"Apple (like most plants), contains polyphenols, which are compounds with strong antioxidant properti",,,,"Apple polyphenols offer multiple benefits for the skin:
 
 - Possess potent antioxidant properties, helping to neutralize  free radicals and prevent o",Apple polyphenols are natural compounds found in apples and are known for their antioxidant and anti-inflammatory properties. They are commonly used i,"[' ', 'Pregnancy']",,,,,"[' ', 'Related Allergy']",Moderate,,"[' ', 'Related Allergy']",
@@ -821,8 +821,8 @@ Tea Tree Oil,,Active,"Tea tree oil is an essential oil extracted from the Melale
 Zinc Sulfate,,Active,"The jury is still out on the efficacy of this zinc derivative, but it is used in skincare for its an",,,,"Zinc salts such as zinc gluconate, zinc PCA and zinc sulphate are used for their anti-inflammatory and sebum regulating properties.",An antibacterial ingredient used in skincare.,"[' ', 'Anyone']",,,,,"[' ', 'Related Allergy']",Limited,,"[' ', 'Related Allergy']",
 Neoglucosamine,,Active,"A patented non-amino acid sugar which gently exfoliates the skin, reduces fine lines and wrinkles an",,,,"Neoglucosamine offers benefits such as:
 - Supports the skin's natural production of hyaluronic acid, contributing to increased hydration and improved ","Neoglucosamine is a patented skincare ingredient derived from glucose, a simple sugar. It is chemically similar to glucosamine, a compound naturally f","[' ', 'Blackheads', ' ', 'Elasticity', ' ', 'Enlarged Pores', ' ', 'Fine Lines', ' ', 'Pigmentation', ' ', 'Post Blemish Marks', ' ', 'Radiance', ' ',",,,,,"[' ', 'Related Allergy', ' ', 'Impaired skin barrier']",Limited,,"[' ', 'Related Allergy', ' ', 'Impaired skin barrier']",
-Marine Bioretinol Complex,Algae-Derived Retinoid;Phytoretinol,Active,Retinoid Alternative,0.5,2,5,Anti-aging;Gentle retinoid alternative,Retinoid receptor modulation via marine compounds,Fine lines;Sensitive aging skin,5.5-7.0,Light stable;More stable than retinol,Low,0.0,Generally safe (emerging data),Moderate,8-12 weeks,None known,Emerging data;Limited long-term studies
-Vegan Polydeoxyribonucleotide,Plant-Derived PDRN;Microbial PDRN,Active,Regenerative,0.5,1,3,Tissue repair;Regeneration,Adenosine A2A receptor activation,Barrier damage;Post-procedure healing,6.0-7.5,Heat sensitive;Stable formulation required,Low,0.0,Caution advised (limited data),Limited,4-8 weeks,Acids,New to market 2026;Limited clinical data
+Marine Bioretinol Complex,Algae-Derived Retinoid;Phytoretinol,Active,Retinoid Alternative,0.5,2,5,Anti-aging;Gentle retinoid alternative,Retinoid receptor modulation via marine compounds,Fine lines;Sensitive aging skin,5.5-7.0,Light stable;More stable than retinol,Low,0.0,Generally safe (emerging data),Moderate Clinical,8-12 weeks,None known,Emerging data;Limited long-term studies
+Vegan Polydeoxyribonucleotide,Plant-Derived PDRN;Microbial PDRN,Active,Regenerative,0.5,1,3,Tissue repair;Regeneration,Adenosine A2A receptor activation,Barrier damage;Post-procedure healing,6.0-7.5,Heat sensitive;Stable formulation required,Low,0.0,Caution advised (limited data),Moderate Clinical,4-8 weeks,Acids,New to market 2026;Limited clinical data
 Senolytic Peptide Complex,Cell-Clearing Peptides;Anti-Senescence Complex,Active,Peptide;Anti-aging,0.01,0.05,0.1,Cellular renewal;Senescent cell clearance,Targets senescent cell markers,Advanced aging;Dull skin,5.0-7.0,Stable;Requires specific formulation,Low,0.0,Avoid (insufficient data),Limited,8-16 weeks,Strong acids,New 2026;Marketing hype;Limited data
 Nicotinamide Mononucleotide,NMN;NAD+ Precursor,Active,NAD+ Booster;Anti-aging,0.5,2,5,Cellular energy;DNA repair,NAD+ biosynthesis precursor,Aging;Dullness;Barrier weakness,5.5-7.0,Moderate stability;Protected formulation needed,Low,0.0,Caution (insufficient topical data),Moderate,6-12 weeks,None known,Premium pricing;Topical efficacy debated
 Fucose-Rich Polysaccharide Complex,Advanced Beta-Glucan;Fucoidan Complex,Active,Barrier Repair;Soothing,0.5,2,5,Barrier strengthening;Microbiome support,Immune modulation;Glycan signaling,Barrier damage;Sensitive skin;Redness,5.0-7.0,Stable,Low,0.0,Safe,Limited,2-6 weeks,,
@@ -831,12 +831,12 @@ Pycnogenol,Pine bark extract,Active,Antioxidant,0.05,0.2,1,Collagen protection,P
 Ceramide EOS,Ceramide EOS,Active,Barrier repair,0.05,0.2,1,Barrier repair,SC lipid mimicry,Barrier,5.0-7.0,Stable,Low,0.0,Safe,Strong,4-8 weeks,,
 Hexapeptide-9,Collagen peptide,Active,Repair peptide,0.005,0.02,0.1,Skin repair,ECM stimulation,Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,8-12 weeks,,Cosmetic-only
 Azelaoyl Glycine,Potassium Azeloyl Diglycinate,Active,Anti-acne;Brightening,3,6,10,Oil control;Tone even,5a-reductase inhibition,Acne;PIH,5.5-7.0,Stable,Low,0.0,Safe,Moderate,6-10 weeks,,
-Azelaic Acid Derivative,Azelaic Acid Ester,Active,Anti-acne;Brightening,2,5,10,Reduced irritation azelaic,Gradual azelaic release,Acne;PIH,5.0-6.5,Stable,Low,0.0,Safe,Moderate,6-10 weeks,,
+Azelaic Acid Derivative,Azelaic Acid Ester,Active,Anti-acne;Brightening,2,5,10,Reduced irritation azelaic,Gradual azelaic release,Acne;PIH,5.0-6.5,Stable,Low,0.0,Safe,Moderate Clinical,6-10 weeks,,
 Glutathione Ethyl Ester,GSH-EE,Active,Brightening;Antioxidant,0.05,0.2,1,Improved penetration glutathione,Enhanced cellular uptake,Pigmentation,5.0-7.0,Oxidation sensitive,Low,0.0,Safe,Moderate,8-12 weeks,,Stability
 Tripeptide-10 Citrulline,Decorinyl,Active,Repair peptide,0.005,0.02,0.1,Collagen organization,ECM regulation,Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,8-12 weeks,,Cosmetic-only
 Mulberry Extract,Morus Alba Extract,Active,Brightening,0.1,0.5,2,Melanin suppression,Tyrosinase inhibition,Pigmentation,5.0-7.0,Stable,Low,0.0,Safe,Moderate,6-10 weeks,,
 Arnica Montana Extract,Arnica Extract,Active,Anti-inflammatory,0.05,0.2,1,Redness reduction,Anti-inflammatory flavonoids,Post-procedure,5.0-7.0,Stable,Medium,0.0,Avoid pregnancy,Limited,2-4 weeks,,Sensitization
-Azelaic Acid Liposome,Encapsulated Azelaic,Active,Anti-acne;Brightening,5,10,15,Lower irritation azelaic,Controlled release azelaic,Acne;PIH,5.0-6.5,Stable,Low,0.0,Safe,Moderate,6-10 weeks,,Encapsulation cost
+Azelaic Acid Liposome,Encapsulated Azelaic,Active,Anti-acne;Brightening,5,10,15,Lower irritation azelaic,Controlled release azelaic,Acne;PIH,5.0-6.5,Stable,Low,0.0,Safe,Moderate Clinical,6-10 weeks,,Encapsulation cost
 Glucosyl Hesperidin,Hesperidin derivative,Active,Brightening;Circulation,0.1,0.5,2,Dark circle improvement,Microcirculation support,Dark circles,5.0-7.0,Stable,Low,0.0,Safe,Limited,6-10 weeks,,Eye-only benefit
 Tetrapeptide-21,Signal peptide,Active,Anti-aging peptide,0.005,0.02,0.1,Collagen I increase,Fibroblast stimulation,Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,8-12 weeks,,Cosmetic-only
 Copper Lysinate/Prolinate,Cu amino acid complex,Active,Repair peptide complex,0.01,0.05,0.2,Wound repair,Copper-mediated healing,Post-acne;Aging,5.0-7.0,Stable,Low,0.0,Safe,Moderate,4-8 weeks,Strong acids,Color
@@ -845,7 +845,7 @@ Oligopeptide-68,Brightening peptide,Active,Pigment control,0.001,0.01,0.05,Melan
 Tranexamic Acid Polymer,Polymeric TXA,Active,Brightening,0.5,2,5,Sustained pigment control,Controlled TXA release,Melasma,5.5-7.0,Stable,Low,0.0,Safe,Limited,8-12 weeks,,Emerging tech
 Oligopeptide-34,Brightening peptide,Active,Pigmentation control,0.001,0.01,0.05,Melanin reduction,MITF suppression,Pigmentation,5.0-7.0,Stable,Low,0.0,Safe,Moderate,8-12 weeks,,Weak solo effect
 Oligopeptide-51,Melanostatine-5,Active,Pigmentation peptide,0.001,0.01,0.05,Melanin inhibition,a-MSH antagonism,Pigmentation,5.0-7.0,Stable,Low,0.0,Safe,Moderate,8-12 weeks,,
-Exosome Extract,Plant-derived exosomes,Active,Regenerative signaling,0.01,0.05,0.2,Cell communication support,Extracellular vesicle signaling,Aging;Barrier,6.0-7.5,Heat sensitive,Low,0.0,Avoid pregnancy caution,Limited,6-12 weeks,,Emerging tech
+Exosome Extract,Plant-derived exosomes,Active,Regenerative signaling,0.01,0.05,0.2,Cell communication support,Extracellular vesicle signaling,Aging;Barrier,6.0-7.5,Heat sensitive,Low,0.0,Avoid pregnancy caution,Emerging Clinical,6-12 weeks,,Emerging tech
 Ethylhexyl Methoxycinnamate,Octinoxate,Active,UV filter (organic),2,7.5,10,UVB protection,UV absorption,Sunburn,5.5-7.5,Photounstable,Medium,0.0,Avoid pregnancy caution,Strong,Immediate,,Photoinstability
 Iron Oxides,CI 77491/92/99,Active,UV-visible filter,0.5,3,10,Visible light protection,Blue-light absorption,Melasma,6.0-8.0,Stable,Low,0.0,Safe,Moderate,Immediate,,Color residue
 Retinyl Acetate,Vitamin A acetate,Active,Vitamin A ester,0.05,0.3,1,Cell turnover,Enzymatic retinol conversion,Aging,5.5-7.0,Light sensitive,Medium,1.0,Avoid pregnancy,Moderate,12-24 weeks,,Weak potency
@@ -855,7 +855,7 @@ Callus Culture Extract,Stem cell extract,Active,Antioxidant;Repair,0.1,0.5,2,Cel
 Human Adipose Stem Cell Conditioned Media,ADSC-CM,Active,Regenerative (cosmetic-grade),0.01,0.05,0.2,Skin regeneration,Secretome signaling,Aging,6.0-7.5,Heat sensitive,Low,0.0,Avoid pregnancy,Limited,6-12 weeks,,Regulatory gray zone
 Tranexamic Acid Cetyl Phosphate,TXC,Active,Brightening (Japan),1,3,5,Melasma control,Plasmin inhibition,Melasma,5.5-7.0,Stable,Low,0.0,Safe,Strong,8-12 weeks,,Japan-only
 4-Methoxysalicylic Acid Potassium Salt,4MSK,Active,Brightening (Japan),0.5,2,4,Pigment reduction,Keratinocyte turnover,Pigmentation,4.5-6.0,Stable,Low,0.0,Safe,Strong,6-10 weeks,,Japan-only
-Tranexamic Acid Stearate,TXS,Active,Brightening (Korea/Japan),0.5,2,5,Sustained TXA delivery,Controlled release,Melasma,5.5-7.0,Stable,Low,0.0,Safe,Moderate,8-12 weeks,,Regional use
+Tranexamic Acid Stearate,TXS,Active,Brightening (Korea/Japan),0.5,2,5,Sustained TXA delivery,Controlled release,Melasma,5.5-7.0,Stable,Low,0.0,Safe,Moderate Clinical,8-12 weeks,,Regional use
 Madecassoside Asiatica Complex,CICA complex (KR),Active,Barrier;Soothing,0.1,0.5,2,Barrier repair,Triterpene synergy,Sensitive,5.0-7.0,Stable,Low,0.0,Safe,Strong,4-8 weeks,,
 Aqua,,Filler,,,,,,,,,,Low,0.0,,Limited,,,
 Sodium Hyaluronate,,Active,,,,,,,Hydration,,,Low,0.0,Safe,Strong,,,
@@ -869,8 +869,8 @@ Silybum Marianum Extract,Milk Thistle Extract,Botanical Extract,"Antioxidant, so
 Hydroxyethyl Acrylate/Sodium Acryloyldimethyl Taurate Copolymer,Acrylate Copolymer,Polymer,"Thickener, stabilizer",0.20%,0.5-2%,No specific limit,"Stabilizes emulsions, improves texture",Forms gel network for viscosity control,All skin types,,Stable polymer,Very Low,0.0,Safe,Limited,Immediate texture effect,,Microplastic concern
 Acacia Senegal Gum,Gum Arabic,Plant Gum,"Film former, stabilizer",0.50%,1-5%,No specific limit,"Film forming, skin tightening effect",Creates flexible film on skin surface,"Fine lines, texture",,May affect viscosity in high electrolyte systems,Low,0.0,Safe,Limited,Immediate tightening effect,Rare plant allergy,Botanical allergen potential
 Trisodium Ethylenediamine Disuccinate,EDDS,Chelating Agent,Stabilizer,0.05%,0.1-0.3%,No specific limit,Enhances preservative efficacy,Binds metal ions to prevent oxidation,All skin types,,Improves formula stability,Very Low,0.0,Safe,Limited,Immediate stabilization,,
-Titanium Dioxide,,Mineral UV Filter,Sunscreen Active,Varies,Regulatory dependent,Region dependent,UV protection,"Absorbs, reflects, or scatters UV radiation","Photoaging, pigmentation, skin cancer prevention",,Check photostability & filter compatibility,Low?Moderate (depends on filter),0.0,Mineral preferred; organic varies,Strong,Immediate protection,Sensitive skin may react to some organic filters,
-Zinc Oxide,,Mineral UV Filter,Sunscreen Active,Varies,Regulatory dependent,Region dependent,UV protection,"Absorbs, reflects, or scatters UV radiation","Photoaging, pigmentation, skin cancer prevention",,Check photostability & filter compatibility,Low?Moderate (depends on filter),0.0,Mineral preferred; organic varies,Strong,Immediate protection,Sensitive skin may react to some organic filters,
+Titanium Dioxide,,Mineral UV Filter,Sunscreen Active,Varies,Regulatory dependent,Region dependent,UV protection,"Absorbs, reflects, or scatters UV radiation","Photoaging, pigmentation, skin cancer prevention",,Check photostability & filter compatibility,Low?Moderate (depends on filter),0.0,Mineral preferred; organic varies,Limited,Immediate protection,Sensitive skin may react to some organic filters,
+Zinc Oxide,,Mineral UV Filter,Sunscreen Active,Varies,Regulatory dependent,Region dependent,UV protection,"Absorbs, reflects, or scatters UV radiation","Photoaging, pigmentation, skin cancer prevention",,Check photostability & filter compatibility,Low?Moderate (depends on filter),0.0,Mineral preferred; organic varies,Limited,Immediate protection,Sensitive skin may react to some organic filters,
 Avobenzone,,Organic UV Filter,Sunscreen Active,Varies,Regulatory dependent,Region dependent,UV protection,"Absorbs, reflects, or scatters UV radiation","Photoaging, pigmentation, skin cancer prevention",,Check photostability & filter compatibility,Low?Moderate (depends on filter),0.0,Mineral preferred; organic varies,Strong,Immediate protection,Sensitive skin may react to some organic filters,
 Octinoxate,,Organic UV Filter,Sunscreen Active,Varies,Regulatory dependent,Region dependent,UV protection,"Absorbs, reflects, or scatters UV radiation","Photoaging, pigmentation, skin cancer prevention",,Check photostability & filter compatibility,Low?Moderate (depends on filter),0.0,Mineral preferred; organic varies,Strong,Immediate protection,Sensitive skin may react to some organic filters,
 Octisalate,,Organic UV Filter,Sunscreen Active,Varies,Regulatory dependent,Region dependent,UV protection,"Absorbs, reflects, or scatters UV radiation","Photoaging, pigmentation, skin cancer prevention",,Check photostability & filter compatibility,Low?Moderate (depends on filter),0.0,Mineral preferred; organic varies,Strong,Immediate protection,Sensitive skin may react to some organic filters,

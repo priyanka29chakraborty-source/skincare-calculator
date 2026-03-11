@@ -106,7 +106,8 @@ function App() {
       fetchBestPrice();
     } catch (e) { setError(e.response?.data?.error || "Analysis failed"); }
     finally { setLoading(false); }
- }, [price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, activeConcentrations, fetchAlts, fetchBestPrice]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, activeConcentrations, fetchAlts, fetchBestPrice]);
 
   // Input debouncing - clear error after typing
   useEffect(() => {

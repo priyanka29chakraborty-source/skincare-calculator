@@ -4,13 +4,20 @@ import { ScoreCircle, TierBadge, BreakdownRow, ProgressBar, ConcernCard, SkinTyp
 import AlternativesCard from "./AlternativesCard";
 import BestPriceCard from "./BestPriceCard";
 
-// Score label helper
-function getScoreLabel(score) {
-  if (score >= 90) return { label: "Excellent Value", color: "#267C36" };
-  if (score >= 75) return { label: "Worth Buying", color: "#2D7FD3" };
-  if (score >= 60) return { label: "Acceptable", color: "#E6A817" };
-  if (score >= 40) return { label: "Poor Value", color: "#D06030" };
-  return { label: "Marketing-Driven", color: "#C0392B" };
+// Score chip label — uses value_tier from backend to avoid logical contradictions
+function getValueChip(valueTier, ratio) {
+  switch (valueTier) {
+    case 'underpriced':
+      return { label: 'Excellent Value', subtitle: 'Good formula, priced below category average.', color: '#267C36' };
+    case 'fair':
+      return { label: 'Acceptable & Fairly Priced', subtitle: `Good formula, ~${(ratio || 1).toFixed(1)}× category price.`, color: '#2D7FD3' };
+    case 'slightly_overpriced':
+      return { label: 'Acceptable but Slightly Overpriced', subtitle: 'Formula is decent but priced above category average.', color: '#E6A817' };
+    case 'overpriced':
+      return { label: 'Overpriced for Actives Inside', subtitle: 'Active ingredient value does not justify the price point.', color: '#D06030' };
+    default:
+      return { label: 'Analysed', subtitle: '', color: '#7A7168' };
+  }
 }
 
 // Ingredient breakdown table
@@ -24,20 +31,33 @@ function IngredientBreakdownTable({ actives }) {
             <th style={{ padding: "6px 10px", textAlign: "left" }}>#</th>
             <th style={{ padding: "6px 10px", textAlign: "left" }}>Active Ingredient</th>
             <th style={{ padding: "6px 10px", textAlign: "center" }}>Evidence</th>
-            <th style={{ padding: "6px 10px", textAlign: "center" }}>Concentration</th>
+            <th style={{ padding: "6px 10px", textAlign: "left" }}>What It Does</th>
+            <th style={{ padding: "6px 10px", textAlign: "center" }}>Concentration Est.</th>
           </tr>
         </thead>
         <tbody>
           {actives.map((a, i) => (
             <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "var(--bg-deep)" }}>
-              <td style={{ padding: "5px 10px", color: "var(--text-sub)" }}>{a.position}</td>
-              <td style={{ padding: "5px 10px", fontWeight: 500 }}>{a.name}</td>
+              <td style={{ padding: "5px 10px", color: "var(--text-sub)" }} title="Position in ingredient list">#{a.position}</td>
+              <td style={{ padding: "5px 10px", fontWeight: 500 }}>
+                {a.name}
+                {a.targets?.length > 0 && (
+                  <div style={{ marginTop: "2px", display: "flex", flexWrap: "wrap", gap: "3px" }}>
+                    {a.targets.map((t, ti) => (
+                      <span key={ti} style={{ fontSize: "0.68rem", background: "var(--cream)", border: "1px solid var(--border)", padding: "1px 5px", borderRadius: "8px", color: "var(--text-sub)" }}>{t}</span>
+                    ))}
+                  </div>
+                )}
+              </td>
               <td style={{ padding: "5px 10px", textAlign: "center" }}>
                 <span style={{
                   padding: "2px 7px", borderRadius: "10px", fontSize: "0.75rem",
-                  background: a.evidence === "strong" ? "#D4EDDA" : a.evidence === "moderate" ? "#FFF3CD" : "#F8D7DA",
-                  color: a.evidence === "strong" ? "#155724" : a.evidence === "moderate" ? "#856404" : "#721C24"
+                  background: a.evidence?.toLowerCase().startsWith("strong") ? "#D4EDDA" : a.evidence?.toLowerCase().startsWith("moderate") ? "#FFF3CD" : "#F8D7DA",
+                  color: a.evidence?.toLowerCase().startsWith("strong") ? "#155724" : a.evidence?.toLowerCase().startsWith("moderate") ? "#856404" : "#721C24"
                 }}>{a.evidence}</span>
+              </td>
+              <td style={{ padding: "5px 10px", color: "var(--text-sub)", fontSize: "0.78rem", maxWidth: "200px" }}>
+                {a.primary_benefits || a.functional_category || "—"}
               </td>
               <td style={{ padding: "5px 10px", textAlign: "center", color: "var(--text-sub)", fontSize: "0.78rem" }}>{a.concentration}</td>
             </tr>
@@ -248,7 +268,10 @@ function SunscreenAnalysisCard({ data }) {
 export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput }) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showIngTable, setShowIngTable] = useState(false);
-  const scoreLabel = getScoreLabel(result.main_worth_score);
+  const valueChip = getValueChip(
+    result.price_analysis?.value_tier,
+    result.price_analysis?.ratio
+  );
 
   return (
     <>
@@ -259,7 +282,8 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           <ScoreCircle score={result.main_worth_score} />
           <div className="score-meta">
             <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
-            <div className="score-label-badge" style={{ display: "inline-block", background: scoreLabel.color + "20", color: scoreLabel.color, border: `1px solid ${scoreLabel.color}40`, borderRadius: "8px", padding: "2px 10px", fontSize: "0.8rem", fontWeight: 600, marginBottom: "4px" }}>{scoreLabel.label}</div>
+            <div style={{ display: "inline-block", background: valueChip.color + "20", color: valueChip.color, border: `1px solid ${valueChip.color}40`, borderRadius: "8px", padding: "2px 10px", fontSize: "0.8rem", fontWeight: 600, marginBottom: "4px" }}>{valueChip.label}</div>
+            {valueChip.subtitle && <p style={{ fontSize: "0.78rem", color: "var(--text-sub)", margin: "2px 0 4px" }}>{valueChip.subtitle}</p>}
             <p className="score-title-text">{result.score_title}</p>
             {result.worth_multipliers_applied?.length > 0 && (
               <p className="multipliers">Bonus: {result.worth_multipliers_applied.join(", ")}</p>
@@ -282,11 +306,11 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           {showBreakdown ? "Hide" : "Show"} Detailed Breakdown {showBreakdown ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
         </button>
         <div className={"breakdown" + (showBreakdown ? " open" : "")} data-testid="breakdown-details">
-            <BreakdownRow icon="fa-solid fa-chart-bar" label="Active Ingredient Value" score={result.component_scores?.A} max={45} details={result.component_details?.A} />
-            <BreakdownRow icon="fa-solid fa-flask" label="Functional Formula Quality" score={result.component_scores?.B} max={20} details={result.component_details?.B} />
-            <BreakdownRow icon="fa-solid fa-check-circle" label="Claim-Reality Accuracy" score={result.component_scores?.C} max={15} details={result.component_details?.C} />
-            <BreakdownRow icon="fa-solid fa-shield-halved" label="Safety & Suitability" score={result.component_scores?.D} max={10} details={result.component_details?.D} />
-            <BreakdownRow icon="fa-solid fa-coins" label="Price Rationality" score={result.component_scores?.E} max={10} details={result.component_details?.E} />
+            <BreakdownRow icon="fa-solid fa-chart-bar" label="Active Ingredients (What's Inside)" score={result.component_scores?.A} max={45} details={result.component_details?.A} />
+            <BreakdownRow icon="fa-solid fa-flask" label="Formula Quality (How Well Made)" score={result.component_scores?.B} max={20} details={result.component_details?.B} />
+            <BreakdownRow icon="fa-solid fa-check-circle" label="Claims vs Reality (Honesty Score)" score={result.component_scores?.C} max={15} details={result.component_details?.C} />
+            <BreakdownRow icon="fa-solid fa-shield-halved" label="Safety Profile" score={result.component_scores?.D} max={10} details={result.component_details?.D} />
+            <BreakdownRow icon="fa-solid fa-coins" label="Price Fairness" score={result.component_scores?.E} max={10} details={result.component_details?.E} />
           </div>
 
         {result.red_flags?.length > 0 && (
@@ -310,6 +334,40 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             </div>
           </div>
         )}
+
+        {/* Active Classes Buckets */}
+        {result.active_classes && Object.values(result.active_classes).some(b => b?.length > 0) && (
+          <div style={{ marginTop: "1.2rem" }}>
+            <h4 style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-sub)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <i className="fa-solid fa-layer-group" style={{ marginRight: "5px" }}></i>Active Ingredient Classes
+            </h4>
+            {[
+              { key: "primary",       label: "Primary Actives",  icon: "fa-solid fa-star",         color: "var(--sage)" },
+              { key: "supporting",    label: "Supporting",       icon: "fa-solid fa-circle-half-stroke", color: "var(--charcoal)" },
+              { key: "antioxidants",  label: "Antioxidants",     icon: "fa-solid fa-shield-halved", color: "var(--dusty-rose-dark)" },
+              { key: "barrier_support", label: "Barrier Support", icon: "fa-solid fa-droplet",      color: "var(--rose)" },
+            ].map(({ key, label, icon, color }) => {
+              const items = result.active_classes[key];
+              if (!items?.length) return null;
+              return (
+                <div key={key} style={{ marginBottom: "0.45rem", display: "flex", alignItems: "flex-start", gap: "6px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color, whiteSpace: "nowrap", minWidth: "110px" }}>
+                    <i className={icon} style={{ marginRight: "4px" }}></i>{label}
+                  </span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                    {items.map((name, i) => (
+                      <span key={i} style={{
+                        fontSize: "0.72rem", padding: "2px 8px", borderRadius: "20px",
+                        background: "var(--cream)", border: "1px solid var(--border)",
+                        color: "var(--charcoal)"
+                      }}>{name}</span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* CARD 2: CONCERN FIT */}
@@ -331,11 +389,27 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       {/* CARD 3: SKIN TYPE COMPAT */}
       <div className="sc-card result-card card-3" data-testid="card-skin-type" style={{ "--anim-delay": "0.3s" }}>
         <h2 className="card-title"><i className="fa-solid fa-user-check"></i> {skinType} Skin Compatibility</h2>
+        <div style={{ marginBottom: "8px", fontSize: "0.8rem", color: "var(--text-sub)" }}>
+          Base texture compatibility for {skinType} skin: <strong style={{ color: getBarColor(result.skin_type_base_texture || result.skin_type_compatibility) }}>{result.skin_type_base_texture || result.skin_type_compatibility}%</strong>
+        </div>
         <div className="compat-score-row">
           <span className="compat-pct" style={{ color: getBarColor(result.skin_type_compatibility) }}>{result.skin_type_compatibility}%</span>
           <ProgressBar pct={result.skin_type_compatibility} label="compat" />
         </div>
-        <SkinTypeDetails details={result.skin_type_details} score={result.skin_type_compatibility} betterSuited={result.better_suited} formNotes={result.skin_type_details?.formulation_notes} />
+        {result.skin_type_risk_level && (
+          <div style={{ marginTop: "8px", marginBottom: "6px" }}>
+            {result.skin_type_risk_level === "low" && (
+              <span style={{ fontSize: "0.78rem", background: "#D4EDDA", color: "#155724", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>✓ Low sensitivity risk overall.</span>
+            )}
+            {result.skin_type_risk_level === "moderate" && (
+              <span style={{ fontSize: "0.78rem", background: "#FFF3CD", color: "#856404", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Some ingredients may not suit acne-prone or sensitive areas.</span>
+            )}
+            {result.skin_type_risk_level === "high" && (
+              <span style={{ fontSize: "0.78rem", background: "#F8D7DA", color: "#721C24", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Important: multiple acne or sensitivity risks detected. See notes below.</span>
+            )}
+          </div>
+        )}
+        <SkinTypeDetails details={result.skin_type_details} score={result.skin_type_compatibility} betterSuited={result.better_suited} formNotes={result.skin_type_details?.formulation_notes} riskLevel={result.skin_type_risk_level} />
       </div>
 
       {/* CARD 4A: ALTERNATIVES */}

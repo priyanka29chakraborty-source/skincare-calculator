@@ -39,15 +39,19 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
         <div key={i} className="upgrade-box" data-testid={`upgrade-suggestion-${i}`}>
           <div className="upgrade-header">
             <i className="fa-solid fa-arrow-trend-up"></i>
-            <span className="upgrade-name">Upgrade Option: {sug.upgrade}</span>
+            <span className="upgrade-name">Add-On: {sug.upgrade}</span>
             <span className="upgrade-concern-tag">{sug.concern}</span>
           </div>
           <div className="upgrade-body">
-            <p className="upgrade-why-title">Why Better:</p>
+            <p className="upgrade-why-title">Why It Helps:</p>
             <ul className="upgrade-reasons">
               <li>{sug.reason}</li>
               {sug.active && <li>Key active: {sug.active}</li>}
             </ul>
+            <p style={{ fontSize: "0.74rem", color: "var(--text-sub)", marginTop: "6px", fontStyle: "italic" }}>
+              <i className="fa-solid fa-circle-info" style={{ marginRight: "4px" }}></i>
+              Consider as an add-on serum for {sug.concern}, not a replacement for your current product.
+            </p>
           </div>
         </div>
       ))}
@@ -80,8 +84,9 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
                 {/* Fixed: backend sends alt.link (single string), not alt.buy_links[] */}
                 {alt.link && (
                   <div className="scored-alt-links">
-                    <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link" data-testid={`scored-alt-link-${i}`}>
-                      {alt.source || 'View Product'} <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                    <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link buy-here-link" data-testid={`scored-alt-link-${i}`}>
+                      <i className="fa-solid fa-store" style={{ marginRight: "5px" }}></i>
+                      Shop on {alt.source || 'Retailer'} <i className="fa-solid fa-arrow-up-right-from-square"></i>
                     </a>
                   </div>
                 )}

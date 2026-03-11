@@ -284,12 +284,17 @@ async def fetch_from_url(url: str):
                 "size": result.get('size_ml'),
                 "unit": result.get('size_unit', 'ml'),
                 "price": result.get('price'),
+                "price_confidence": result.get('price_confidence', 'low'),
                 "country": result.get('country'),
                 "currency": result.get('currency'),
                 "category": result.get('category'),
                 "partial": not has_ingredients,
                 "country_uncertain": country_uncertain,
-                "price_note": "Price could not be determined. Please fill in manually." if not result.get('price') else None,
+                "price_note": (
+                    "Price could not be determined. Please fill in manually." if not result.get('price')
+                    else "Price could not be determined reliably from this page. Please double-check or edit manually." if result.get('price_confidence') == 'low'
+                    else None
+                ),
                 "message": "Some fields could not be fetched. Please fill in the missing fields manually." if not (result.get('product_name') and has_ingredients) else None,
                 "country_message": "Could not detect country automatically. Please select your country." if country_uncertain else None,
                 "active_concentrations": result.get('active_concentrations', {}),
@@ -364,7 +369,7 @@ def _serp_shopping_search(query, country, serp_key, num=10):
             data = resp.json()
             results = []
             for item in data.get('shopping_results', [])[:num]:
-                link = item.get('product_link', '') or item.get('link', '') or item.get('serpapi_product_api', '')
+                link = item.get('link', '') or item.get('product_link', '') or item.get('serpapi_product_api', '')
                 results.append({
                     'name': item.get('title', ''),
                     'price': item.get('extracted_price', item.get('price', '')),
@@ -653,9 +658,9 @@ async def best_price(req: BestPriceRequest, request: Request):
                 source_domain = ddg_urls[i].split('/')[2] if '/' in ddg_urls[i] else ''
                 if source_domain in seen_sources:
                     continue
-                # Verify same product
-                name = pd_item.get('product_name') or ddg_results[i].get('title', '')
-                if req.brand and req.brand.lower() not in name.lower():
+                name = pd_item.get('product_name') or ddg_results[i].get('title', '') if i < len(ddg_results) else ''
+                # Apply same product check (brand + size match)
+                if not _is_same_product(name or '', req.brand, req.product_name, req.size_ml):
                     continue
                 seen_sources.add(source_domain)
                 validated.append({
@@ -702,6 +707,7 @@ async def best_price(req: BestPriceRequest, request: Request):
         return {"best_price": None, "all_prices": [], "is_user_cheapest": False, "savings": 0}
 
     user_price = req.user_price or 0
+    # Keep only ONE best (cheapest) result — strict single-result mode
     cheapest = validated[0]
 
     if user_price > 0 and user_price <= cheapest['price']:
@@ -710,7 +716,7 @@ async def best_price(req: BestPriceRequest, request: Request):
             "user_url": req.user_url,
             "user_price": user_price,
             "best_price": None,
-            "all_prices": validated[:5],
+            "all_prices": [],
             "savings": 0,
         }
     else:
@@ -718,7 +724,7 @@ async def best_price(req: BestPriceRequest, request: Request):
         return {
             "is_user_cheapest": False,
             "best_price": cheapest,
-            "all_prices": validated[:5],
+            "all_prices": [],
             "savings": savings,
         }
 

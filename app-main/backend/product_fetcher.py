@@ -298,7 +298,7 @@ def _merge_results(base, overlay):
     if not overlay:
         return base
     merged = dict(base)
-    for key in ['product_name', 'brand', 'price', 'size_ml', 'size_unit',
+    for key in ['product_name', 'brand', 'price', 'price_confidence', 'size_ml', 'size_unit',
                 'ingredients', 'category', 'country', 'currency']:
         if not merged.get(key) and overlay.get(key):
             merged[key] = overlay[key]
@@ -573,44 +573,105 @@ def _extract_metadata(html, url):
 
     # --- Price ---
     price = None
+    price_confidence = "low"
+
+    # Priority 1: JSON-LD structured data (most reliable)
     for script_tag in soup.find_all('script', type='application/ld+json'):
         try:
             ld = json.loads(script_tag.string)
             items = ld if isinstance(ld, list) else [ld]
             for item in items:
-                offers = item.get('offers', item)
-                if isinstance(offers, list):
-                    offers = offers[0]
-                if isinstance(offers, dict):
-                    p = offers.get('price') or offers.get('lowPrice')
-                    if p:
-                        price = float(str(p).replace(',', ''))
-                        break
+                # Handle @graph
+                graph = item.get('@graph', [])
+                candidates = [item] + graph
+                for candidate in candidates:
+                    if candidate.get('@type') not in ('Product', 'IndividualProduct', None):
+                        if candidate.get('@type') not in ('Product', 'IndividualProduct'):
+                            continue
+                    offers = candidate.get('offers', candidate)
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    if isinstance(offers, dict):
+                        p = offers.get('price') or offers.get('lowPrice')
+                        if p:
+                            try:
+                                price = float(str(p).replace(',', ''))
+                                price_confidence = "high"
+                                break
+                            except (ValueError, TypeError):
+                                pass
+                if price:
+                    break
         except Exception:
             pass
 
+    # Priority 2: Structured HTML price selectors (medium confidence)
+    if not price:
+        price_selectors = [
+            # Amazon
+            {'id': 'priceblock_ourprice'}, {'id': 'priceblock_dealprice'},
+            {'id': 'price_inside_buybox'}, {'id': 'apex_offerDisplay_desktop'},
+            {'class': 'a-price-whole'},
+            # Nykaa
+            {'class': 'css-1jczs19'}, {'class': 'price-box'},
+            {'class': 'final-price'}, {'class': 'selling-price'},
+            # Generic
+            {'itemprop': 'price'},
+            {'class': re.compile(r'sale.?price|selling.?price|offer.?price|current.?price|final.?price', re.I)},
+            {'id': re.compile(r'sale.?price|selling.?price|offer.?price|current.?price', re.I)},
+        ]
+        sym = CURRENCY_SYMBOLS.get(currency, r'[\$₹£€]')
+        for sel in price_selectors:
+            el = soup.find(attrs=sel) if not any(isinstance(v, re.Pattern) for v in sel.values()) else soup.find(True, attrs=sel)
+            if el:
+                raw = el.get('content') or el.get('data-price') or el.get_text(strip=True)
+                raw = re.sub(r'[^\d.,]', '', raw)
+                try:
+                    p = float(raw.replace(',', ''))
+                    if 0 < p < 500000:
+                        price = p
+                        price_confidence = "medium"
+                        break
+                except (ValueError, TypeError):
+                    pass
+
+    # Priority 3: Regex on page text (low confidence)
     if not price:
         sym = CURRENCY_SYMBOLS.get(currency, r'[\$₹£€]')
-        patterns = [
-            re.compile(r'(?:sale|offer|special|discounted?|selling)\s*(?:price)?[:\s]*' + sym + r'\s*(\d[\d,]*\.?\d*)', re.I),
-            re.compile(sym + r'\s*(\d[\d,]*\.?\d*)', re.I),
+        # Tighter patterns: require proximity to price keywords
+        price_patterns = [
+            re.compile(r'(?:sale|offer|special|discounted?|selling|deal)\s*(?:price)?\s*[:\-]?\s*' + sym + r'\s*([\d,]+\.?\d*)', re.I),
+            re.compile(r'(?:mrp|price|cost)\s*[:\-]?\s*' + sym + r'\s*([\d,]+\.?\d*)', re.I),
+            re.compile(sym + r'\s*([\d,]+\.?\d*)(?:\s*(?:only|inclusive|incl))?', re.I),
         ]
-        for pat in patterns:
-            m = pat.search(text[:8000])
-            if m:
+        for pat in price_patterns:
+            for m in pat.finditer(text[:10000]):
                 try:
                     p = float(m.group(1).replace(',', ''))
-                    if 0 < p < 100000:
+                    # Sanity check: realistic cosmetic price range
+                    if 10 < p < 200000:
                         price = p
+                        price_confidence = "low"
                         break
                 except ValueError:
                     pass
+            if price:
+                break
 
     # --- Size ---
     size_ml, size_unit = _parse_size(text[:3000], product_name)
 
     # --- Ingredients ---
     ingredients = None
+
+    # Pre-clean: remove "Read more" / "Show more" / "View more" button text from soup
+    _UI_TAIL_RE = re.compile(r'\b(read\s*more|show\s*more|view\s*more|see\s*more|load\s*more)\b', re.I)
+    for btn in soup.find_all(['button', 'a', 'span', 'div']):
+        if _UI_TAIL_RE.search(btn.get_text(strip=True)):
+            btn.decompose()
+
+    # Re-extract text after cleaning
+    text_clean = soup.get_text(' ', strip=True)
 
     # Strategy 1: Section markers
     inci_patterns = [
@@ -619,9 +680,11 @@ def _extract_metadata(html, url):
         re.compile(r'composition\s*[:\-]\s*', re.I),
     ]
     for pat in inci_patterns:
-        m = pat.search(text)
+        m = pat.search(text_clean)
         if m:
-            after = text[m.end():m.end() + 3000]
+            after = text_clean[m.end():m.end() + 3000]
+            # Strip any trailing UI text
+            after = _UI_TAIL_RE.sub('', after).strip()
             cb = re.match(r'([^.]{20,}(?:,\s*[^.]{2,}){4,})', after)
             if cb:
                 ingredients = cb.group(1).strip()
@@ -629,7 +692,7 @@ def _extract_metadata(html, url):
 
     # Strategy 2: Aqua/Water pattern
     if not ingredients:
-        wm = re.search(r'((?:Aqua|Water)(?:/[^,]*)?[^.]*(?:,\s*[\w\s\-\(\)\/]+){4,})', text)
+        wm = re.search(r'((?:Aqua|Water)(?:/[^,]*)?[^.]*(?:,\s*[\w\s\-\(\)\/]+){4,})', text_clean)
         if wm:
             ingredients = wm.group(1).strip()
 
@@ -637,6 +700,9 @@ def _extract_metadata(html, url):
     if not ingredients:
         for el in soup.find_all(['div', 'p', 'span', 'td', 'li']):
             el_text = el.get_text(' ', strip=True)
+            # Skip elements that are clearly UI / navigation
+            if _UI_TAIL_RE.search(el_text):
+                continue
             if len(el_text) > 50 and el_text.count(',') >= 8:
                 words = el_text.split(',')
                 if any(w.strip().lower() in ('aqua', 'water', 'glycerin', 'dimethicone', 'niacinamide') for w in words[:5]):
@@ -655,6 +721,8 @@ def _extract_metadata(html, url):
     if ingredients:
         ingredients = re.sub(r'^(?:Ingredients|INCI|Composition)\s*[:\-]\s*', '', ingredients, flags=re.I)
         ingredients = re.sub(r'\s*(?:How to use|Directions|Warning|Disclaimer|Storage).*$', '', ingredients, flags=re.I)
+        # Strip any trailing "Read more" / UI tails
+        ingredients = _UI_TAIL_RE.sub('', ingredients).strip().rstrip(',').strip()
         if len(ingredients) > 3000:
             ingredients = ingredients[:3000]
 
@@ -693,6 +761,7 @@ def _extract_metadata(html, url):
         'product_name': product_name,
         'brand': brand,
         'price': price,
+        'price_confidence': price_confidence,
         'size_ml': size_ml,
         'size_unit': size_unit,
         'ingredients': ingredients,
