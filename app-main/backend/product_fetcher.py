@@ -88,6 +88,7 @@ KNOWN_SHOPIFY_DOMAINS = [
 SITE_ROUTING = {
     # India — custom (non-Shopify)
     'nykaa.com':          ['firecrawl', 'scrapedo'],
+    'tirabeauty.com':     ['firecrawl', 'scrapedo'],
     'amazon.in':          ['scrapedo', 'scraperapi'],
     'purplle.com':        ['firecrawl', 'scrapedo'],
     'flipkart.com':       ['scrapedo', 'scraperapi'],
@@ -146,6 +147,7 @@ KNOWN_BRAND_COUNTRIES = {
     'nykaa.com': ('India', 'INR'), 'flipkart.com': ('India', 'INR'),
     'purplle.com': ('India', 'INR'), 'myntra.com': ('India', 'INR'),
     'tatacliq.com': ('India', 'INR'), '1mg.com': ('India', 'INR'),
+    'tirabeauty.com': ('India', 'INR'),
     'foxtale.in': ('India', 'INR'), 'minimalistskincare.com': ('India', 'INR'),
     # Korean brands on .com
     'cosrx.com': ('South Korea', 'KRW'), 'innisfree.com': ('South Korea', 'KRW'),
@@ -576,34 +578,40 @@ def _extract_metadata(html, url):
     price_confidence = "low"
 
     # Priority 1: JSON-LD structured data (most reliable)
+    # Collect ALL price candidates, then pick highest — discount/cashback amounts
+    # are always smaller than the real product price.
+    _jsonld_candidates = []
     for script_tag in soup.find_all('script', type='application/ld+json'):
         try:
             ld = json.loads(script_tag.string)
             items = ld if isinstance(ld, list) else [ld]
             for item in items:
-                # Handle @graph
                 graph = item.get('@graph', [])
                 candidates = [item] + graph
                 for candidate in candidates:
-                    if candidate.get('@type') not in ('Product', 'IndividualProduct', None):
-                        if candidate.get('@type') not in ('Product', 'IndividualProduct'):
-                            continue
+                    # Only accept explicitly typed Product/IndividualProduct nodes
+                    c_type = candidate.get('@type', '')
+                    if c_type and c_type not in ('Product', 'IndividualProduct'):
+                        continue
                     offers = candidate.get('offers', candidate)
-                    if isinstance(offers, list):
-                        offers = offers[0]
-                    if isinstance(offers, dict):
-                        p = offers.get('price') or offers.get('lowPrice')
+                    offer_list = offers if isinstance(offers, list) else [offers]
+                    for offer in offer_list:
+                        if not isinstance(offer, dict):
+                            continue
+                        p = offer.get('price') or offer.get('highPrice')
                         if p:
                             try:
-                                price = float(str(p).replace(',', ''))
-                                price_confidence = "high"
-                                break
+                                val = float(str(p).replace(',', ''))
+                                if val > 0:
+                                    _jsonld_candidates.append(val)
                             except (ValueError, TypeError):
                                 pass
-                if price:
-                    break
         except Exception:
             pass
+    if _jsonld_candidates:
+        # Use the highest price — real price is always > any discount/cashback amount
+        price = max(_jsonld_candidates)
+        price_confidence = "high"
 
     # Priority 2: Structured HTML price selectors (medium confidence)
     if not price:
@@ -615,7 +623,10 @@ def _extract_metadata(html, url):
             # Nykaa
             {'class': 'css-1jczs19'}, {'class': 'price-box'},
             {'class': 'final-price'}, {'class': 'selling-price'},
-            # Generic
+            # Tira Beauty (Reliance React platform)
+            {'data-testid': 'selling-price'}, {'data-testid': 'product-price'},
+            {'class': re.compile(r'wt-text-base-max|sellingPrice|product.*price|price.*value', re.I)},
+            # Generic structured selectors
             {'itemprop': 'price'},
             {'class': re.compile(r'sale.?price|selling.?price|offer.?price|current.?price|final.?price', re.I)},
             {'id': re.compile(r'sale.?price|selling.?price|offer.?price|current.?price', re.I)},
@@ -638,25 +649,63 @@ def _extract_metadata(html, url):
     # Priority 3: Regex on page text (low confidence)
     if not price:
         sym = CURRENCY_SYMBOLS.get(currency, r'[\$₹£€]')
-        # Tighter patterns: require proximity to price keywords
-        price_patterns = [
-            re.compile(r'(?:sale|offer|special|discounted?|selling|deal)\s*(?:price)?\s*[:\-]?\s*' + sym + r'\s*([\d,]+\.?\d*)', re.I),
-            re.compile(r'(?:mrp|price|cost)\s*[:\-]?\s*' + sym + r'\s*([\d,]+\.?\d*)', re.I),
-            re.compile(sym + r'\s*([\d,]+\.?\d*)(?:\s*(?:only|inclusive|incl))?', re.I),
-        ]
-        for pat in price_patterns:
-            for m in pat.finditer(text[:10000]):
-                try:
-                    p = float(m.group(1).replace(',', ''))
-                    # Sanity check: realistic cosmetic price range
-                    if 10 < p < 200000:
-                        price = p
-                        price_confidence = "low"
-                        break
-                except ValueError:
-                    pass
-            if price:
-                break
+        # Collect ALL price candidates from page — avoid picking up discounts/savings first
+        price_candidates = []
+        # Pattern A: Tightly anchored to price-keyword context — highest priority
+        kw_pat = re.compile(
+            r'(?:selling\s+price|current\s+price|offer\s+price|special\s+price|deal\s+price|you\s+pay|buy\s+(?:now\s+)?(?:at|for)?)\s*[:\-]?\s*'
+            + sym + r'\s*([\d,]+\.?\d*)', re.I)
+        for m in kw_pat.finditer(text[:12000]):
+            try:
+                p = float(m.group(1).replace(',', ''))
+                if 10 < p < 200000:
+                    price_candidates.append((p, 0))  # priority 0 = highest
+            except ValueError:
+                pass
+
+        # Pattern B: MRP/price label
+        mrp_pat = re.compile(r'(?:mrp|price|cost)\s*[:\-]?\s*' + sym + r'\s*([\d,]+\.?\d*)', re.I)
+        for m in mrp_pat.finditer(text[:12000]):
+            try:
+                p = float(m.group(1).replace(',', ''))
+                if 10 < p < 200000:
+                    price_candidates.append((p, 1))
+            except ValueError:
+                pass
+
+        # Pattern C: Bare currency symbol — lowest priority, skip "save/off" context
+        bare_pat = re.compile(sym + r'\s*([\d,]+\.?\d*)', re.I)
+        # Negative context: amounts preceded by save/off/discount
+        negative_ctx = re.compile(r'(?:save|off|discount(?:ed)?|cashback|points?|earn|get)\s*' + sym + r'\s*([\d,]+)', re.I)
+        negative_amounts = set()
+        for m in negative_ctx.finditer(text[:12000]):
+            try:
+                negative_amounts.add(float(m.group(1).replace(',', '')))
+            except ValueError:
+                pass
+        for m in bare_pat.finditer(text[:12000]):
+            try:
+                p = float(m.group(1).replace(',', ''))
+                if 10 < p < 200000 and p not in negative_amounts:
+                    price_candidates.append((p, 2))
+            except ValueError:
+                pass
+
+        if price_candidates:
+            # Sort: prefer lower priority number (more specific context), then higher price
+            # Discount/savings/cashback amounts are always smaller than actual product price.
+            price_candidates.sort(key=lambda x: (x[1], -x[0]))
+            price = price_candidates[0][0]
+            price_confidence = "low"
+            # Extra guard: if chosen price is implausibly low and a much higher candidate exists,
+            # prefer the highest priority-0 or priority-1 candidate.
+            best_p0 = max((p for p, pri in price_candidates if pri == 0), default=None)
+            best_p1 = max((p for p, pri in price_candidates if pri <= 1), default=None)
+            if best_p0 and best_p0 > price * 3:
+                price = best_p0
+                price_confidence = "medium"
+            elif best_p1 and best_p1 > price * 3:
+                price = best_p1
 
     # --- Size ---
     size_ml, size_unit = _parse_size(text[:3000], product_name)
@@ -673,22 +722,84 @@ def _extract_metadata(html, url):
     # Re-extract text after cleaning
     text_clean = soup.get_text(' ', strip=True)
 
-    # Strategy 1: Section markers
+    # Strategy 1: Section markers — ordered from most to least specific.
+    # Negative lookbehind prevents matching "Key Ingredients:", "Hero Ingredients:" etc.
+    # Those sections contain marketing text, not INCI lists.
+    _MKTG_ADJECTIVE = re.compile(
+        r'(?:key|hero|star|active|main|featured|highlight|top|signature|power|hero(?:ine)?|why)\s+ingredients?\s*[:\-]',
+        re.I
+    )
     inci_patterns = [
-        re.compile(r'(?:full\s+)?ingredients?\s*[:\-]\s*', re.I),
-        re.compile(r'INCI\s*[:\-]\s*', re.I),
+        # Most explicit — "All Ingredients:", "Full Ingredients:", "Complete Ingredients:"
+        re.compile(r'(?:all|full|complete|total)\s+ingredients?\s*[:\-]\s*', re.I),
+        # INCI label
+        re.compile(r'\bINCI\s*[:\-]\s*', re.I),
+        # Bare "Ingredients:" — but ONLY if not preceded by marketing adjectives
+        re.compile(r'(?<!key\s)(?<!hero\s)(?<!star\s)(?<!main\s)(?<!active\s)(?<!featured\s)\bingredients?\s*[:\-]\s*', re.I),
         re.compile(r'composition\s*[:\-]\s*', re.I),
     ]
+
+    # Helper: detect if text looks like marketing descriptions instead of INCI
+    def _is_marketing_description(text):
+        """Return True if text looks like 'Ingredient : does X' marketing copy, not INCI list."""
+        _MARKETING_VERBS = re.compile(
+            r'\b(brighten|moisturi[sz]|protect|reduce|smooth|hydrat|repair|nourish|sooth|firm|tone|revitaliz|rejuvenat|stimulat|boost|energi[sz]|defend|restore|strengthen|reviv|calm|heal)\b',
+            re.I
+        )
+        # Check comma-separated format ("Ing1, Ing2 : does X, Ing3")
+        segs = text.split(',')
+        if len(segs) >= 3:
+            desc_count = sum(
+                1 for s in segs
+                if ':' in s and re.search(r':\s*\w.{5,}', s)
+            )
+            if desc_count / len(segs) > 0.3:
+                return True
+
+        # Check newline/bullet format ("Vitamin C : Brightens\nYerba mate : Reduces...")
+        # Each line has pattern "IngredientName : marketing sentence"
+        lines = [l.strip() for l in re.split(r'[\n\r]+', text) if l.strip()]
+        if len(lines) >= 2:
+            desc_lines = sum(
+                1 for l in lines
+                if ':' in l and _MARKETING_VERBS.search(l.split(':', 1)[-1])
+            )
+            if desc_lines >= 2 or (len(lines) > 0 and desc_lines / len(lines) > 0.4):
+                return True
+
+        # Check if overall text has many marketing verbs relative to its length
+        # (catches cases like "Vitamin C Brightens skin. Caffeine reduces puffiness.")
+        word_count = len(text.split())
+        verb_hits = len(_MARKETING_VERBS.findall(text))
+        if word_count > 10 and verb_hits / max(1, word_count) > 0.05:
+            return True
+
+        return False
+
     for pat in inci_patterns:
         m = pat.search(text_clean)
         if m:
+            # Extra guard: skip if the matched heading is a marketing adjective form
+            match_text = text_clean[max(0, m.start()-30):m.end()]
+            if _MKTG_ADJECTIVE.search(match_text):
+                continue
             after = text_clean[m.end():m.end() + 3000]
             # Strip any trailing UI text
             after = _UI_TAIL_RE.sub('', after).strip()
+            # Trim at the next section heading (e.g. "How to Use", "Directions", "Disclaimer")
+            section_break = re.search(
+                r'\n\s*(?:how to use|directions|warnings?|disclaimer|storage|about the brand|why you|key benefit)',
+                after, re.I
+            )
+            if section_break:
+                after = after[:section_break.start()]
             cb = re.match(r'([^.]{20,}(?:,\s*[^.]{2,}){4,})', after)
             if cb:
-                ingredients = cb.group(1).strip()
-                break
+                candidate = cb.group(1).strip()
+                # Reject if it looks like marketing descriptions
+                if not _is_marketing_description(candidate):
+                    ingredients = candidate
+                    break
 
     # Strategy 2: Aqua/Water pattern
     if not ingredients:
@@ -706,8 +817,10 @@ def _extract_metadata(html, url):
             if len(el_text) > 50 and el_text.count(',') >= 8:
                 words = el_text.split(',')
                 if any(w.strip().lower() in ('aqua', 'water', 'glycerin', 'dimethicone', 'niacinamide') for w in words[:5]):
-                    ingredients = el_text.strip()
-                    break
+                    # Reject marketing description blocks
+                    if not _is_marketing_description(el_text):
+                        ingredients = el_text.strip()
+                        break
 
     # Strategy 4: Amazon ingredient section
     if not ingredients:
@@ -716,6 +829,19 @@ def _extract_metadata(html, url):
             ing_t = ing_s.get_text(' ', strip=True)
             if len(ing_t) > 20:
                 ingredients = ing_t
+
+    # Strategy 5: "All Ingredients:" label (used by Tira, COSRX, etc.)
+    if not ingredients:
+        all_ing_pat = re.compile(r'(?:all\s+)?ingredients?\s*(?:list)?\s*[:\-]\s*', re.I)
+        m5 = all_ing_pat.search(text_clean)
+        if m5:
+            after5 = text_clean[m5.end():m5.end() + 3000]
+            after5 = _UI_TAIL_RE.sub('', after5).strip()
+            cb5 = re.match(r'([^.]{20,}(?:,\s*[^.]{2,}){4,})', after5)
+            if cb5:
+                candidate5 = cb5.group(1).strip()
+                if not _is_marketing_description(candidate5):
+                    ingredients = candidate5
 
     # Clean ingredients
     if ingredients:

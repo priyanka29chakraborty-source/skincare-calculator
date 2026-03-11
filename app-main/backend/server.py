@@ -143,16 +143,8 @@ async def root():
 
 @api_router.get("/health")
 async def health():
-    db_loaded = data_loader.is_loaded()
-    ing_count = len(data_loader.ingredient_lookup)
-    if not db_loaded:
-        logger.error("STARTUP WARNING: ingredient database not loaded. Check backend/database/ folder.")
-    return {
-        "status": "alive",
-        "db_loaded": db_loaded,
-        "ingredient_count": ing_count,
-        "warning": "Ingredient database empty — check database/ folder" if not db_loaded else None
-    }
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse("ok")
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}
