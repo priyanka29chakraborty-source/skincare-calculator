@@ -65,8 +65,9 @@ function App() {
   }, [category, country, currency, skinType, concerns, price, size]);
 
   const fetchBestPrice = useCallback(async () => {
-    const pName = productName || brand || ingredients.substring(0, 40);
-    if (!pName.trim()) return;
+    const pName = (productName || brand || "").trim();
+    // Only search if we have a real product name or brand (not ingredient fallback)
+    if (!pName) { setBestPriceLoading(false); return; }
     setBestPriceLoading(true);
     try {
       const userUrl = fetchInput.trim().startsWith('http') ? fetchInput.trim() : null;
@@ -122,25 +123,32 @@ function App() {
     const isBarcode = /^\d{8,14}$/.test(fetchInput.trim());
     const isUrl = fetchInput.trim().startsWith("http");
     if (!isBarcode && !isUrl) { setFetchError("Enter a valid barcode or product URL"); setFetchLoading(false); return; }
+    
+    // Reset form fields before fetching new product
+    setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml");
+    setProductName(""); setBrand(""); setActiveConcentrations({});
+    setResult(null); setAlternatives(null); setBestPrice(null);
+
     try {
       const body = isBarcode ? { barcode: fetchInput.trim() } : { url: fetchInput.trim() };
       const { data } = await axios.post(`${API}/fetch-product`, body);
-      if (data.ingredients && !ingredients.trim()) setIngredients(data.ingredients);
-      else if (data.ingredients && ingredients.trim()) setFetchMsg("Ingredients found but not overwritten.");
-      if (data.price && !price) setPrice(String(data.price));
-      if (data.size && !size) { setSize(String(data.size)); if (data.unit) setSizeUnit(data.unit); }
+      if (data.ingredients) setIngredients(data.ingredients);
+      if (data.price) setPrice(String(data.price));
+      if (data.size) { setSize(String(data.size)); if (data.unit) setSizeUnit(data.unit); }
       if (data.country) setCountry(data.country);
-      if (data.brand && !brand) setBrand(data.brand);
-      if (data.product_name && !productName) setProductName(data.product_name);
+      if (data.brand) setBrand(data.brand);
+      if (data.product_name) setProductName(data.product_name);
       if (data.category) setCategory(data.category);
       if (data.active_concentrations) setActiveConcentrations(data.active_concentrations);
-      if (data.message) setFetchMsg(data.message);
+      if (data.scrape_failed) {
+        setFetchError("⚠️ Could not fetch product details from this URL. Please fill in the fields manually.");
+      } else if (data.message) setFetchMsg(data.message);
       else if (data.price_note) setFetchMsg(data.price_note);
-      else if (data.partial) setFetchMsg("Ingredient list not found - please paste manually.");
+      else if (data.partial) setFetchMsg("Some fields not found — please check and fill in manually.");
       else if (!data.partial && data.ingredients) setFetchMsg("Product details fetched successfully!");
-    } catch (e) { setFetchError(e.response?.data?.error || "Failed to fetch"); }
+    } catch (e) { setFetchError(e.response?.data?.error || "Failed to fetch. Please fill in manually."); }
     finally { setFetchLoading(false); }
-  }, [fetchInput, ingredients, price, size, brand, productName]);
+  }, [fetchInput]);
 
   const handleClear = () => {
     setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml"); setCategory("Serum");

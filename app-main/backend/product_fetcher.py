@@ -71,12 +71,62 @@ GARBAGE_TITLES = [
 
 # Known Shopify stores (partial list - detection also uses meta tags)
 KNOWN_SHOPIFY_DOMAINS = [
-    'foxtale.in', 'minimalistskincare.com', 'dotandkey.com', 'plumgoodness.com',
-    'mamaearth.in', 'sugandh.com', 'mcaboratory.com', 'theordinary.com',
-    'cerave.com', 'drunkenlephant.com', 'paulaschoice.com', 'skinceuticals.com',
-    'beaminimalist.com', 'consciouschemist.com', 'mcaffeine.com', 'pilgrimbeauty.com',
-    'foxtalecare.com', 'juicychemistry.com',
+    # India
+    'beaminimalist.com', 'foxtalecare.com', 'foxtale.in', 'dotandkey.com',
+    'plumgoodness.com', 'mcaffeine.com', 'mamaearth.in', 'pilgrimbeauty.com',
+    'thedermacompany.com', 'fixderma.com', 'purplle.com', 'juicychemistry.com',
+    'wowskinscience.com', 'forestessentialsindia.com', 'kamaayurveda.com',
+    'cosiq.in', 'reequil.com', 'minimalistskincare.com', 'consciouschemist.com',
+    # International Shopify
+    'cosrx.com', 'paulaschoice.com', 'adorebeauty.com.au',
 ]
+
+# ─── Site-Specific Scraping Routing ──────────────────────────────────
+# Maps domain → ordered list of scraper layers to try.
+# 'shopify' = Shopify JSON API, 'cloud' = cloudscraper,
+# 'firecrawl' = Firecrawl, 'scrapedo' = ScrapeDo, 'scraperapi' = ScraperAPI
+SITE_ROUTING = {
+    # India — custom (non-Shopify)
+    'nykaa.com':          ['firecrawl', 'scrapedo'],
+    'amazon.in':          ['scrapedo', 'scraperapi'],
+    'purplle.com':        ['firecrawl', 'scrapedo'],
+    'flipkart.com':       ['scrapedo', 'scraperapi'],
+    'myntra.com':         ['firecrawl', 'scrapedo'],
+    # India — Shopify
+    'beaminimalist.com':  ['shopify', 'firecrawl'],
+    'foxtalecare.com':    ['shopify', 'firecrawl'],
+    'foxtale.in':         ['shopify', 'firecrawl'],
+    'dotandkey.com':      ['shopify', 'firecrawl'],
+    'plumgoodness.com':   ['shopify', 'firecrawl'],
+    'mcaffeine.com':      ['shopify', 'firecrawl'],
+    'mamaearth.in':       ['shopify', 'firecrawl'],
+    'pilgrimbeauty.com':  ['shopify', 'firecrawl'],
+    'thedermacompany.com':['shopify', 'firecrawl'],
+    'fixderma.com':       ['shopify', 'firecrawl'],
+    'juicychemistry.com': ['shopify', 'firecrawl'],
+    'wowskinscience.com': ['shopify', 'firecrawl'],
+    'forestessentialsindia.com': ['shopify', 'firecrawl'],
+    'kamaayurveda.com':   ['shopify', 'firecrawl'],
+    'cosiq.in':           ['shopify', 'firecrawl'],
+    'reequil.com':        ['shopify', 'firecrawl'],
+    # International — Shopify
+    'cosrx.com':          ['shopify', 'firecrawl'],
+    'paulaschoice.com':   ['shopify', 'firecrawl'],
+    'adorebeauty.com.au': ['shopify', 'firecrawl'],
+    # International — custom
+    'amazon.com':         ['scrapedo', 'scraperapi'],
+    'sephora.com':        ['scrapedo', 'scraperapi'],   # render=true
+    'ulta.com':           ['firecrawl', 'scrapedo'],
+    'theordinary.com':    ['firecrawl', 'scrapedo'],
+    'boots.com':          ['scrapedo', 'scraperapi'],
+    'lookfantastic.com':  ['firecrawl', 'scrapedo'],
+    'cultbeauty.co.uk':   ['firecrawl', 'scrapedo'],
+    'nysaa.com':          ['firecrawl', 'scrapedo'],
+    'noon.com':           ['scrapedo', 'scraperapi'],   # render=true
+    'oliveyoung.co.kr':   ['scrapedo', 'scraperapi'],
+    'coupang.com':        ['scrapedo', 'scraperapi'],
+    'lazada.sg':          ['scrapedo', 'scraperapi'],
+}
 
 # Layer 1: Known brand → country hardcoded lookup (most reliable)
 KNOWN_BRAND_COUNTRIES = {
@@ -265,6 +315,19 @@ def _is_shopify_url(url):
     if '/products/' in url.lower():
         return True
     return False
+
+
+def _get_site_layers(url):
+    """Return ordered list of scraper layers for a given URL."""
+    from urllib.parse import urlparse
+    domain = urlparse(url).netloc.replace('www.', '').lower()
+    if domain in SITE_ROUTING:
+        return SITE_ROUTING[domain]
+    # Default waterfall
+    if _is_shopify_url(url):
+        return ['shopify', 'cloud', 'firecrawl', 'scrapedo', 'scraperapi']
+    return ['cloud', 'firecrawl', 'scrapedo', 'scraperapi']
+
 
 
 def _fetch_shopify_json(url):
@@ -645,12 +708,9 @@ def _extract_metadata(html, url):
 
 async def fetch_product_data(url, timeout=25):
     """
-    5-layer waterfall with smart merging:
-      Layer 0: Shopify JSON API (free)
-      Layer 1: cloudscraper (free, Cloudflare bypass)
-      Layer 2: Firecrawl API
-      Layer 3: ScrapeDo API (render=true)
-      Layer 4: ScraperAPI (render=true)
+    Site-specific routing waterfall with smart merging.
+    Each domain has a pre-defined ordered list of scrapers from SITE_ROUTING.
+    Layers: shopify, cloud, firecrawl, scrapedo, scraperapi
     """
     import time as _time
     from urllib.parse import urlparse
@@ -663,6 +723,7 @@ async def fetch_product_data(url, timeout=25):
     domain = urlparse(url).netloc.replace('www.', '') if url else ''
     ALL_FIELDS = ['product_name', 'brand', 'price', 'size_ml', 'ingredients', 'category', 'country']
     partial_data = None
+    loop = asyncio.get_event_loop()
 
     def _log(layer, result, t0, error=None):
         elapsed = round((_time.time() - t0) * 1000)
@@ -673,80 +734,89 @@ async def fetch_product_data(url, timeout=25):
         else:
             log_fetch(domain, url, layer, False, [], ALL_FIELDS, elapsed, error)
 
-    # ── Layer 0: Shopify JSON ──
-    if _is_shopify_url(url):
-        t0 = _time.time()
-        shopify = _fetch_shopify_json(url)
-        if shopify:
-            _log('Shopify JSON', shopify, t0)
-            if shopify.get('ingredients') and shopify.get('product_name'):
-                shopify['source'] = 'shopify_json'
-                logger.info(f"Shopify JSON fully resolved: {url}")
-                return shopify
-            partial_data = shopify
-            logger.info(f"Shopify JSON partial (missing ingredients): {url}")
-        else:
-            _log('Shopify JSON', None, t0, 'Not a Shopify store or JSON blocked')
+    def _is_full(r):
+        return r and r.get('ingredients') and r.get('product_name')
 
-    # ── Layer 1: cloudscraper (sync, run in thread) ──
-    loop = asyncio.get_event_loop()
-    t0 = _time.time()
-    try:
-        cs_html = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_with_cloudscraper, url),
-            timeout=22
-        )
-        if cs_html and len(cs_html) > 500:
-            result = _extract_metadata(cs_html, url)
-            if not _is_garbage(result.get('product_name', '')):
-                _log('cloudscraper', result, t0)
-                score = _score_result(result)
-                if result.get('ingredients') and result.get('product_name'):
-                    merged = _merge_results(partial_data, result)
-                    merged['source'] = f"{partial_data['source']}+cloudscraper" if partial_data else 'cloudscraper'
-                    logger.info(f"cloudscraper fully resolved: {url}")
-                    return merged
-                if score >= 2:
-                    partial_data = _merge_results(partial_data, result)
-                    logger.info(f"cloudscraper partial data (score {score}/8): {url}")
+    def _try_merge(base, overlay, layer_name):
+        merged = _merge_results(base, overlay)
+        src = f"{base.get('source', '')}+{layer_name}" if base and base.get('source') else layer_name
+        merged['source'] = src
+        return merged
+
+    layers = _get_site_layers(url)
+    credit_map = {'firecrawl': ('firecrawl', 1), 'scrapedo': ('scrapdo', 5), 'scraperapi': ('scraperapi', 10)}
+    api_fetchers = {
+        'firecrawl': _fetch_html_firecrawl,
+        'scrapedo': _fetch_html_scrapdo,
+        'scraperapi': _fetch_html_scraperapi,
+    }
+
+    for layer in layers:
+        t0 = _time.time()
+
+        # ── Shopify JSON ──
+        if layer == 'shopify':
+            shopify = _fetch_shopify_json(url)
+            if shopify:
+                _log('Shopify JSON', shopify, t0)
+                if _is_full(shopify):
+                    shopify['source'] = 'shopify_json'
+                    logger.info(f"Shopify JSON fully resolved: {url}")
+                    return shopify
+                partial_data = _merge_results(partial_data, shopify)
+                logger.info(f"Shopify JSON partial: {url}")
             else:
-                _log('cloudscraper', None, t0, 'Garbage page (bot detection)')
-        else:
-            _log('cloudscraper', None, t0, 'Empty or blocked response')
-    except Exception as e:
-        _log('cloudscraper', None, t0, str(e)[:200])
-        logger.info(f"cloudscraper skipped: {e}")
+                _log('Shopify JSON', None, t0, 'Blocked or not Shopify')
+            continue
 
-    # ── Layers 2-4: API scrapers ──
-    credit_map = {'Firecrawl': ('firecrawl', 1), 'ScrapeDo': ('scrapdo', 5), 'ScraperAPI': ('scraperapi', 10)}
-    for name, fetcher in [
-        ('Firecrawl', _fetch_html_firecrawl),
-        ('ScrapeDo', _fetch_html_scrapdo),
-        ('ScraperAPI', _fetch_html_scraperapi),
-    ]:
-        t0 = _time.time()
-        t = 30 if name == 'ScraperAPI' else timeout
-        html = await fetcher(url, t)
-        api_name, credits = credit_map[name]
-        increment_credits(api_name, credits)
-        if html and len(html) > 500:
-            result = _extract_metadata(html, url)
-            if _is_garbage(result.get('product_name', '')):
-                _log(name, None, t0, 'Garbage page')
-                logger.info(f"{name} returned garbage page: {url}")
-                continue
-            _log(name, result, t0)
-            score = _score_result(result)
-            if result.get('ingredients') and result.get('product_name'):
-                merged = _merge_results(partial_data, result)
-                merged['source'] = f"{partial_data['source']}+{name}" if partial_data and partial_data.get('source') else name
-                logger.info(f"{name} fully resolved: {url}")
-                return merged
-            if score >= 2:
-                partial_data = _merge_results(partial_data, result)
-                logger.info(f"{name} partial data (score {score}/8): {url}")
-        else:
-            _log(name, None, t0, 'Empty response or error')
+        # ── cloudscraper ──
+        if layer == 'cloud':
+            try:
+                cs_html = await asyncio.wait_for(
+                    loop.run_in_executor(None, _fetch_with_cloudscraper, url), timeout=22)
+                if cs_html and len(cs_html) > 500:
+                    result = _extract_metadata(cs_html, url)
+                    if not _is_garbage(result.get('product_name', '')):
+                        _log('cloudscraper', result, t0)
+                        if _is_full(result):
+                            merged = _try_merge(partial_data, result, 'cloudscraper')
+                            logger.info(f"cloudscraper fully resolved: {url}")
+                            return merged
+                        if _score_result(result) >= 2:
+                            partial_data = _merge_results(partial_data, result)
+                    else:
+                        _log('cloudscraper', None, t0, 'Garbage/bot-blocked')
+                else:
+                    _log('cloudscraper', None, t0, 'Empty response')
+            except Exception as e:
+                _log('cloudscraper', None, t0, str(e)[:200])
+            continue
+
+        # ── API scrapers (firecrawl, scrapedo, scraperapi) ──
+        if layer in api_fetchers:
+            t_limit = 30 if layer == 'scraperapi' else timeout
+            try:
+                html = await api_fetchers[layer](url, t_limit)
+                api_name, credits = credit_map[layer]
+                increment_credits(api_name, credits)
+                if html and len(html) > 500:
+                    result = _extract_metadata(html, url)
+                    if _is_garbage(result.get('product_name', '')):
+                        _log(layer, None, t0, 'Garbage page')
+                        continue
+                    _log(layer, result, t0)
+                    if _is_full(result):
+                        merged = _try_merge(partial_data, result, layer)
+                        logger.info(f"{layer} fully resolved: {url}")
+                        return merged
+                    if _score_result(result) >= 2:
+                        partial_data = _merge_results(partial_data, result)
+                        logger.info(f"{layer} partial (score {_score_result(partial_data)}/8): {url}")
+                else:
+                    _log(layer, None, t0, 'Empty response')
+            except Exception as e:
+                _log(layer, None, t0, str(e)[:200])
+                logger.info(f"{layer} failed: {e}")
 
     # Return best partial or None
     if partial_data and _score_result(partial_data) >= 2:

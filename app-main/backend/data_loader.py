@@ -144,6 +144,69 @@ class DataLoader:
 
             logger.info(f"Loaded {len(self.all_inci_names)} ingredients from master database")
 
+            # Supplement master with ingredient_science.csv (extra aliases, red flags, contraindications)
+            try:
+                sci_path = os.path.join(self.database_path, 'ingredient_science.csv')
+                if os.path.exists(sci_path):
+                    sci_df = pd.read_csv(sci_path, encoding='utf-8')
+                    sci_df.columns = sci_df.columns.str.strip()
+                    added_sci = 0
+                    for _, row in sci_df.iterrows():
+                        inci = str(row.get('INCI_Name', '')).strip()
+                        if not inci or inci == 'nan':
+                            continue
+                        key = inci.lower()
+                        if key not in self.ingredient_lookup:
+                            # New ingredient not in master — add it
+                            self.ingredient_lookup[key] = row.to_dict()
+                            self.all_inci_names.append(inci)
+                            added_sci += 1
+                        else:
+                            # Merge missing fields into existing entry
+                            existing = self.ingredient_lookup[key]
+                            for col in ['Contraindications', 'Red_Flag_Tags', 'Stability_Notes']:
+                                val = row.get(col)
+                                if val and str(val).strip() not in ('', 'nan') and (
+                                    not existing.get(col) or str(existing.get(col, '')).strip() in ('', 'nan')
+                                ):
+                                    existing[col] = val
+                        # Also register extra aliases from science table
+                        aliases = str(row.get('Aliases', ''))
+                        if aliases and aliases != 'nan':
+                            for alias in aliases.split(';'):
+                                alias = alias.strip()
+                                if alias and alias.lower() not in self.ingredient_lookup:
+                                    self.ingredient_lookup[alias.lower()] = self.ingredient_lookup[key]
+                    logger.info(f"Science supplement: added {added_sci} new ingredients, merged aliases")
+            except Exception as e:
+                logger.warning(f"Could not load ingredient_science.csv: {e}")
+
+            # Supplement master with ingredient_scoring.csv (scoring weights/evidence for any gaps)
+            try:
+                score_path = os.path.join(self.database_path, 'ingredient_scoring.csv')
+                if os.path.exists(score_path):
+                    score_df = pd.read_csv(score_path, encoding='utf-8')
+                    score_df.columns = score_df.columns.str.strip()
+                    for _, row in score_df.iterrows():
+                        inci = str(row.get('INCI_Name', '')).strip()
+                        if not inci or inci == 'nan':
+                            continue
+                        key = inci.lower()
+                        if key in self.ingredient_lookup:
+                            existing = self.ingredient_lookup[key]
+                            for col in ['Effect_Strength_Weight', 'Evidence_Factor', 'Evidence_Quality',
+                                        'Evidence_Level_Normalized', 'Final_Effect_Score']:
+                                val = row.get(col)
+                                if val is not None and str(val).strip() not in ('', 'nan'):
+                                    try:
+                                        float(val) if col != 'Evidence_Quality' and col != 'Evidence_Level_Normalized' else str(val)
+                                        if not existing.get(col) or str(existing.get(col, '')).strip() in ('', 'nan', '0', '0.0'):
+                                            existing[col] = val
+                                    except (ValueError, TypeError):
+                                        pass
+            except Exception as e:
+                logger.warning(f"Could not load ingredient_scoring.csv: {e}")
+
             # Load aliases.json and add each alias → target INCI mapping
             try:
                 import json as _json
@@ -155,7 +218,6 @@ class DataLoader:
                     for alias_key, target_inci in extra_aliases.items():
                         alias_lower = alias_key.strip().lower()
                         target_lower = target_inci.strip().lower()
-                        # Only add if target exists in DB and alias not already mapped
                         if target_lower in self.ingredient_lookup and alias_lower not in self.ingredient_lookup:
                             self.ingredient_lookup[alias_lower] = self.ingredient_lookup[target_lower]
                             added += 1
@@ -173,43 +235,44 @@ class DataLoader:
         except Exception as e:
             logger.error(f"Error loading upgrade map: {e}")
 
-        try:
-            eq_path = os.path.join(self.database_path, 'evidence_quality_mapping.csv')
-            if os.path.exists(eq_path):
-                self.evidence_quality_map = pd.read_csv(eq_path)
-        except Exception as e:
-            logger.error(f"Error loading evidence quality map: {e}")
-
         self._build_concern_maps()
         self._load_synergy_registry()
         self._load_uv_sun_tanning_db()
 
     def _load_synergy_registry(self):
+        """Load pair-based synergy data from ingredient_synergy_table.csv.
+        Format: INCI_Name, Synergistic_Ingredients (semicolon-separated partners).
+        Builds a flat list of pair combos stored under '__all__' key,
+        returned for any concern since the table is not concern-specific.
+        """
         try:
-            syn_path = os.path.join(self.database_path, 'clinical_synergy_registry.csv')
+            syn_path = os.path.join(self.database_path, 'ingredient_synergy_table.csv')
             if not os.path.exists(syn_path):
-                logger.warning("Synergy registry not found")
+                logger.warning("ingredient_synergy_table.csv not found")
                 return
             df = pd.read_csv(syn_path)
+            seen_pairs = set()
+            all_synergies = []
             for _, row in df.iterrows():
-                concern = str(row.get('Concern', '')).strip()
-                concern = SYNERGY_CONCERN_MAP.get(concern, concern)
-                ing1 = str(row.get('Ingredient_1', '')).strip().lower()
-                ing2 = str(row.get('Ingredient_2', '')).strip().lower()
-                ing3 = str(row.get('Ingredient_3_Optional', '')).strip().lower()
-                if ing3 == 'nan':
-                    ing3 = None
-                bonus = int(row.get('Synergy_Bonus_Points', 2) or 2)
-                combo = {
-                    'ingredients': [ing1, ing2] + ([ing3] if ing3 else []),
-                    'bonus': bonus,
-                    'type': str(row.get('Synergy_Type', '')),
-                    'mechanism': str(row.get('Mechanism_Logic', '')),
-                }
-                if concern not in self.synergy_registry:
-                    self.synergy_registry[concern] = []
-                self.synergy_registry[concern].append(combo)
-            logger.info(f"Loaded {sum(len(v) for v in self.synergy_registry.values())} synergy combos across {len(self.synergy_registry)} concerns")
+                ing1 = str(row.get('INCI_Name', '')).strip().lower()
+                partners_raw = str(row.get('Synergistic_Ingredients', ''))
+                if not ing1 or ing1 == 'nan' or partners_raw == 'nan':
+                    continue
+                partners = [p.strip().lower() for p in partners_raw.split(';') if p.strip()]
+                for ing2 in partners:
+                    pair_key = tuple(sorted([ing1, ing2]))
+                    if pair_key in seen_pairs:
+                        continue
+                    seen_pairs.add(pair_key)
+                    all_synergies.append({
+                        'ingredients': [ing1, ing2],
+                        'bonus': 2,
+                        'type': 'synergy',
+                        'mechanism': f"{ing1.title()} + {ing2.title()} synergy",
+                    })
+            # Store under '__all__' — get_synergies returns same list for any concern
+            self.synergy_registry['__all__'] = all_synergies
+            logger.info(f"Loaded {len(all_synergies)} synergy pairs from ingredient_synergy_table.csv")
         except Exception as e:
             logger.error(f"Error loading synergy registry: {e}")
 
@@ -229,7 +292,18 @@ class DataLoader:
                     if ing_class == 'active':
                         try:
                             ef = float(row.get('Evidence_Factor', 0.4) or 0.4)
-                            esw = float(row.get('Effect_Strength_Weight', 0.5) or 0.5)
+                            esw_raw = row.get('Effect_Strength_Weight', '')
+                            if esw_raw == '' or str(esw_raw).strip() in ('', 'nan', '0'):
+                                # Category-based ESW default for blank/unscored ingredients
+                                func_cat = str(row.get('Functional_Category', '')).lower()
+                                if 'humectant' in func_cat:
+                                    esw = 1.0
+                                elif any(c in func_cat for c in ['emulsifier', 'thickener', 'solvent', 'preservative']):
+                                    esw = 0.5
+                                else:
+                                    esw = 0.5  # conservative default for actives without scored weight
+                            else:
+                                esw = float(esw_raw)
                         except (ValueError, TypeError):
                             ef, esw = 0.4, 0.5
                         import math
@@ -262,60 +336,66 @@ class DataLoader:
             logger.info(f"  {concern}: {len(self.concern_actives[concern])} ideal actives, {len(all_supporters)} supporters")
 
     def _load_uv_sun_tanning_db(self):
-        """Load UV/Sun/Tanning data from both the specialized DB and the ingredient master."""
-        # Step 1: Load the dedicated UV DB (has detailed fields like UV_Filter_Type, Photostability, etc.)
+        """Load UV/Sun/Tanning data from uv_sunscreen_tanning_database.csv (32-column comprehensive DB).
+        This is the primary source for all UV filter fields:
+        Estimated_SPF_Contribution_Weight, Photostability_Rating, UV_Filter_Type,
+        UV_Spectrum_Coverage, UVA_Subtype_Coverage, Ingredient_Category, etc.
+        """
+        # Alias resolution: common/trade names → canonical INCI names
+        INCI_ALIASES = {
+            'bemotrizinol': 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+            'bisoctrizole': 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+            'avobenzone': 'Butyl Methoxydibenzoylmethane',
+            'octinoxate': 'Ethylhexyl Methoxycinnamate',
+            'octisalate': 'Ethylhexyl Salicylate',
+            'ensulizole': 'Phenylbenzimidazole Sulfonic Acid',
+            'ecamsule': 'Terephthalylidene Dicamphor Sulfonic Acid',
+        }
+
         try:
-            uv_path = os.path.join(self.database_path, 'uv_sun_tanning_db.csv')
-            if os.path.exists(uv_path):
-                df = pd.read_csv(uv_path)
-                count = 0
-                for _, row in df.iterrows():
-                    inci = str(row.get('INCI_Name', '')).strip()
-                    if not inci or inci == 'nan':
-                        continue
-                    key = inci.lower()
-                    if key not in self.uv_sun_db:
-                        self.uv_sun_db[key] = row.to_dict()
-                        count += 1
-                    aliases = str(row.get('Aliases', ''))
-                    if aliases and aliases != 'nan':
-                        for alias in aliases.split(';'):
-                            alias = alias.strip()
-                            if alias and alias.lower() not in self.uv_sun_db:
-                                self.uv_sun_db[alias.lower()] = row.to_dict()
-                logger.info(f"Loaded {count} UV ingredients from dedicated UV DB")
+            uv_path = os.path.join(self.database_path, 'uv_sunscreen_tanning_database.csv')
+            if not os.path.exists(uv_path):
+                logger.warning("uv_sunscreen_tanning_database.csv not found")
+                return
+
+            df = pd.read_csv(uv_path)
+            df.columns = df.columns.str.strip()
+            count = 0
+
+            for _, row in df.iterrows():
+                inci = str(row.get('INCI_Name', '')).strip()
+                if not inci or inci == 'nan':
+                    continue
+
+                entry = row.to_dict()
+                # Normalise NaN → empty string for safe .get() usage in scoring
+                for k, v in entry.items():
+                    if pd.isna(v):
+                        entry[k] = ''
+
+                # Store by canonical INCI key (lowercase)
+                key = inci.lower()
+                self.uv_sun_db[key] = entry
+
+                # Also register under any alias keys so alias lookups hit this entry
+                alias_canonical = INCI_ALIASES.get(key)
+                if alias_canonical:
+                    # e.g. 'bemotrizinol' → store canonical INCI data under bemotrizinol key too
+                    self.uv_sun_db[key] = entry  # already set above
+                count += 1
+
+            # Build reverse-alias entries: so scoring can look up 'Bemotrizinol'
+            # and get Tinosorb M data (canonical INCI entry)
+            for alias_lower, canonical_inci in INCI_ALIASES.items():
+                canonical_key = canonical_inci.lower()
+                if canonical_key in self.uv_sun_db and alias_lower not in self.uv_sun_db:
+                    self.uv_sun_db[alias_lower] = self.uv_sun_db[canonical_key]
+
+            logger.info(f"Loaded {count} UV/sunscreen ingredients from uv_sunscreen_tanning_database.csv")
         except Exception as e:
-            logger.error(f"Error loading UV/Sun/Tanning DB: {e}")
+            logger.error(f"Error loading UV sunscreen DB: {e}")
 
-        # Step 2: Merge UV role data from ingredient master (for ingredients not in the dedicated DB)
-        if self.ingredient_master is not None:
-            uv_role_cols = ['Sun_Protection_Role', 'UV_Damage_Role', 'Tanning_Role']
-            if all(c in self.ingredient_master.columns for c in uv_role_cols):
-                added = 0
-                for _, row in self.ingredient_master.iterrows():
-                    inci = str(row.get('INCI_Name', '')).strip()
-                    if not inci or inci == 'nan':
-                        continue
-                    has_uv_role = any(
-                        pd.notna(row.get(c)) and str(row.get(c, '')).strip() and str(row.get(c, '')).strip() != 'nan'
-                        for c in uv_role_cols
-                    )
-                    if has_uv_role:
-                        key = inci.lower()
-                        if key not in self.uv_sun_db:
-                            self.uv_sun_db[key] = row.to_dict()
-                            added += 1
-                        else:
-                            # Merge missing UV role columns into existing entry
-                            for c in uv_role_cols:
-                                val = row.get(c)
-                                if pd.notna(val) and str(val).strip() and str(val).strip() != 'nan':
-                                    existing_val = self.uv_sun_db[key].get(c)
-                                    if not existing_val or pd.isna(existing_val) or str(existing_val).strip() in ('', 'nan'):
-                                        self.uv_sun_db[key][c] = val
-                logger.info(f"Merged {added} additional UV ingredients from ingredient master")
-
-        logger.info(f"Total UV/Sun/Tanning ingredients: {len(self.uv_sun_db)}")
+        logger.info(f"Total UV/Sun/Tanning ingredients in db: {len(self.uv_sun_db)}")
 
     def get_concern_actives(self, concern):
         return self.concern_actives.get(concern, [])
@@ -326,6 +406,14 @@ class DataLoader:
     def get_synergies(self, concern):
         return self.synergy_registry.get(concern, [])
 
+    @staticmethod
+    def _normalize_ingredient(name):
+        """Lowercase, remove punctuation, collapse spaces before fuzzy matching."""
+        n = name.strip().lower()
+        n = re.sub(r'[^\w\s]', ' ', n)
+        n = re.sub(r'\s+', ' ', n).strip()
+        return n
+
     def get_uv_data(self, ingredient_name):
         """Get UV/Sun/Tanning data for an ingredient by name or alias."""
         if not ingredient_name:
@@ -333,9 +421,10 @@ class DataLoader:
         key = ingredient_name.strip().lower()
         if key in self.uv_sun_db:
             return self.uv_sun_db[key]
-        # Try fuzzy match — token_set_ratio handles word-order and spacing variants
-        # e.g. "Methyl Propanediol" vs "Methylpropanediol", "Titanium Diox" vs "Titanium Dioxide"
-        match = process.extractOne(key, list(self.uv_sun_db.keys()), scorer=fuzz.token_set_ratio, score_cutoff=78)
+        normalized = self._normalize_ingredient(ingredient_name)
+        if normalized in self.uv_sun_db:
+            return self.uv_sun_db[normalized]
+        match = process.extractOne(normalized, list(self.uv_sun_db.keys()), scorer=fuzz.token_set_ratio, score_cutoff=85)
         if match:
             return self.uv_sun_db[match[0]]
         return None
@@ -346,9 +435,10 @@ class DataLoader:
         key = ingredient_name.strip().lower()
         if key in self.ingredient_lookup:
             return self.ingredient_lookup[key]
-        # Try fuzzy match — token_set_ratio handles word-order and spacing variants
-        # e.g. "Methyl Propanediol" vs "Methylpropanediol", "Sodium Ascorbyl Phosphate" variants
-        match = process.extractOne(key, list(self.ingredient_lookup.keys()), scorer=fuzz.token_set_ratio, score_cutoff=78)
+        normalized = self._normalize_ingredient(ingredient_name)
+        if normalized in self.ingredient_lookup:
+            return self.ingredient_lookup[normalized]
+        match = process.extractOne(normalized, list(self.ingredient_lookup.keys()), scorer=fuzz.token_set_ratio, score_cutoff=85)
         if match:
             return self.ingredient_lookup[match[0]]
         return None

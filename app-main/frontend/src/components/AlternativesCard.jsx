@@ -67,34 +67,22 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
                   {alt.score_delta > 0 && <span className="scored-alt-badge">+{alt.score_delta} pts</span>}
                 </div>
                 <div className="scored-alt-scores">
+                  {/* Fixed: backend sends alt.score not alt.worth_score */}
                   <div className="scored-alt-metric">
                     <span className="scored-alt-label">Worth</span>
-                    <span className="scored-alt-value">{alt.worth_score}/100</span>
+                    <span className="scored-alt-value">{alt.score}/100</span>
                   </div>
-                  {alt.concern_scores && Object.entries(alt.concern_scores).map(([concern, score]) => (
-                    <div key={concern} className="scored-alt-metric">
-                      <span className="scored-alt-label">{concern}</span>
-                      <span className="scored-alt-value">{score}%</span>
-                    </div>
-                  ))}
-                  {alt.skin_type_score && (
-                    <div className="scored-alt-metric">
-                      <span className="scored-alt-label">Skin Fit</span>
-                      <span className="scored-alt-value">{alt.skin_type_score}%</span>
-                    </div>
-                  )}
                 </div>
                 {alt.why_better?.length > 0 && (
                   <ul className="scored-alt-reasons">{alt.why_better.map((r, j) => <li key={j}>{r}</li>)}</ul>
                 )}
                 {alt.price && <div className="scored-alt-price">{currency} {alt.price}</div>}
-                {alt.buy_links?.length > 0 && (
+                {/* Fixed: backend sends alt.link (single string), not alt.buy_links[] */}
+                {alt.link && (
                   <div className="scored-alt-links">
-                    {alt.buy_links.map((bl, j) => (
-                      <a key={j} href={bl.url} target="_blank" rel="noopener noreferrer" className="scored-alt-link" data-testid={`scored-alt-link-${i}-${j}`}>
-                        {bl.source} <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                      </a>
-                    ))}
+                    <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link" data-testid={`scored-alt-link-${i}`}>
+                      {alt.source || 'View Product'} <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
                   </div>
                 )}
               </div>
@@ -122,7 +110,18 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
       )}
 
       {!altLoading && !alternatives?.scored_alternatives?.length && !alternatives?.basic_alternatives?.length && result.upgrade_suggestions?.length > 0 && (
-        <p className="alt-empty">Search for the upgrade ingredients above on your preferred shopping site for best results.</p>
+        <div className="alt-search-failed" data-testid="alt-search-failed">
+          <p className="alt-empty">
+            <i className="fa-solid fa-magnifying-glass"></i>{" "}
+            {alternatives?.search_message || "Live product search was unavailable. Search for these ingredients manually:"}
+          </p>
+          <ul className="alt-manual-list">
+            {result.upgrade_suggestions.map((sug, i) => (
+              <li key={i}><strong>{sug.upgrade}</strong> — for {sug.concern}</li>
+            ))}
+          </ul>
+          <p className="alt-manual-sites">Try: Amazon, Nykaa, Purplle, Sephora or your local skincare retailer.</p>
+        </div>
       )}
     </div>
   );

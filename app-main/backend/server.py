@@ -7,6 +7,8 @@ import logging
 import re
 import html as html_module
 import requests
+import time
+import hashlib
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
@@ -32,6 +34,40 @@ app.include_router(admin_router)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# ─── Simple In-Memory Cache ───────────────────────────────────────────────
+# Caches analysis results keyed by (url or ingredient_hash, concerns, skin_type, price, size)
+_CACHE: dict = {}
+_CACHE_TTL = 3600  # 1 hour
+
+def _make_cache_key(data: dict) -> str:
+    """Create a stable cache key from request fields."""
+    key_str = "|".join([
+        str(data.get('url', '')),
+        str(data.get('ingredients', ''))[:200],
+        str(data.get('product_name', '')),
+        str(data.get('price', '')),
+        str(data.get('size_ml', '')),
+        ",".join(sorted(data.get('concerns', []))),
+        str(data.get('skin_type', '')),
+        str(data.get('country', '')),
+    ])
+    return hashlib.md5(key_str.encode()).hexdigest()
+
+def _cache_get(key: str):
+    entry = _CACHE.get(key)
+    if entry and (time.time() - entry['ts']) < _CACHE_TTL:
+        return entry['data']
+    if entry:
+        del _CACHE[key]
+    return None
+
+def _cache_set(key: str, data: dict):
+    # Evict oldest if cache too large
+    if len(_CACHE) > 500:
+        oldest = min(_CACHE.items(), key=lambda x: x[1]['ts'])
+        del _CACHE[oldest[0]]
+    _CACHE[key] = {'data': data, 'ts': time.time()}
 
 
 def _sanitize(text):
@@ -132,16 +168,13 @@ async def analyze(req: AnalyzeRequest, request: Request):
     if len(ingredients) > 5000:
         return JSONResponse(status_code=400, content={"error": "Ingredient list too long. Maximum 5000 characters."})
 
-    # Validate and normalise skin_type
     skin_type_raw = (_sanitize(req.skin_type) or "normal").lower()
     if skin_type_raw not in VALID_SKIN_TYPES:
         skin_type_raw = "normal"
 
-    # Validate and normalise category
     category_raw = (_sanitize(req.category) or "Serum").lower()
     if category_raw not in VALID_CATEGORIES:
         category_raw = "serum"
-    # Restore Title Case for display
     category_display = category_raw.title()
 
     try:
@@ -161,10 +194,21 @@ async def analyze(req: AnalyzeRequest, request: Request):
             'product_name': _sanitize(req.product_name or ''),
             'active_concentrations': req.active_concentrations or {},
         }
+
+        # Check cache
+        cache_key = _make_cache_key(product_data)
+        cached = _cache_get(cache_key)
+        if cached:
+            logger.info("Cache hit for analysis request")
+            return cached
+
         result = analyze_product(product_data)
         elapsed = round((_time.time() - t0) * 1000)
         log_analysis(category_display, req.country, skin_type_raw, concerns,
                      result.get('main_worth_score', 0), bool(req.url_provided), None, elapsed)
+
+        # Store in cache
+        _cache_set(cache_key, result)
         return result
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
@@ -251,12 +295,14 @@ async def fetch_from_url(url: str):
                 "active_concentrations": result.get('active_concentrations', {}),
             }
         return JSONResponse(status_code=502, content={
-            "error": "Data fetching failed. Please paste ingredients manually."
+            "error": "Data fetching failed. Please paste ingredients manually.",
+            "scrape_failed": True
         })
     except Exception as e:
         logger.error(f"URL fetch failed: {e}")
         return JSONResponse(status_code=500, content={
-            "error": "Data fetching failed. Please paste ingredients manually."
+            "error": "Data fetching failed. Please paste ingredients manually.",
+            "scrape_failed": True
         })
 
 
@@ -489,10 +535,25 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
     scored_names = {a['name'] for a in scored_alternatives}
     basic_alternatives = [r for r in basic_alternatives if r['name'] not in scored_names][:6]
 
+    # Build a helpful message when search returned nothing
+    search_message = None
+    if not scored_alternatives and not basic_alternatives:
+        if not serp_key:
+            search_message = (
+                "Live product search requires a SerpAPI key (SERPER_API_KEY). "
+                "Search the upgrade suggestions above on Nykaa, Amazon, or your preferred site."
+            )
+        else:
+            search_message = (
+                "Could not find scorable alternatives right now — search may be temporarily limited. "
+                "Try searching the upgrade suggestions above directly on Nykaa or Amazon."
+            )
+
     return {
         "scored_alternatives": scored_alternatives[:3],
         "basic_alternatives": basic_alternatives,
         "user_score": req.user_score,
+        "search_message": search_message,
     }
 
 
@@ -676,6 +737,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5001",
     ],
+    # Covers Cloudflare Pages preview deployments (e.g. 023c036f.skincare-calculator.pages.dev)
+    allow_origin_regex=r"https://.*\.skincare-calculator\.pages\.dev",
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )

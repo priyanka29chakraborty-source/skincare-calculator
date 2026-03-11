@@ -9,24 +9,62 @@ from config import (
 
 
 def parse_ingredients(ingredient_list_str):
+    """Normalize and parse an INCI ingredient list.
+    Handles: comma/semicolon/linebreak separators, parenthetical descriptors
+    like (Vitamin B3) or (10%), and combined entries like (and)/(und)/(et).
+    Also deduplicates entries.
+    """
     if not ingredient_list_str:
         return []
+
+    # Strip "Ingredients:" / "Full Ingredients:" prefix
     marker = re.search(r'(?:full\s+)?ingred\w*\s*:', ingredient_list_str, re.IGNORECASE)
     if marker:
         ingredient_list_str = ingredient_list_str[marker.end():]
-    raw_ingredients = [x.strip() for x in ingredient_list_str.split(',')]
+
+    # Split by comma, semicolon, or line breaks
+    raw_parts = re.split(r'[,;\n\r]+', ingredient_list_str)
+
     cleaned = []
-    for ing in raw_ingredients:
-        ing = ing.strip().strip('.')
-        if not ing:
+    seen = set()
+
+    for part in raw_parts:
+        part = part.strip().strip('.')
+        if not part:
             continue
-        if len(ing) > 80:
-            continue
-        if ing.count(' ') > 8:
-            continue
-        if '.' in ing and len(ing) > 20:
-            continue
-        cleaned.append(ing)
+
+        # Split combined "(and)" / "(und)" / "(et)" entries
+        # e.g. "Caprylyl Glycol (and) Ethylhexylglycerin" → two ingredients
+        sub_parts = re.split(r'\s*\((?:and|und|et)\)\s*', part, flags=re.IGNORECASE)
+
+        for ing in sub_parts:
+            ing = ing.strip()
+
+            # Remove parenthetical descriptors: "(Vitamin B3)", "(Provitamin B5)", etc.
+            ing = re.sub(r'\([^)]*\)', '', ing).strip()
+
+            # Remove percentage annotations inline: "10%", "0.3 %", "10 percent"
+            ing = re.sub(r'\s*[\d\.]+\s*(?:%|percent)\s*', '', ing, flags=re.IGNORECASE).strip()
+
+            # Remove trailing/leading punctuation artifacts
+            ing = ing.strip('.-/ ')
+
+            if not ing:
+                continue
+            if len(ing) > 80:
+                continue
+            if ing.count(' ') > 8:
+                continue
+            # Skip entries that look like sentences (contain a period mid-text)
+            if '.' in ing and len(ing) > 20:
+                continue
+
+            # Deduplicate (case-insensitive)
+            key = ing.lower()
+            if key not in seen:
+                seen.add(key)
+                cleaned.append(ing)
+
     return cleaned
 
 
@@ -369,7 +407,18 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         data = data_loader.get_ingredient_data(ing_name)
         if data and str(data.get('Ingredient_Class', '')).lower() == 'active':
             try:
-                weight = float(data.get('Effect_Strength_Weight', 0.5) or 0.5)
+                esw_raw = data.get('Effect_Strength_Weight', '')
+                if esw_raw == '' or str(esw_raw).strip() in ('', 'nan', '0'):
+                    # Category-based ESW default for blank/unscored ingredients
+                    func_cat = str(data.get('Functional_Category', '')).lower()
+                    if 'humectant' in func_cat:
+                        weight = 1.0
+                    elif any(c in func_cat for c in ['emulsifier', 'thickener', 'solvent', 'preservative']):
+                        weight = 0.5
+                    else:
+                        weight = 0.5  # conservative default for actives without scored weight
+                else:
+                    weight = float(esw_raw)
                 if math.isnan(weight):
                     weight = 0.5
             except (ValueError, TypeError):
@@ -685,359 +734,566 @@ def get_score_title(score):
 
 UV_CONCERN_SET = {'Sun Protection', 'UV Damage', 'Tanning'}
 
+# ─── INCI ALIAS RESOLUTION ────────────────────────────────────────────────────
+# Bemotrizinol = Bisoctrizole = Methylene Bis-Benzotriazolyl Tetramethylbutylphenol (Tinosorb M)
+# These are resolved BEFORE any lookup so we never double-count or miss entries.
+INCI_ALIASES = {
+    'Bemotrizinol': 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+    'Bisoctrizole':  'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+    'Avobenzone':    'Butyl Methoxydibenzoylmethane',
+    'Octinoxate':    'Ethylhexyl Methoxycinnamate',
+    'Octisalate':    'Ethylhexyl Salicylate',
+    'Ensulizole':    'Phenylbenzimidazole Sulfonic Acid',
+    'Ecamsule':      'Terephthalylidene Dicamphor Sulfonic Acid',
+}
+
+# ─── UV BAND MEMBERSHIP LISTS ─────────────────────────────────────────────────
+_UVB_FILTER_LIST = {
+    'Ethylhexyl Methoxycinnamate', 'Octocrylene', 'Homosalate', 'Ethylhexyl Salicylate',
+    'Phenylbenzimidazole Sulfonic Acid', 'Ethylhexyl Triazone', 'Titanium Dioxide',
+    'Titanium Dioxide (nano)', 'Zinc Oxide', 'Diethylhexyl Butamido Triazone',
+    'Polysilicone-15', 'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine',
+    'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol', 'Drometrizole Trisiloxane',
+    'Tris-Biphenyl Triazine', 'Isoamyl p-Methoxycinnamate', 'Camphor Benzalkonium Methosulfate',
+    '4-Methylbenzylidene Camphor', 'Padimate O', 'Aminobenzoic Acid', 'Cinoxate',
+    'Trolamine Salicylate', 'Oxybenzone', 'Sulisobenzone', 'Dioxybenzone',
+    'Benzylidene Camphor Sulfonic Acid', '3-Benzylidene Camphor',
+    'Sodium Phenylbenzimidazole Sulfonate', 'Benzophenone-9',
+}
+
+_UVA1_FILTER_LIST = {
+    'Butyl Methoxydibenzoylmethane', 'Diethylamino Hydroxybenzoyl Hexyl Benzoate',
+    'Terephthalylidene Dicamphor Sulfonic Acid', 'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine',
+    'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol', 'Drometrizole Trisiloxane',
+    'Disodium Phenyl Dibenzimidazole Tetrasulfonate', 'Zinc Oxide',
+}
+
+_UVA2_FILTER_LIST = {
+    'Titanium Dioxide', 'Titanium Dioxide (nano)', 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+    'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine', 'Drometrizole Trisiloxane',
+    'Oxybenzone', 'Sulisobenzone', 'Dioxybenzone', 'Zinc Oxide',
+    'Tris-Biphenyl Triazine', 'Diethylhexyl Butamido Triazone', 'Ecamsule',
+}
+
+# ─── FILTER STRENGTH MAP (Part 4.3 of scoring spec) ──────────────────────────
+_UV_FILTER_STRENGTH_MAP = {
+    # Strength 5 — Elite filters
+    'Ethylhexyl Triazone':                                   5,
+    'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine':        5,
+    'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol':   5,
+    'Tris-Biphenyl Triazine':                                5,
+    # Strength 4 — High performance
+    'Zinc Oxide':                                            4,
+    'Diethylamino Hydroxybenzoyl Hexyl Benzoate':            4,
+    'Drometrizole Trisiloxane':                              4,
+    'Terephthalylidene Dicamphor Sulfonic Acid':             4,
+    'Disodium Phenyl Dibenzimidazole Tetrasulfonate':        4,
+    'Diethylhexyl Butamido Triazone':                        4,
+    # Strength 3 — Good standard
+    'Titanium Dioxide':                                      3,
+    'Titanium Dioxide (nano)':                               3,
+    'Butyl Methoxydibenzoylmethane':                         3,
+    # Strength 2 — Moderate
+    'Ethylhexyl Methoxycinnamate':                           2,
+    'Octocrylene':                                           2,
+    'Homosalate':                                            2,
+    'Oxybenzone':                                            2,
+    'Sulisobenzone':                                         2,
+    'Polysilicone-15':                                       2,
+    'Isoamyl p-Methoxycinnamate':                            2,
+    'Phenylbenzimidazole Sulfonic Acid':                     2,
+    'Benzylidene Camphor Sulfonic Acid':                     2,
+    '4-Methylbenzylidene Camphor':                           2,
+    'Padimate O':                                            2,
+    # Strength 1 — Weak / legacy
+    'Ethylhexyl Salicylate':                                 1,
+    'Camphor Benzalkonium Methosulfate':                     1,
+    'Dioxybenzone':                                          1,
+    'Meradimate':                                            1,
+    'Trolamine Salicylate':                                  1,
+    'Aminobenzoic Acid':                                     1,
+    'Cinoxate':                                              1,
+    'Benzophenone-9':                                        1,
+    '3-Benzylidene Camphor':                                 1,
+    'Sodium Phenylbenzimidazole Sulfonate':                  1,
+}
+
+def _build_avobenzone_stabilizers():
+    """
+    Build the set of Avobenzone photostabilizers from the UV DB.
+    PRIMARY source: Avobenzone's own Common_Synergy_Partners column — these are
+    the ingredients listed by the DB as Avobenzone's actual stabilizers.
+    SECONDARY: Photostabilizer col with "Avobenzone" mentioned explicitly in value.
+    Tocopherol/Ferulic Acid have Photostabilizer=Yes but for Vit C systems, NOT Avobenzone.
+    Fallback: hardcoded set if DB not loaded yet.
+    """
+    fallback = {
+        'Octocrylene', 'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine',
+        'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+        'Diethylamino Hydroxybenzoyl Hexyl Benzoate', 'Ethylhexyl Methoxycrylene',
+        'Diethylhexyl Syringylidenemalonate',
+    }
+    try:
+        stabilizers = set()
+        avobenzone_inci = 'Butyl Methoxydibenzoylmethane'
+
+        # Signal 1 (PRIMARY): read Avobenzone's Common_Synergy_Partners from DB
+        # This is the most accurate source — Avobenzone's own row lists its stabilizers.
+        avob_data = data_loader.get_uv_data(avobenzone_inci)
+        if avob_data:
+            partners_raw = str(avob_data.get('Common_Synergy_Partners', '') or '')
+            for partner in partners_raw.split(';'):
+                partner = partner.strip()
+                if partner:
+                    stabilizers.add(partner)
+
+        # Signal 2 (SECONDARY): Photostabilizer col explicitly mentions "Avobenzone"
+        # OR Photostability_Notes contain a POSITIVE stabilization keyword + "avobenzone".
+        # Octinoxate Notes say "Degrades Avobenzone" — excluded because no positive keyword.
+        # Octisalate is borderline and excluded for safety (not a reliable stabilizer).
+        # Tinosorb M Notes mention "Avobenzone" as synergy partner — included correctly.
+        _POSITIVE_STAB_KEYWORDS = ('stabiliz', 'quench', 'prevent avobenzone', 'protects avobenzone')
+        for key, uv_data in data_loader.uv_sun_db.items():
+            phot_flag  = str(uv_data.get('Photostabilizer', '')   or '').strip().lower()
+            phot_notes = str(uv_data.get('Photostability_Notes', '') or '').strip().lower()
+            flag_mentions_avob  = 'avobenzone' in phot_flag
+            notes_positively_stab = (
+                'avobenzone' in phot_notes and
+                any(kw in phot_notes for kw in _POSITIVE_STAB_KEYWORDS) and
+                'degrades' not in phot_notes and
+                'slightly' not in phot_notes  # minor/partial help excluded
+            )
+            if flag_mentions_avob or notes_positively_stab:
+                inci_name = uv_data.get('INCI_Name', '').strip()
+                if inci_name:
+                    stabilizers.add(inci_name)
+
+        stabilizers.discard('')
+        return stabilizers if stabilizers else fallback
+    except Exception:
+        return fallback
+
+# Resolved at first call from DB
+_AVOBENZONE_STABILIZERS_CACHE: set = set()
+
+_FILM_FORMERS = {'VP/Hexadecene Copolymer', 'Acrylates Copolymer', 'Trimethylsiloxysilicate', 'Polyurethane-34'}
+_SPF_BOOSTERS  = {'Butyloctyl Salicylate', 'Isopropyl Lauroyl Sarcosinate', 'Polyester-8'}
+
+_BANNED_FILTERS = {
+    'Aminobenzoic Acid':           'Banned EU; high sensitization risk',
+    'Oxybenzone':                  'Banned Hawaii; endocrine/reef concerns',
+    '3-Benzylidene Camphor':       'Endocrine concerns; avoided in modern formulas',
+    '4-Methylbenzylidene Camphor': 'Endocrine review; restricted use',
+}
+
+
+def _uv_conc_factor(inci_name, resolved_list):
+    """Position-based concentration factor for sunscreen formulas.
+    Sunscreens: positions 1-4 = Water/Emollients. Filters typically start at pos 5+.
+    pos < 8  → high  → 1.0
+    pos < 20 → mid   → 0.75
+    pos 20+  → low   → 0.5
+    """
+    try:
+        pos = next(i for i, x in enumerate(resolved_list) if x.lower() == inci_name.lower())
+    except StopIteration:
+        return 0.5
+    if pos < 8:    return 1.0
+    elif pos < 20: return 0.75
+    else:          return 0.5
+
 
 def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map, product_inci_lower, synergies):
-    """Specialized scoring for Sun Protection, UV Damage, and Tanning.
-    Uses the UV/Sun/Tanning database with concern-specific Component A splits."""
+    """
+    Full sunscreen scoring engine (v2.0) for Sun Protection, UV Damage, Tanning.
+    Implements scoring logic from sunscreen_scoring_logic_v2_fixed.txt.
 
-    # Classify ingredients by their UV roles
-    uv_filters = []     # (inci, uv_data, raw_name, conc)
-    antioxidants = []    # (inci, uv_data, raw_name, conc)
-    melanin_suppressors = []  # (inci, uv_data, raw_name, conc)
-    secondary_supporters = []
+    Part 4 (0-100): Overall sunscreen quality — UV Coverage (40) + Filter Strength (30)
+                    + Photostability (20) + Formulation (10)
+    Part 5 per concern: Sunburn / Tanning / UV Damage specific scores (0-100)
+    Part 6: Fake SPF detection, stability warnings, banned filter flags
+    """
 
-    role_key = {
-        'Sun Protection': 'Sun_Protection_Role',
-        'UV Damage': 'UV_Damage_Role',
-        'Tanning': 'Tanning_Role',
-    }[concern]
+    # ── Step 0: Alias resolution ─────────────────────────────────────────────
+    resolved_list = [INCI_ALIASES.get(ing, ing) for ing in ingredient_list]
+    resolved_lower = {ing.lower() for ing in resolved_list}
 
-    for ing, info in product_inci_map.items():
-        inci = info['inci']
-        raw = info['raw']
-        est_conc = concentrations.get(raw, 0.3)
+    # ── Step 1: Detect UV filters from DB (Ingredient_Category contains 'UV Filter') ──
+    # Deduplicate so each filter counts exactly once in strength calculations.
+    detected_filters = []
+    seen_filter_keys = set()
+    for ing in resolved_list:
+        canonical = INCI_ALIASES.get(ing, ing)
+        uv_data = data_loader.get_uv_data(canonical) or data_loader.get_uv_data(ing)
+        if uv_data:
+            cat = str(uv_data.get('Ingredient_Category', '') or '').lower()
+            if 'uv filter' in cat and canonical not in seen_filter_keys:
+                detected_filters.append(canonical)
+                seen_filter_keys.add(canonical)
 
-        # Check UV/Sun/Tanning DB first
-        uv_data = data_loader.get_uv_data(inci)
-        if not uv_data:
-            uv_data = data_loader.get_uv_data(raw)
-        if not uv_data:
-            continue
+    # ── Step 2: UV band presence ──────────────────────────────────────────────
+    uvb_present  = any(f in _UVB_FILTER_LIST  for f in detected_filters)
+    uva1_present = any(f in _UVA1_FILTER_LIST for f in detected_filters)
+    uva2_present = any(f in _UVA2_FILTER_LIST for f in detected_filters)
 
-        role = str(uv_data.get(role_key, '') or '').strip()
-        if not role or role == 'nan':
-            continue
+    # ── Step 3: Avobenzone stability ──────────────────────────────────────────
+    avobenzone_present  = 'Butyl Methoxydibenzoylmethane' in detected_filters
+    octinoxate_present  = 'Ethylhexyl Methoxycinnamate'   in detected_filters
+    # Build stabilizer set from DB (Photostabilizer col + Common_Synergy_Partners of Avobenzone)
+    global _AVOBENZONE_STABILIZERS_CACHE
+    if not _AVOBENZONE_STABILIZERS_CACHE:
+        _AVOBENZONE_STABILIZERS_CACHE = _build_avobenzone_stabilizers()
+    stabilizer_present = any(s.lower() in resolved_lower for s in _AVOBENZONE_STABILIZERS_CACHE)
 
-        if 'Primary UV Filter' in role or 'Primary UV Block' in role:
-            uv_filters.append((inci, uv_data, raw, est_conc))
-        elif 'Primary Antioxidant' in role:
-            antioxidants.append((inci, uv_data, raw, est_conc))
-        elif 'Primary Melanin Suppressor' in role:
-            melanin_suppressors.append((inci, uv_data, raw, est_conc))
-        else:
-            secondary_supporters.append((inci, uv_data, raw, est_conc))
+    # Read Avobenzone's Photostability_Notes from DB for richer warning text
+    _avob_uv = data_loader.get_uv_data('Butyl Methoxydibenzoylmethane')
+    _avob_stability_note = str(_avob_uv.get('Photostability_Notes', '') or '').strip() if _avob_uv else ''
+    film_former_present = any(ff.lower() in resolved_lower for ff in _FILM_FORMERS)
 
-    has_uv_filters = len(uv_filters) > 0
-    explanation = []
-    conc_info = []
+    warnings_list = []
+    flags_list    = []
+    explanation   = []
 
-    # --- Classify UV spectrum coverage ---
-    has_uva = False
-    has_uvb = False
-    for inci, uv_data, raw, conc in uv_filters:
-        spectrum = str(uv_data.get('UV_Spectrum_Coverage', '') or '').lower()
-        if 'broad' in spectrum or ('uva' in spectrum and 'uvb' in spectrum):
-            has_uva = True
-            has_uvb = True
-        elif 'uva' in spectrum:
-            has_uva = True
-        elif 'uvb' in spectrum:
-            has_uvb = True
-        filter_type = str(uv_data.get('UV_Filter_Type', '') or '').lower()
-        if 'mineral' in filter_type:
-            has_uva = True
-            has_uvb = True
+    # Avobenzone stability warnings (Part 4.4 / Part 6.3)
+    if avobenzone_present and not stabilizer_present:
+        # Use Photostability_Notes from DB for precise warning text
+        _detail = _avob_stability_note if _avob_stability_note else "Degrades without stabilizer"
+        warnings_list.append(f"⚠️ Unstable Avobenzone — {_detail}")
+        flags_list.append("⚠️ Avobenzone Degradation: UVA protection drops ~50% after 1hr sun exposure")
+    if avobenzone_present and octinoxate_present and not stabilizer_present:
+        # Read Octinoxate's Common_Synergy_Partners / Photostability_Notes for mechanism
+        _oct_uv = data_loader.get_uv_data('Ethylhexyl Methoxycinnamate')
+        _oct_note = str(_oct_uv.get('Photostability_Notes', '') or '').strip() if _oct_uv else ''
+        _conflict = _oct_note if _oct_note else "Octinoxate actively degrades Avobenzone"
+        warnings_list.append(f"⚠️ Critical stability conflict: {_conflict}")
 
-    # ============================
-    # SUN PROTECTION SCORING
-    # ============================
+    # ── PART 4: OVERALL SUNSCREEN SCORE (0-100) ──────────────────────────────
+
+    # 4.2 UV Coverage Score (max 40)
+    if   not uvb_present and not uva1_present and not uva2_present: coverage_pts = 0
+    elif not uvb_present and not uva1_present and     uva2_present: coverage_pts = 8
+    elif     uvb_present and not uva1_present and not uva2_present: coverage_pts = 20
+    elif     uvb_present and     uva2_present and not uva1_present: coverage_pts = 28
+    elif     uvb_present and     uva1_present and not uva2_present: coverage_pts = 33
+    else:                                                            coverage_pts = 40   # full broad spectrum
+
+    # 4.3 Filter Strength Score (max 30)
+    raw_strength = sum(
+        _UV_FILTER_STRENGTH_MAP.get(f, 1) * _uv_conc_factor(f, resolved_list)
+        for f in detected_filters
+    )
+    filter_pts = min((raw_strength / 12.0) * 30, 30)
+
+    # 4.4 Photostability Score (max 20)
+    phot_pts = 20
+    if avobenzone_present and not stabilizer_present:
+        phot_pts -= 10
+    if avobenzone_present and octinoxate_present and not stabilizer_present:
+        phot_pts -= 8
+
+    PHOTOSTAB_PTS = {'Low': 0, 'Moderate': 1, 'High': 2, 'Very High': 3}
+    photostab_bonus   = 0
+    max_possible_bonus = max(len(detected_filters) * 3, 1)
+    for f in detected_filters:
+        uv_d = data_loader.get_uv_data(f)
+        if uv_d:
+            rating = str(uv_d.get('Photostability_Rating', 'Moderate') or 'Moderate').strip()
+            photostab_bonus += PHOTOSTAB_PTS.get(rating, 1)
+
+    if photostab_bonus > 0 and phot_pts < 20:
+        phot_pts = min(phot_pts + (photostab_bonus / max_possible_bonus) * 8, 20)
+    if film_former_present:
+        phot_pts = min(phot_pts + 2, 20)
+    phot_pts = max(phot_pts, 0)
+
+    # 4.5 Formulation Score (max 10)
+    form_pts = 0
+    if film_former_present:
+        form_pts += 3
+    if any(b.lower() in resolved_lower for b in _SPF_BOOSTERS):
+        form_pts += 2
+    _ANTIOXIDANTS_FORM = [
+        'Tocopherol', 'Ferulic Acid', 'Ascorbic Acid', 'Resveratrol', 'Astaxanthin',
+        'Coenzyme Q10', 'Green Tea Extract', 'EGCG', 'Ergothioneine',
+        'Polypodium Leucotomos Extract',
+    ]
+    aox_count = sum(1 for a in _ANTIOXIDANTS_FORM if a.lower() in resolved_lower)
+    if   aox_count >= 2: form_pts += 3
+    elif aox_count == 1: form_pts += 2
+    if any(d.lower() in resolved_lower for d in ('photolyase', 'endonuclease')):
+        form_pts += 2
+    form_pts = min(form_pts, 10)
+
+    total_score = round(coverage_pts + filter_pts + phot_pts + form_pts)
+
+    # 4.6 SPF Estimate from filter_pts
+    if   filter_pts >= 27: spf_estimate = "SPF 50+"
+    elif filter_pts >= 22: spf_estimate = "SPF 40-50"
+    elif filter_pts >= 16: spf_estimate = "SPF 30-40"
+    elif filter_pts >= 10: spf_estimate = "SPF 20-30"
+    elif filter_pts >= 5:  spf_estimate = "SPF 15-20"
+    else:                  spf_estimate = "SPF < 15 (estimated)"
+
+    # PA Rating from UVA score
+    uva1_filter_count = sum(1 for f in detected_filters if f in _UVA1_FILTER_LIST)
+    if   uva1_filter_count >= 2 and uva2_present: pa_estimate = "PA++++"
+    elif uva1_filter_count >= 1 and uva2_present: pa_estimate = "PA+++"
+    elif uva1_filter_count >= 1:                  pa_estimate = "PA++"
+    elif uva2_present:                            pa_estimate = "PA+"
+    else:                                         pa_estimate = "No UVA protection estimated"
+
+    # ── PART 6: FLAGS ─────────────────────────────────────────────────────────
+    reef_safe = True
+    for f in detected_filters:
+        if f in _BANNED_FILTERS:
+            flags_list.append(f"⚠️ {f} — {_BANNED_FILTERS[f]}")
+            if f == 'Oxybenzone':
+                reef_safe = False
+
+    if uvb_present and not uva1_present and not uva2_present:
+        flags_list.append("⚠️ Not broad spectrum — only UVB covered, no UVA protection")
+    if not uvb_present and not uva1_present and not uva2_present and len(ingredient_list) > 3:
+        flags_list.append("🚨 No UV filters detected — this product does not appear to be a sunscreen")
+
+    # Single weak filter fake-SPF check (per spec Part 6.4: exempt ZnO/TiO2 = strength ≥ 4)
+    if len(detected_filters) == 1:
+        only_f = detected_filters[0]
+        if _UV_FILTER_STRENGTH_MAP.get(only_f, 1) < 4:
+            flags_list.append(f"🚨 Single weak UV filter ({only_f}) — cannot achieve meaningful SPF alone")
+
+    # ── PART 5: CONCERN-SPECIFIC SCORES ──────────────────────────────────────
+
+    # ── 5.1  SUN PROTECTION ──────────────────────────────────────────────────
     if concern == 'Sun Protection':
-        # Component A: 40% UV Filter Coverage + 10% Photostability
-        uv_coverage_score = 0
-        photostability_score = 0
+        # Sun Protection = BROAD SPECTRUM quality (UVB + UVA + stability + formulation)
+        # = total_score (already computed above from Part 4: coverage+filter+photostab+form)
+        # This is distinct from Sunburn Protection (UVB-only) which is a sub-score.
+        concern_score = float(total_score)
 
-        if uv_filters:
-            filter_strengths = []
-            stability_ratings = []
-            for inci, uv_data, raw, conc in uv_filters:
-                spf_weight = 3.0
-                try:
-                    spf_weight = float(uv_data.get('Estimated_SPF_Contribution_Weight', 3) or 3)
-                    if math.isnan(spf_weight):
-                        spf_weight = 3.0
-                except (ValueError, TypeError):
-                    pass
-                conc_factor = min(1.0, conc / 3.0) if conc > 0 else 0.5
-                stability = str(uv_data.get('Photostability_Rating', 'Moderate') or 'Moderate').lower()
-                stab_mod = 1.1 if 'high' in stability else (1.0 if 'moderate' in stability else 0.8)
-                strength = spf_weight * conc_factor * stab_mod
-                filter_strengths.append(strength)
-                stability_ratings.append(stability)
-                conc_info.append(f"{inci}: SPF contribution weight {spf_weight}")
+        # Sunburn sub-score (UVB-only) — stored in sunscreen_analysis for display
+        uvb_strength_raw = sum(
+            _UV_FILTER_STRENGTH_MAP.get(f, 1) * _uv_conc_factor(f, resolved_list)
+            for f in detected_filters if f in _UVB_FILTER_LIST
+        )
+        sunburn_score = round(min((uvb_strength_raw / 8.0) * 100, 100))
 
-            # Theoretical max = 5 filters at max strength
-            theoretical_max = 5 * 5.0 * 1.0 * 1.1
-            raw_uv = (sum(filter_strengths) / theoretical_max) * 40
-            uv_coverage_score = min(40, raw_uv)
-
-            # Photostability bonus (0-10)
-            high_count = sum(1 for s in stability_ratings if 'high' in s)
-            if high_count == len(stability_ratings):
-                photostability_score = min(10, 8 + len(stability_ratings) * 0.5)
-            elif high_count > 0:
-                photostability_score = 5 + (high_count / len(stability_ratings)) * 2
-            else:
-                photostability_score = 2 + len(stability_ratings) * 0.5
-
-            explanation.append(f"{len(uv_filters)} UV filter(s) detected")
-            if has_uva and has_uvb:
-                explanation.append("Broad spectrum: Both UVA + UVB coverage")
-            elif has_uva:
-                explanation.append("UVA coverage only - missing UVB protection")
-            elif has_uvb:
-                explanation.append("UVB coverage only - missing UVA protection")
+        if not uvb_present:
+            explanation.append("No UVB filters found — limited sun protection")
+        elif uvb_present and uva1_present and uva2_present:
+            explanation.append("Full broad spectrum: UVB + UVA1 + UVA2 coverage")
+        elif uvb_present and uva1_present:
+            explanation.append("Good broad spectrum: UVB + UVA1 — missing UVA2 (minor gap)")
+        elif uvb_present and uva2_present:
+            explanation.append("UVB + UVA2 — missing UVA1 (main tanning band)")
         else:
-            explanation.append("No UV filters found - limited sun protection")
+            explanation.append("UVB-only — no UVA protection (not broad spectrum)")
 
-        # Spectrum balance cap
-        if has_uva and has_uvb:
-            comp_a = uv_coverage_score + photostability_score
-        elif has_uva or has_uvb:
-            comp_a = min(30, uv_coverage_score + photostability_score)  # cap at 60% of 50
-            explanation.append("Score capped: incomplete UV spectrum coverage")
+        if total_score >= 85:
+            explanation.append(f"Sunscreen quality: Excellent ({total_score}/100)")
+        elif total_score >= 70:
+            explanation.append(f"Sunscreen quality: Good ({total_score}/100)")
+        elif total_score >= 55:
+            explanation.append(f"Sunscreen quality: Average ({total_score}/100)")
         else:
-            comp_a = min(10, uv_coverage_score + photostability_score)  # cap at 20% of 50
-            if not uv_filters:
-                explanation.append("Score capped at 20%: no UV filters")
+            explanation.append(f"Sunscreen quality: Weak ({total_score}/100)")
 
-        comp_a = min(50, comp_a)
+        if warnings_list:
+            explanation.append(warnings_list[0])
 
-    # ============================
-    # UV DAMAGE SCORING
-    # ============================
-    elif concern == 'UV Damage':
-        # Component A: 25% UV Filter + 25% Antioxidant Network
-        uv_filter_score = 0
-        antioxidant_score = 0
+        missing_actives = []
+        if not uvb_present:
+            missing_actives.append("UVB filter (Zinc Oxide, Titanium Dioxide, Ethylhexyl Triazone)")
+        if not uva1_present and not uva2_present:
+            missing_actives.append("UVA filter (Zinc Oxide, Avobenzone, Tinosorb S)")
+        elif not uva1_present:
+            missing_actives.append("UVA1 filter (Avobenzone, Tinosorb S, Zinc Oxide) for full spectrum")
 
-        if uv_filters:
-            filter_strengths = []
-            for inci, uv_data, raw, conc in uv_filters:
-                spf_weight = 3.0
-                try:
-                    spf_weight = float(uv_data.get('Estimated_SPF_Contribution_Weight', 3) or 3)
-                    if math.isnan(spf_weight):
-                        spf_weight = 3.0
-                except (ValueError, TypeError):
-                    pass
-                conc_factor = min(1.0, conc / 3.0) if conc > 0 else 0.5
-                filter_strengths.append(spf_weight * conc_factor)
-            theoretical_max = 5 * 5.0 * 1.0
-            uv_filter_score = min(25, (sum(filter_strengths) / theoretical_max) * 25)
-            explanation.append(f"{len(uv_filters)} UV filter(s) for damage prevention")
-        else:
-            explanation.append("No UV filters - UV damage prevention limited")
+        return {
+            'score': round(concern_score),
+            'present_actives': detected_filters[:5],
+            'missing_actives': missing_actives[:3],
+            'supporting_ingredients': [],
+            'explanation': explanation[:4],
+            'advisory': (
+                f"SPF estimate: {spf_estimate} · PA estimate: {pa_estimate} "
+                f"(tool estimates only — not lab-tested values)"
+            ),
+            'synergy_bonus': 0,
+            'sunscreen_analysis': {
+                'overall_score': total_score,
+                'score_breakdown': {
+                    'uv_coverage':    round(coverage_pts),
+                    'filter_strength': round(filter_pts),
+                    'photostability': round(phot_pts),
+                    'formulation':    round(form_pts),
+                },
+                'spf_estimate':    spf_estimate,
+                'pa_estimate':     pa_estimate,
+                'pa_note':         'Approximation based on filter type; not lab-tested (PPD test required)',
+                'broad_spectrum':  uvb_present and (uva1_present or uva2_present),
+                'uvb_covered':     uvb_present,
+                'uva1_covered':    uva1_present,
+                'uva2_covered':    uva2_present,
+                'reef_safe':       reef_safe,
+                'sunburn_score':    sunburn_score,
+                'filters_detected': detected_filters,
+                'warnings':        warnings_list,
+                'flags':           flags_list,
+            },
+        }
 
-        if antioxidants:
-            antioxidant_strengths = []
-            for inci, uv_data, raw, conc in antioxidants:
-                ev_factor = 0.7
-                try:
-                    ef = float(uv_data.get('Evidence_Factor', 0.7) or 0.7)
-                    if not math.isnan(ef):
-                        ev_factor = ef
-                except (ValueError, TypeError):
-                    pass
-                conc_factor = min(1.0, conc / 1.0) if conc > 0 else 0.5
-                # Synergy multiplier (e.g., Vit C + Ferulic + Vit E)
-                syn_mult = 1.0
-                for syn in synergies:
-                    syn_ings = syn['ingredients']
-                    if inci.lower() in syn_ings:
-                        other = [s for s in syn_ings if s != inci.lower()]
-                        if all(o in product_inci_lower for o in other):
-                            syn_mult = max(syn_mult, 1.1)
-                            break
-                antioxidant_strengths.append(ev_factor * conc_factor * syn_mult)
-            theoretical_max = 5 * 1.0 * 1.0 * 1.1
-            antioxidant_score = min(25, (sum(antioxidant_strengths) / theoretical_max) * 25)
-            explanation.append(f"{len(antioxidants)} antioxidant(s) for free radical protection")
-            if any(s > 0.7 for s in antioxidant_strengths):
-                explanation.append("Strong antioxidant network present")
-        else:
-            explanation.append("No key antioxidants for UV damage repair")
-
-        comp_a = uv_filter_score + antioxidant_score
-        # Cap: no UV filter = max 40%
-        if not has_uv_filters:
-            comp_a = min(20, comp_a)  # 40% of 50
-            explanation.append("Score capped at 40%: no UV filters present")
-        comp_a = min(50, comp_a)
-
-    # ============================
-    # TANNING SCORING
-    # ============================
+    # ── 5.2  TANNING PREVENTION ──────────────────────────────────────────────
     elif concern == 'Tanning':
-        # Component A: 30% UV Filter + 20% Melanin Suppression
-        uv_filter_score = 0
-        melanin_score = 0
+        _BEST_ANTITAN = {
+            'Butyl Methoxydibenzoylmethane':                       10,
+            'Diethylamino Hydroxybenzoyl Hexyl Benzoate':          10,
+            'Terephthalylidene Dicamphor Sulfonic Acid':            9,
+            'Drometrizole Trisiloxane':                             9,
+            'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine':      10,
+            'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol':  9,
+            'Zinc Oxide':                                           8,
+            'Disodium Phenyl Dibenzimidazole Tetrasulfonate':       9,
+        }
+        uva_tan_raw = sum(_BEST_ANTITAN.get(f, 0) for f in detected_filters if f in _BEST_ANTITAN)
+        uva_tan_score = min((uva_tan_raw / 20) * 60, 60)
 
-        if uv_filters:
-            filter_strengths = []
-            for inci, uv_data, raw, conc in uv_filters:
-                spf_weight = 3.0
-                try:
-                    spf_weight = float(uv_data.get('Estimated_SPF_Contribution_Weight', 3) or 3)
-                    if math.isnan(spf_weight):
-                        spf_weight = 3.0
-                except (ValueError, TypeError):
-                    pass
-                conc_factor = min(1.0, conc / 3.0) if conc > 0 else 0.5
-                filter_strengths.append(spf_weight * conc_factor)
-            theoretical_max = 5 * 5.0 * 1.0
-            uv_filter_score = min(30, (sum(filter_strengths) / theoretical_max) * 30)
-            explanation.append(f"{len(uv_filters)} UV filter(s) blocking melanin-triggering UV")
+        if not uva1_present:
+            uva_tan_score *= 0.4
+            warnings_list.append("⚠️ No UVA1 filter — limited tanning prevention (UVA1 causes 90% of tanning)")
+        if avobenzone_present and not stabilizer_present:
+            uva_tan_score *= 0.4
+
+        _MELANIN_SUPPRESSORS = {
+            'Tranexamic Acid': 10, 'Alpha Arbutin': 9, 'Niacinamide': 8,
+            'Azelaic Acid':     8, 'Kojic Acid':    8, 'Ascorbic Acid': 7,
+            'Cysteamine HCl':   9, 'Thiamidol':    10, 'Hexylresorcinol': 7,
+        }
+        suppressor_raw   = sum(v for k, v in _MELANIN_SUPPRESSORS.items() if k.lower() in resolved_lower)
+        suppressor_score = min((suppressor_raw / 25) * 30, 30)
+        concern_score    = min(uva_tan_score + suppressor_score, 100)
+
+        melanin_found = [k for k in _MELANIN_SUPPRESSORS if k.lower() in resolved_lower]
+        present_actives = list(dict.fromkeys(detected_filters + melanin_found))
+
+        if melanin_found:
+            explanation.append(f"Melanin suppressors: {', '.join(melanin_found[:2])}")
         else:
-            explanation.append("No UV filters - tanning prevention limited")
-
-        if melanin_suppressors:
-            melanin_strengths = []
-            for inci, uv_data, raw, conc in melanin_suppressors:
-                ev_factor = 0.7
-                try:
-                    ef = float(uv_data.get('Evidence_Factor', 0.7) or 0.7)
-                    if not math.isnan(ef):
-                        ev_factor = ef
-                except (ValueError, TypeError):
-                    pass
-                conc_factor = min(1.0, conc / 1.0) if conc > 0 else 0.5
-                syn_mult = 1.0
-                for syn in synergies:
-                    syn_ings = syn['ingredients']
-                    if inci.lower() in syn_ings:
-                        other = [s for s in syn_ings if s != inci.lower()]
-                        if all(o in product_inci_lower for o in other):
-                            syn_mult = max(syn_mult, 1.1)
-                            break
-                melanin_strengths.append(ev_factor * conc_factor * syn_mult)
-            theoretical_max = 5 * 1.0 * 1.0 * 1.1
-            melanin_score = min(20, (sum(melanin_strengths) / theoretical_max) * 20)
-            suppressors_names = [inci for inci, _, _, _ in melanin_suppressors]
-            explanation.append(f"Melanin suppression: {', '.join(suppressors_names[:3])}")
+            explanation.append("No melanin suppressors — add Niacinamide or Alpha Arbutin")
+        if uva1_present:
+            explanation.append("UVA1 filter present — blocks main tanning radiation (320–400nm)")
         else:
-            explanation.append("No melanin suppression actives found")
+            explanation.append("Missing UVA1 filter — main tanning band unprotected")
+        if warnings_list:
+            explanation.append(warnings_list[0])
 
-        comp_a = uv_filter_score + melanin_score
-        # Cap: no UV filter = max 35%
-        if not has_uv_filters:
-            comp_a = min(17.5, comp_a)  # 35% of 50
-            explanation.append("Score capped at 35%: no UV filters (brightening serums shouldn't score high)")
-        comp_a = min(50, comp_a)
+        missing_actives = []
+        if not melanin_found:
+            missing_actives.append("Melanin suppressor (Alpha Arbutin, Tranexamic Acid, Niacinamide)")
+        if not uva1_present:
+            missing_actives.append("UVA1 filter (Avobenzone, Tinosorb S, Zinc Oxide)")
+
+        if   concern_score >= 80: advisory = "Strong tanning prevention formula"
+        elif concern_score >= 60: advisory = "Good tanning control — add melanin-suppressing serum underneath for best results"
+        elif concern_score >= 40: advisory = "Moderate — pair with Alpha Arbutin or Tranexamic Acid serum for better tanning prevention"
+        else:                     advisory = "⚠️ Weak tanning prevention — missing UVA1 filter and/or melanin suppressors"
+
+        return {
+            'score': round(concern_score),
+            'present_actives': present_actives[:5],
+            'missing_actives': missing_actives[:3],
+            'supporting_ingredients': [],
+            'explanation': explanation[:4],
+            'advisory': advisory,
+            'synergy_bonus': 0,
+        }
+
+    # ── 5.3  UV DAMAGE (Photoaging / DNA) ────────────────────────────────────
+    elif concern == 'UV Damage':
+        _BEST_UVA_DMG = {
+            'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine',
+            'Diethylamino Hydroxybenzoyl Hexyl Benzoate',
+            'Terephthalylidene Dicamphor Sulfonic Acid',
+            'Drometrizole Trisiloxane', 'Zinc Oxide',
+            'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+            'Disodium Phenyl Dibenzimidazole Tetrasulfonate',
+        }
+        uva_dmg_raw = sum(
+            _UV_FILTER_STRENGTH_MAP.get(f, 1) * _uv_conc_factor(f, resolved_list)
+            for f in detected_filters if f in _BEST_UVA_DMG
+        )
+        uva_dmg_score = min((uva_dmg_raw / 8.0) * 50, 50)
+
+        if not uva1_present and not uva2_present:
+            uva_dmg_score *= 0.3
+            warnings_list.append("⚠️ No UVA protection — provides no photoaging or anti-aging defense")
+
+        _ANTIOXIDANT_WEIGHTS = {
+            'Ascorbic Acid': 10, 'Ferulic Acid': 10, 'Tocopherol': 8,
+            'Astaxanthin':   10, 'Resveratrol':   8, 'Polypodium Leucotomos Extract': 9,
+            'Ergothioneine':  8, 'Green Tea Extract': 7, 'EGCG': 8,
+            'Coenzyme Q10':   7, 'Idebenone': 8,
+        }
+        # Triple antioxidant synergy bonus (C + E + Ferulic)
+        triple_synergy = (
+            'ferulic acid' in resolved_lower and
+            'ascorbic acid' in resolved_lower and
+            'tocopherol' in resolved_lower
+        )
+        aox_raw = sum(v for k, v in _ANTIOXIDANT_WEIGHTS.items() if k.lower() in resolved_lower)
+        if triple_synergy:
+            aox_raw += 8
+        aox_score = min((aox_raw / 20) * 35, 35)
+
+        _DNA_REPAIR = {'Photolyase': 10, 'Endonuclease': 10}
+        dna_raw   = sum(v for k, v in _DNA_REPAIR.items() if k.lower() in resolved_lower)
+        dna_score = min((dna_raw / 10) * 15, 15)
+
+        concern_score = min(uva_dmg_score + aox_score + dna_score, 100)
+
+        antioxidants_found = [k for k in _ANTIOXIDANT_WEIGHTS if k.lower() in resolved_lower]
+        present_actives = list(dict.fromkeys(detected_filters + antioxidants_found))
+
+        if antioxidants_found:
+            explanation.append(f"Antioxidants: {', '.join(antioxidants_found[:2])}")
+        else:
+            explanation.append("No antioxidants — UV-triggered free radicals not neutralized")
+            warnings_list.append("💡 Add Vitamin C or Ferulic Acid serum for better UV damage defense")
+        if triple_synergy:
+            explanation.append("Triple antioxidant system (C + E + Ferulic) — enhanced photoprotection")
+        if uva1_present:
+            explanation.append("UVA1 filter present — key for anti-aging/photoaging defense")
+        else:
+            explanation.append("Missing UVA1 filter — photoaging radiation unblocked")
+        if dna_score > 0:
+            explanation.append("DNA repair enzyme detected — premium anti-aging formula")
+
+        missing_actives = []
+        if not antioxidants_found:
+            missing_actives.append("Antioxidant (Vitamin C, Ferulic Acid, Vitamin E)")
+        if not uva1_present:
+            missing_actives.append("UVA1 filter (Avobenzone, Tinosorb S, Zinc Oxide)")
+
+        if   concern_score >= 85: advisory = "Excellent UV damage prevention — professional-grade anti-aging protection"
+        elif concern_score >= 70: advisory = "Good UV damage protection"
+        elif concern_score >= 50: advisory = "Average — layer Vitamin C serum underneath for better UV damage defense"
+        else:                     advisory = "⚠️ Weak UV damage protection — add broad-spectrum UVA filters and antioxidants"
+
+        return {
+            'score': round(concern_score),
+            'present_actives': present_actives[:5],
+            'missing_actives': missing_actives[:3],
+            'supporting_ingredients': [],
+            'explanation': explanation[:4],
+            'advisory': advisory,
+            'synergy_bonus': round(8 if triple_synergy else 0),
+        }
+
     else:
-        comp_a = 0
-
-    # --- Component B: Support System Quality (0-20%) ---
-    has_barrier = False
-    has_anti_inflammatory = False
-    has_humectant = False
-    has_antioxidant = False
-    support_count = len(secondary_supporters) + len(antioxidants)
-
-    for ing, info in product_inci_map.items():
-        data = info['data']
-        func_cat = str(data.get('Functional_Category', '')).lower()
-        ing_class = str(data.get('Ingredient_Class', '')).lower().strip()
-        inci_lower = info['inci'].lower()
-        if 'humectant' in func_cat or ing_class == 'humectant':
-            has_humectant = True
-        if any(kw in func_cat for kw in ['anti-inflam', 'soothing', 'calming']):
-            has_anti_inflammatory = True
-        if any(kw in func_cat for kw in ['antioxidant', 'photoprotect']):
-            has_antioxidant = True
-        if any(kw in func_cat for kw in ['barrier', 'ceramide', 'lipid', 'emollient', 'occlusive']):
-            has_barrier = True
-        if any(kw in inci_lower for kw in ['dimethicone', 'silicone', 'acrylate', 'crosspolymer']):
-            support_count += 1
-        if any(kw in inci_lower for kw in ['centella', 'allantoin', 'panthenol', 'bisabolol']):
-            has_anti_inflammatory = True
-
-    support_flags = sum([has_barrier, has_anti_inflammatory, has_humectant, has_antioxidant])
-    if support_flags >= 3 and support_count >= 2:
-        comp_b = 18
-    elif support_flags >= 2 and support_count >= 1:
-        comp_b = 14
-    elif support_flags >= 2 or support_count >= 2:
-        comp_b = 10
-    elif support_flags >= 1 or support_count >= 1:
-        comp_b = 6
-    else:
-        comp_b = 0
-
-    # --- Component C: Synergy Bonus (0-10%) ---
-    comp_c = 0
-    synergy_found = []
-    seen_groups = set()
-    for syn in synergies:
-        syn_ings = syn['ingredients']
-        group_id = syn.get('mechanism', '')
-        if group_id in seen_groups:
-            continue
-        if all(si in product_inci_lower for si in syn_ings):
-            comp_c += syn['bonus']
-            synergy_found.append(syn['mechanism'])
-            seen_groups.add(group_id)
-    comp_c = min(10, comp_c)
-    if synergy_found:
-        explanation.append("Beneficial synergy detected between ingredients")
-
-    # --- Component D: Worsening Penalty (max -30%) ---
-    comp_d = 0
-    worsening_found = []
-    ing_str = " ".join(ingredient_list).lower()
-    for trigger, penalty in WORSENING_INGREDIENTS.get(concern, []):
-        if trigger in ing_str:
-            comp_d += penalty
-            worsening_found.append(trigger)
-    # Position-weighted: high alcohol/fragrance in top 5
-    for i, ing in enumerate(ingredient_list[:10]):
-        ing_lower = ing.lower()
-        if i < 5:
-            if any(kw in ing_lower for kw in ['alcohol denat', 'sd alcohol', 'isopropyl alcohol']):
-                comp_d -= 5
-                worsening_found.append(f"{ing} (alcohol in top 5)")
-            if 'fragrance' in ing_lower or 'parfum' in ing_lower:
-                comp_d -= 3
-                worsening_found.append(f"{ing} (fragrance in top 5)")
-    comp_d = max(-30, comp_d)
-    if worsening_found:
-        explanation.append(f"Worsening: {', '.join(worsening_found[:2])}")
-
-    final = max(0, min(100, comp_a + comp_b + comp_c + comp_d))
-
-    # Build advisory
-    present_active_names = ([f for f, _, _, _ in uv_filters] +
-                            [f for f, _, _, _ in antioxidants] +
-                            [f for f, _, _, _ in melanin_suppressors])
-    missing = []
-    if concern == 'Sun Protection' and not has_uv_filters:
-        missing.append("UV filters (Zinc Oxide, Titanium Dioxide)")
-    if concern == 'UV Damage' and not antioxidants:
-        missing.append("antioxidants (Vitamin C, Ferulic Acid, Vitamin E)")
-    if concern == 'Tanning' and not melanin_suppressors:
-        missing.append("melanin suppressors (Alpha Arbutin, Tranexamic Acid)")
-
-    advisory = f"Consider adding {', '.join(missing)} for better {concern.lower()} results." if missing else "Good active coverage for this concern."
-
-    return {
-        'score': round(final),
-        'present_actives': present_active_names[:5],
-        'missing_actives': missing[:3],
-        'supporting_ingredients': [f for f, _, _, _ in secondary_supporters[:4]],
-        'explanation': explanation[:4],
-        'advisory': advisory,
-        'synergy_bonus': comp_c,
-    }
-
+        return {
+            'score': 0, 'present_actives': [], 'missing_actives': [],
+            'supporting_ingredients': [], 'explanation': ['Unknown concern'],
+            'advisory': '', 'synergy_bonus': 0,
+        }
 
 def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=None):
     """Skin Concern Fit: 4-component intelligent scoring model.

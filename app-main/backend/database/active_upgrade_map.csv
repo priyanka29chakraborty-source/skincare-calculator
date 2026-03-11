@@ -1,17 +1,860 @@
 Skin_Concern,Primary_Active,Primary_Evidence_Level,Primary_Effect_Weight,Upgrade_Active,Upgrade_Evidence_Level,Upgrade_Effect_Weight,Upgrade_Type,Works_Better_With,Required_Functional_Support,Safety_Floor,Min_Formulation_Gain,Upgrade_Reason,Confidence_Level,Do_Not_Upgrade,Release_Tier,Do_Not_Upgrade_Reason
-PIH,Alpha Arbutin,Medium,0.55,Tranexamic Acid,High,0.82,Evidence,"Niacinamide,Panthenol","Barrier,Humectant",Low,15,Stronger inhibition of melanocyte activation via anti-plasmin pathway,High,NO,MVP,
-PIH,Alpha Arbutin,Medium,0.55,Azelaic Acid,High,0.78,Multi-Pathway,"Niacinamide,Ceramides","Barrier,Soothing",Low–Moderate,15,Addresses pigmentation + inflammation + acne pathways,High,NO,Advanced,
-PIH,Licorice Extract,Medium,0.45,Tranexamic Acid,High,0.82,Evidence,Niacinamide,Barrier,Low,15,Superior clinical evidence for melasma and PIH,High,NO,MVP,
-PIH,Vitamin C Derivatives,Medium,0.5,L-Ascorbic Acid,High,0.9,Potency,"Vitamin E,Ferulic Acid",Antioxidant Stability,Moderate,20,Direct antioxidant and collagen-stimulating action,High,NO,MVP,
-Acne,Niacinamide,Medium,0.5,Adapalene,High,0.9,Evidence,"Ceramides,Glycerin","Barrier,Soothing",Moderate,20,Normalizes follicular keratinization and prevents comedones,High,NO,MVP,
-Acne,Salicylic Acid,Medium,0.6,Adapalene,High,0.9,Potency,"Niacinamide,Panthenol",Barrier,Moderate,20,Treats acne at cellular turnover level,High,NO,MVP,
-Acne,Tea Tree Oil,Low,0.35,Salicylic Acid,Medium,0.6,Evidence,Zinc PCA,Sebum Control,Low,10,More reliable comedolytic and anti-inflammatory action,Medium,NO,Advanced,
-Aging,Peptides,Medium,0.55,Retinoids,High,0.95,Evidence,"Ceramides,Niacinamide","Barrier,Soothing",Moderate,25,Stimulates collagen at gene-expression level,High,NO,Advanced,
-Aging,Bakuchiol,Medium,0.5,Retinoids,High,0.95,Potency,"Ceramides,Panthenol",Barrier,Moderate,25,Retinoids show stronger anti-aging outcomes,High,NO,Advanced,
-Aging,Coenzyme Q10,Medium,0.45,L-Ascorbic Acid,High,0.9,Multi-Pathway,"Vitamin E,Ferulic Acid",Antioxidant Network,Moderate,20,Stronger antioxidant synergy and collagen support,Medium,NO,Advanced,
-Barrier,Ceramide Blend,Medium,0.6,Multi-Ceramide + Cholesterol,High,0.85,Multi-Pathway,Glycerin,Humectant,Low,15,Mimics physiological skin lipid ratio,High,NO,Advanced,
-Barrier,Panthenol,Medium,0.5,Madecassoside,High,0.75,Evidence,Ceramides,Barrier Repair,Low,15,Stronger barrier recovery and anti-inflammatory action,High,NO,MVP,
-Hydration,Hyaluronic Acid,Medium,0.55,Multi-MW Hyaluronic Acid,High,0.75,Potency,"Ceramides,Glycerin","Barrier,Humectant",Low,15,Improves hydration across skin layers,High,NO,MVP,
-Hydration,Glycerin,Medium,0.5,Urea (low %),High,0.8,Evidence,Sodium PCA,NMF Support,Moderate,15,Enhances natural moisturizing factor,Medium,NO,Advanced,
-Pores,Niacinamide,Medium,0.5,Retinoids,High,0.95,Multi-Pathway,Ceramides,Barrier,Moderate,20,Improves pore appearance via collagen remodeling,High,NO,Advanced,
-Pores,Lactic Acid,Medium,0.55,Glycolic Acid,High,0.75,Potency,Panthenol,Barrier,Moderate,15,Deeper exfoliation and texture refinement,High,NO,MVP,
+PIH,Alpha Arbutin,Medium,0.55,Tranexamic Acid,High,0.82,Evidence,"Niacinamide,Panthenol","Barrier,Humectant",Low,15.0,Stronger inhibition of melanocyte activation via anti-plasmin pathway,High,NO,MVP,
+PIH,Alpha Arbutin,Medium,0.55,Azelaic Acid,High,0.78,Multi-Pathway,"Niacinamide,Ceramides","Barrier,Soothing",LowModerate,15.0,Addresses pigmentation + inflammation + acne pathways,High,NO,Advanced,
+PIH,Licorice Extract,Medium,0.45,Tranexamic Acid,High,0.82,Evidence,Niacinamide,Barrier,Low,15.0,Superior clinical evidence for melasma and PIH,High,NO,MVP,
+PIH,Vitamin C Derivatives,Medium,0.5,L-Ascorbic Acid,High,0.9,Potency,"Vitamin E,Ferulic Acid",Antioxidant Stability,Moderate,20.0,Direct antioxidant and collagen-stimulating action,High,NO,MVP,
+Acne,Niacinamide,Medium,0.5,Adapalene,High,0.9,Evidence,"Ceramides,Glycerin","Barrier,Soothing",Moderate,20.0,Normalizes follicular keratinization and prevents comedones,High,NO,MVP,
+Acne,Salicylic Acid,Medium,0.6,Adapalene,High,0.9,Potency,"Niacinamide,Panthenol",Barrier,Moderate,20.0,Treats acne at cellular turnover level,High,NO,MVP,
+Acne,Tea Tree Oil,Low,0.35,Salicylic Acid,Medium,0.6,Evidence,Zinc PCA,Sebum Control,Low,10.0,More reliable comedolytic and anti-inflammatory action,Medium,NO,Advanced,
+Aging,Peptides,Medium,0.55,Retinoids,High,0.95,Evidence,"Ceramides,Niacinamide","Barrier,Soothing",Moderate,25.0,Stimulates collagen at gene-expression level,High,NO,Advanced,
+Aging,Bakuchiol,Medium,0.5,Retinoids,High,0.95,Potency,"Ceramides,Panthenol",Barrier,Moderate,25.0,Retinoids show stronger anti-aging outcomes,High,NO,Advanced,
+Aging,Coenzyme Q10,Medium,0.45,L-Ascorbic Acid,High,0.9,Multi-Pathway,"Vitamin E,Ferulic Acid",Antioxidant Network,Moderate,20.0,Stronger antioxidant synergy and collagen support,Medium,NO,Advanced,
+Barrier,Ceramide Blend,Medium,0.6,Multi-Ceramide + Cholesterol,High,0.85,Multi-Pathway,Glycerin,Humectant,Low,15.0,Mimics physiological skin lipid ratio,High,NO,Advanced,
+Barrier,Panthenol,Medium,0.5,Madecassoside,High,0.75,Evidence,Ceramides,Barrier Repair,Low,15.0,Stronger barrier recovery and anti-inflammatory action,High,NO,MVP,
+Hydration,Hyaluronic Acid,Medium,0.55,Multi-MW Hyaluronic Acid,High,0.75,Potency,"Ceramides,Glycerin","Barrier,Humectant",Low,15.0,Improves hydration across skin layers,High,NO,MVP,
+Hydration,Glycerin,Medium,0.5,Urea (low %),High,0.8,Evidence,Sodium PCA,NMF Support,Moderate,15.0,Enhances natural moisturizing factor,Medium,NO,Advanced,
+Pores,Niacinamide,Medium,0.5,Retinoids,High,0.95,Multi-Pathway,Ceramides,Barrier,Moderate,20.0,Improves pore appearance via collagen remodeling,High,NO,Advanced,
+Pores,Lactic Acid,Medium,0.55,Glycolic Acid,High,0.75,Potency,Panthenol,Barrier,Moderate,15.0,Deeper exfoliation and texture refinement,High,NO,MVP,
+General,"1,4-Dioxane",Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,3-O-Ethyl Ascorbic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,4-Methoxysalicylic Acid Potassium Salt,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acacia Senegal Gum,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acai Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Glucosamine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Hexapeptide-8,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Octapeptide-3,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Tetrapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Tetrapeptide-11,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Tetrapeptide-2,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Tetrapeptide-5,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Tyrosinamide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetyl Zingerone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acetylarginyltryptophyl Diphenylglycine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acrylates Copolymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Acrylates/C10-30 Alkyl Acrylate Crosspolymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Adansonia Digitata Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Adapalene,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Adenosine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ahnfeltia Concinna Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alanine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alaria Esculenta Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alcohol Denat,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Algae Exopolysaccharides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Algae Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Algin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alginate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Allantoin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aloe Barbadensis Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aloe Barbadensis Leaf Juice,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aloe Vera,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alpha Lipoic,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alpha Lipoic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alpha-Arbutin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alpha-Glucan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alpha-Glucan Oligosaccharide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alpha-Lipoic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Alteromonas Ferment Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aluminum Chlor,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aluminum Starch Octenylsuccinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Amino Acids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aminomethyl Propanol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ammonium Acryloyldimethyltaurate/VP Copolymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ammonium Lactate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Anti-Ageing Peptides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Apigenin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Apple Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Apple Polyphenols,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Apple Stem Cells,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aqua,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aquagenium,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arachidyl Alcohol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arachidyl Glucoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arbutin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arctostaphylos Uva-Ursi Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Argan Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arginine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arginine HCL,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arginine PCA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arginine/Lysine Polypeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Argireline,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Arnica Montana Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Artemisia Capillaris Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Artemisia Princeps Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ascophyllum Nodosum Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ascorbic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ascorbyl Glucoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ascorbyl Palmitate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ascorbyl Tetraisopalmitate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Asiatic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Asiaticoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Asparagopsis Armata Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Aspergillus Ferment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Astaxanthin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Avene Thermal Water,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Avobenzone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Avocado Ferment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Avocado Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Azelaic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Azelaic Acid Derivative,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Azelaic Acid Liposome,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Azelaic Acid Potassium Salt,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Azelaoyl Bis-Dipeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Azelaoyl Diglycinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Azelaoyl Glycine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,BHA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,BHT,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bacillus Ferment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Baicalein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Baicalin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bakuchiol Analog (Babchi Synth),Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Beeswax,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Behenyl Alcohol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bemotrizinol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzene,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzophenone-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzophenone-2,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzophenone-3,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzophenone-4,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzophenone-5,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzoyl Perox,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Benzyl Alcohol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Beta Glucan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Beta-Cyclodextrin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Beta-Glucan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Beta-Glucan Oligosaccharide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Beta-Sitosterol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Betaine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Betaine Salicylate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bifida Ferment Lysate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bilberry Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bio-Active Glucosides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Biosaccharide Gum-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Biosaccharide Gum-2,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bisabolol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bisphenol S,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Blue Lotus Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Blue Mallow Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Blueberry Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Borage Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Bromelain,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Butyl Methoxydibenzoylmethane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Butylene Glycol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Butylparaben,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,C12-15 Alkyl Benzoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 16035,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 19140,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 42090,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 77007,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 77288,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 77491,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 77492,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 77499,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 77742,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,CI 77891,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cabbage Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caffeic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caffeine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Calcium Alginate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Calcium PCA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Calendula Officinalis Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Callus Culture Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Camellia Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Camellia Sinensis Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Campesterol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Camphor,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Camphor Benzalkonium Methosulfate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Candelilla Wax,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Capric Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caprooyl Phytosphingosine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caprooyl Sphingosine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caprylhydroxamic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caprylic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caprylic/Capric Triglyceride,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Capryloyl Salicylic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caprylyl Glycol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Caprylyl/Capryl Glucoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Carbomer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Carnauba Wax,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Carnitine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Carnosine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Carrageenan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Catalase,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Centella Asiatica,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Centella Asiatica Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Centella Asiatica Leaf Water,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceramide AP,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceramide EOP,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceramide EOS,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceramide NP,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceramide NS,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceramides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceresin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ceteareth-20,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cetearyl Alcohol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cetearyl Olivate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cetyl Alcohol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chamomile Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chamomilla Recutita Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chemical UV Filters,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chitosan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chlorella Protothecoides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chlorella Protothecoides Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chlorella Vulgaris Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chlorogenic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chlorophyll,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chlorphenesin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cholesterol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Chondrus Crispus,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cinnamon Bark,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Citral,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Citramalic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Citric Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Clarivine?,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Coal Tar,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cocamidopropyl,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cocamidopropyl Betaine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Coco Glucoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Coco-Betaine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Coco-Caprylate/Caprate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cocos Nucifera Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Coffee Seed Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Colloidal Oatmeal,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Copper Heptapeptide-14 Pantothenate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Copper Lysinate/Prolinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Copper PCA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Copper Palmitoyl Heptapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Copper Peptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Copper Tripeptide-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Creatine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Crosslinked Hyaluronic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cucumber Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cucumis Sativus Fruit Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Curcuma Longa,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cyclodextrin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cyclohexasiloxane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cyclopentasiloxane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cysteamine HCl,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Cysteine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,DMAE,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,DMDM Hydantoin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,DNA Repair Enzyme,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Decyl Glucoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dehydroacetic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Diazolidinyl Urea,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dicaprylyl Carbonate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Diethylamino Hydroxybenzoyl Hexyl Benzoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Diethylhexyl Butamido Triazone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dihydroxyacetone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Diisopropyl Adipate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Diisopropyl Sebacate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dimethicone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dimethiconol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dioic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Diosmin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dipeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dipeptide Diaminobutyroyl Benzylamide Diacetate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dipotassium Glycyrrhizate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dipropylene Glycol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Disodium Cocoyl Glutamate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Disodium EDTA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Disodium Laureth Sulfosuccinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Drometrizole Trisiloxane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dunaliella Salina (Green Algae) Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Dunaliella Salina Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,EGCG,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,ETERWELL? YOUTH,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ecamsule,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ectoin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Elastin Amino Acids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ellagic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Encapsulated Retinol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Encapsulated Salicylic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Endonuclease,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Endothelyol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ensulizole,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Epidermal Lipid Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ergosterol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ergothioneine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Erythritol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Erythrulose,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Essential Lipids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethanol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethyl Ascorbic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethylhexyl Methoxycinnamate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethylhexyl Salicylate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethylhexyl Triazone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethylhexylglyc.,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethylhexylglycerin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ethylhexylglycerin Carbonate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Evening Primrose Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Exosome Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Exosome-like Vesicles,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Exosomes,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fermented Ceramide NP,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fermented Hyaluronic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fermented Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fernblock,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ferric Hexapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ferulic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ferulic Acid Ethyl Ester,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Feruloyl Soy Glycerides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Feverfew Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fomes Of?cinalis (Mushroom) Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Formaldehyde,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fragrance,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fructooligosaccharides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Fucose-Rich Polysaccharide Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Galactomyces Ferment Filtrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Galguard?,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Gellan Gum,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Geraniol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ginkgo Biloba,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ginseng Ext,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Gluconic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Gluconolactone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glucose Oxidase,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glucosyl Hesperidin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glutathione,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glutathione Ethyl Ester,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glyceryl Caprylate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glyceryl Glucoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glyceryl Stearate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glycine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glycolic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glycolipids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glycoproteins,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glycosphingolipids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glycyrrhiza Glabra Root Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Glycyrrhiza Inflata Root Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Golden-Eye Grass Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Granactive Retinoid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Grapeseed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Green Tea,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Green Tea Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Guarana Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,HPR,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Haematococcus Pluvialis Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hamamelis Virginiana Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hemp Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Heptapeptide-15 Palmitate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hesperidin Methyl Chalcone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hexapeptide-11,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hexapeptide-9,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hexylresorcinol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hibiscus Fruit Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,High Molecular Weight HA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Histidine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Homosalate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Horse Chestnut,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Human Adipose Stem Cell Conditioned Media,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Humectants,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrogenated Lecithin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrogenated Polyisobutene,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrogenated Vegetable Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Collagen,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Elastin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed F-Fucoidan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Hyaluronic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Keratin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Oat Protein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Pumpkin Seedcake,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Rice Protein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Soy Protein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydrolyzed Wheat Protein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroquinone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxyacetophenone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxyectoin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxyethyl Acrylate/Sodium Acryloyldimethyl Taurate Copolymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxyethyl Urea,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxyethylcellulose,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxypinacolone Retinoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxypinacolone Retinoate Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxypropyl Chitosan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxypropyl Cyclodextrin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxypropyl Methylcellulose,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxypropyl Starch Phosphate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxypropyltrimonium Hyaluronate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Hydroxystearic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Idebenone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Imidazolidinyl Urea,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Indian Gooseberry,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Inulin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Iron Oxides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isoamyl Laurate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isoamyl p-Methoxycinnamate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isododecane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isohexadecane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isoleucine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isopropyl Alcohol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isopropyl Myristate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Isostearyl Isostearate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Jeju Green Tea Water,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Jojoba Beads,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Jojoba Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Kojic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Kojic Dipalmitate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Kola Seed Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Konjac Glucomannan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Kukui Nut Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,L-Ascorbic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,L-Carnitine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lactobacillus Extract Filtrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lactobacillus Ferment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lactobacillus Ferment Lysate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lactobionic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lactococcus Ferment Lysate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lactoferrin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lactoperoxidase,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lamellar Emulsion Base,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Laminaria Ochroleuca (Kelp) Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lauryl Glucoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lavandula Angustifolia Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lecithin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Leucine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Leuconostoc/Radish Root Ferment Filtrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Licochalcone A,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Licorice Root,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lily Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Limonene,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Linalool,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Linoleic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Linolenic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lipase,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lipochroman-6,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Liposomes,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Low Molecular Weight HA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Luceane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Luffa Cylindrica Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lutein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Lysine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Macadamia Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Macrocystis Pyrifera (Kelp) Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Madecassic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Madecassoside,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Madecassoside Asiatica Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Magnesium Ascorbyl Phosphate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Magnesium Ascorbyl Phosphate Phosphate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Magnesium PCA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Magnesium Sulfate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Malic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mandelic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mangifera Ind.,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mango Seed Butter,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Marine Bioretinol Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Marine Collagen,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Marine Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Marshmallow Root,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Marula Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Maslinic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Matrixyl 3000,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Meadowfoam Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Melicica?,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Menthol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Meradimate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Methionine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Methylchloroisothiazolinone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Methylene Bis-Benzotriazolyl Tetramethylbutylphenol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Methylisothiazolinone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Methylparaben,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mica,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Microcrystalline Wax,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Milk Thistle Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mineral Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mineral UV Filters,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Moringa Seed Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Morus Alba Root Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mulberry Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Mushroom Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Myristol Hexapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Myristol Pentapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Myristoyl Nonapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Myristoyl Pentapeptide-17,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,N-Acetyl Glucosamine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Naringenin Chalcone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Natural Moisturising Factors,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Neoglucosamine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Neopentyl Glycol Diheptanoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Neurophroline,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niacinamide Ascorbate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niacinamide Chloride,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niacinamide Ferulate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niacinamide Microcapsules,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niacinamide PCA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niacinamide Polydextrose,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niacinamide Salicylate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Nicotinamide Mononucleotide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Niosomes,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Nonapeptide-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Nordihydroguaiaretic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Nylon-12,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oat Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Octinoxate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Octisalate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Octocrylene,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oleanolic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oleic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,OleoShine Green,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide-2,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide-20,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide-24,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide-34,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide-51,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oligopeptide-68,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Oxybenzone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ozokerite,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,PDRN,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,PEG-100 Stearate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,PEG-40 Hydrogenated Castor Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,PEG-6 Caprylic/Capric Glycerides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,PEG-7 Glyceryl Cocoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,PRO-LONGEVIA®,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Padina Pavonica Thallus Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl  Tripeptide-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Decapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Dipeptide-7,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Glycine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Heptapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Nonapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Oligopeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Pentapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Pentapeptide-4,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Tetrapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Tetrapeptide-7,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Tripeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Tripeptide-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Palmitoyl Tripeptide-38,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Papain,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Parabens,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Parachlorella Beijerinckii Exopolysaccharides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pea Peptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pelargonium Graveolens Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pentapeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pentapeptide-18,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pentylene Glycol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Perfluorodecalin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Petrolatum,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phenoxyethanol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phenylalanine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phenylbenzimidazole Sulfonic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phenylethyl Resorcinol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phloretin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phospholipids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Photolyase,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phytic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,PhytoCellTec?,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phytosphingos.,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phytosphingosine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Phytosterols,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pickmulse?,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Plankton Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyacrylate Crosspolymer-6,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyacrylate-13,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polydeoxyribonucleotide Sodium,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyglutamic Ac.,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyglutamic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyglyceryl-10 Laurate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyglyceryl-6 Caprylate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyhydroxy Acid Blend,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyhydroxy Acids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyhydroxybutyrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyisobutene,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polypodium Leucotomos Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyporus Umbellatus (Mushroom) Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyquaternium-51,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polysilicone-15,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polysorbate 20,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polysorbate 80,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Polyurethane-35,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pomegranate Ex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Porphyridium Cruentum Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Postbiotic Lactobacillus Metabolite,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Postbiotic Peptide Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Potassium Azeloyl Diglycinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Potassium Benzoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Potassium Cocoyl Glycinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Potassium Hydroxide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Potassium Sorbate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Prebiotics,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Prickly Pear Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Probiotics,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Proline,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Propanediol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Propylene Glycol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Propylene Glycol Dicaprylate/Dicaprate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Propylparaben,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pseudoalteromonas Exopolysaccharides,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pseudoalteromonas Ferment Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pullulan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pullulan Crosspolymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pullulan Gum,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Punica Granatum Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pycnogenol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Pyruvic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Quaternium-15,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Quercetin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Red Algae,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Resveratrol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinal,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinaldehyde,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinyl Acetate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinyl Linoleate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinyl Palmitate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinyl Propionate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinyl Retinoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Retinyl Retinoate Encapsulated,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rhamnose,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rice Bran Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rosehip Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rosehip Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rosemary Ext,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rosemary Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rosmarinic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rosmarinus Officinalis Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rubus Idaeus Leaf Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Rutin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,S3D® Reverso,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Saccharide Isom.,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Saccharide Isomerate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Saccharomyces Cerevisiae (Yeast) Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Saccharomyces Ferment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Saccharomyces Ferment Filtrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sacred Lotus Flower Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Safflower Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Safflower Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Salix Alba Bark Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Salmon DNA Fragment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Saskatoon Berry,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sclerotium Gum,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Scutellaria Baicalensis Root Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sea Buckthorn Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sea Buckthorn Water,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Senolytic Pep,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Senolytic Peptide Complex,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Serine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sesame Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sh-Oligopeptide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sh-Oligopeptide-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sh-Polypeptide-11,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Shea Butter,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Shea Olein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Silica,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Silk Amino Acids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Silk Protein,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Silver Citrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Silybum Marianum Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sinapic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Snow Mushroom Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Acetylated Hyaluronate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Alginate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Anisate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Ascorbyl Phosphate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Ascorbyl Phosphate Chloride,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Benzoate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Carboxymethyl Beta-Glucan,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Chloride,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Citrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Cocoyl Alaninate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Cocoyl Glutamate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Cocoyl Glycinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Cocoyl Isethionate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium DNA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Dehydroacetate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Hyaluronate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Hyaluronate Crosspolymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Hydroxide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Lactate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Laureth,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Laureth Sulfate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Lauroamphoacetate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Lauroyl Glutamate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Lauroyl Methyl Isethionate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Lauroyl Sarcosinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Lauryl Sulfate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Levulinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium PCA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium PCA Lactate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Phytate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Polyacrylate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Polyglutamate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sodium Retinoyl Hyaluronate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sorbitan Olivate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Spent Grain Wax,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Spirulina Platensis Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Squalane,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Squalene,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Stearic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Stearyl Alcohol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Stem Cell Conditioned Media,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Stigmasterol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Subtilisin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Succinic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sugar Cane Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sulfur,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sunflower Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sunflower Seed Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Superoxide Dismutase,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Sweet Almond Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Symsitive,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Syringic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tamanu Oil,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tartaric Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tasmanian Pepperberry Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Taurine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Teprenone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Terephthalylidene Dicamphor Sulfonic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tetrahexyldecyl Ascorbate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tetrapeptide-21,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Thermus Thermophillus Ferment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Thiamidol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Thiotic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Threonine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Titanium Diox,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Titanium Dioxide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Titanium Dioxide (nano),Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tocopherol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tocopheryl Acetate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tomato Stem Cells,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tranexamic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tranexamic Acid Cetyl Ester,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tranexamic Acid Cetyl Phosphate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tranexamic Acid Liposome,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tranexamic Acid Polymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tranexamic Acid Stearate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Trehalose,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Trehalose Liposomes,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tremella Fuciformis Polysaccharide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tretinoin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Triazine Diethyl Butamidotriazone,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Triethanolamine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tripeptide-1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tripeptide-10 Citrulline,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tripleurospermum Maritimum Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Trisodium EDTA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Trisodium Ethylenediamine Disuccinate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tromethamine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Turmeric Root Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Tyrosine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 10,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 11,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 12,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 13,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 14,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 15,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 16,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 17,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 18,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 19,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 2,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 20,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 21,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 22,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 23,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 24,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 25,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 26,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 27,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 28,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 29,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 3,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 30,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 31,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 32,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 33,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 34,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 35,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 36,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 37,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 38,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 39,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 4,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 40,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 41,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 42,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 43,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 44,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 45,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 46,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 47,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 48,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 49,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 5,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 50,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 51,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 52,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 53,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 54,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 55,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 56,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 57,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 58,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 59,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 6,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 60,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 61,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 62,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 63,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 64,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 65,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 66,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 67,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 68,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 69,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 7,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 70,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 71,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 72,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 73,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 74,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 75,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 76,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 77,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 78,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 79,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 8,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 80,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 81,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 82,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 83,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 84,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,UV Filter Variant 9,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ubiquinol,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Undecylenoyl Glycine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Undecylenoyl Phenylalanine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Urea,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Ursolic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,VP/VA Copolymer,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vaccinium Myrtillus Fruit Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Valine,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vanillic Acid,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vegan Polydeoxyribonucleotide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vibrio Alginolyticus Ferment Filtrate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitamin A,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitamin B5,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitamin C,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitamin E,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitamin K,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitamin K1,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitis Vinifera Fruit Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Vitreoscilla Ferment,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Water,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Water/Aqua,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,White Tea,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Wild Cherry Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Willow Bark Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Willow Herb Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Xanthan Gum,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Yeast Amino Acids,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Yerba Mate Extract,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Zeaxanthin,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Zinc,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Zinc Gluconate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Zinc Oxide,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Zinc PCA,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Zinc Salicylate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship
+General,Zinc Sulfate,Unknown,Baseline,,,,,,,,,No established upgrade pathway in literature,Low,TRUE,Base,No validated upgrade relationship

@@ -4,8 +4,251 @@ import { ScoreCircle, TierBadge, BreakdownRow, ProgressBar, ConcernCard, SkinTyp
 import AlternativesCard from "./AlternativesCard";
 import BestPriceCard from "./BestPriceCard";
 
+// Score label helper
+function getScoreLabel(score) {
+  if (score >= 90) return { label: "Excellent Value", color: "#267C36" };
+  if (score >= 75) return { label: "Worth Buying", color: "#2D7FD3" };
+  if (score >= 60) return { label: "Acceptable", color: "#E6A817" };
+  if (score >= 40) return { label: "Poor Value", color: "#D06030" };
+  return { label: "Marketing-Driven", color: "#C0392B" };
+}
+
+// Ingredient breakdown table
+function IngredientBreakdownTable({ actives }) {
+  if (!actives || actives.length === 0) return null;
+  return (
+    <div className="ingredient-breakdown-table" style={{ marginTop: "1rem", overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+        <thead>
+          <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid var(--border)" }}>
+            <th style={{ padding: "6px 10px", textAlign: "left" }}>#</th>
+            <th style={{ padding: "6px 10px", textAlign: "left" }}>Active Ingredient</th>
+            <th style={{ padding: "6px 10px", textAlign: "center" }}>Evidence</th>
+            <th style={{ padding: "6px 10px", textAlign: "center" }}>Concentration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {actives.map((a, i) => (
+            <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "var(--bg-deep)" }}>
+              <td style={{ padding: "5px 10px", color: "var(--text-sub)" }}>{a.position}</td>
+              <td style={{ padding: "5px 10px", fontWeight: 500 }}>{a.name}</td>
+              <td style={{ padding: "5px 10px", textAlign: "center" }}>
+                <span style={{
+                  padding: "2px 7px", borderRadius: "10px", fontSize: "0.75rem",
+                  background: a.evidence === "strong" ? "#D4EDDA" : a.evidence === "moderate" ? "#FFF3CD" : "#F8D7DA",
+                  color: a.evidence === "strong" ? "#155724" : a.evidence === "moderate" ? "#856404" : "#721C24"
+                }}>{a.evidence}</span>
+              </td>
+              <td style={{ padding: "5px 10px", textAlign: "center", color: "var(--text-sub)", fontSize: "0.78rem" }}>{a.concentration}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
+// ── Sunscreen Analysis Card ──────────────────────────────────────────────────
+function SunscreenAnalysisCard({ data }) {
+  const [open, setOpen] = useState(false);
+  if (!data) return null;
+
+  const sa = data.sunscreen_analysis;
+  if (!sa) return null;
+
+  const overallScore = sa.overall_score ?? 0;
+  const sunburnScore = sa.sunburn_score ?? 0;
+  const spf = sa.spf_estimate || '—';
+  const pa  = sa.pa_estimate  || '—';
+  const broad = sa.broad_spectrum;
+  const uvb = sa.uvb_covered;
+  const uva1 = sa.uva1_covered;
+  const uva2 = sa.uva2_covered;
+  const reefSafe = sa.reef_safe !== false;
+  const filters = sa.filters_detected || [];
+  const warnings = sa.warnings || [];
+  const flags = sa.flags || [];
+  const breakdown = sa.score_breakdown || {};
+
+  const pillStyle = (active, color) => ({
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+    background: active ? color + '22' : '#f0e8df',
+    color: active ? color : 'var(--text-sub)',
+    border: `1px solid ${active ? color + '55' : 'var(--border)'}`,
+  });
+
+  const overallColor = overallScore >= 85 ? 'var(--sage)' :
+                       overallScore >= 70 ? '#2D7FD3' :
+                       overallScore >= 55 ? 'var(--gold)' :
+                       overallScore >= 40 ? 'var(--orange)' : 'var(--red)';
+
+  const overallLabel = overallScore >= 85 ? 'Excellent' :
+                       overallScore >= 70 ? 'Good' :
+                       overallScore >= 55 ? 'Average' :
+                       overallScore >= 40 ? 'Weak' : 'Poor';
+
+  return (
+    <div className="sc-card result-card" data-testid="card-sunscreen-analysis"
+         style={{ "--anim-delay": "0.2s", borderTop: "3px solid var(--dusty-rose)" }}>
+      <h2 className="card-title">
+        <i className="fa-solid fa-sun"></i> Sunscreen Analysis
+      </h2>
+
+      {/* Top row: overall + SPF estimate + PA estimate */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {/* Overall sunscreen quality */}
+        <div style={{
+          flex: '1 1 120px', background: overallColor + '11', border: `1.5px solid ${overallColor}33`,
+          borderRadius: '12px', padding: '12px 14px', textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: overallColor, lineHeight: 1 }}>
+            {overallScore}
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Overall Quality
+          </div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: overallColor, marginTop: '4px' }}>
+            {overallLabel}
+          </div>
+        </div>
+
+        {/* SPF Estimate */}
+        <div style={{
+          flex: '1 1 100px', background: '#fff8f0', border: '1.5px solid var(--gold)',
+          borderRadius: '12px', padding: '12px 14px', textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gold)', lineHeight: 1.2 }}>
+            {spf}
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            SPF Estimate*
+          </div>
+        </div>
+
+        {/* PA Estimate */}
+        <div style={{
+          flex: '1 1 100px', background: '#f0f8ff', border: '1.5px solid #5BA4CF',
+          borderRadius: '12px', padding: '12px 14px', textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#2D7FD3', lineHeight: 1.2 }}>
+            {pa}
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            PA Estimate*
+          </div>
+        </div>
+
+        {/* Sunburn (UVB) sub-score */}
+        <div style={{
+          flex: '1 1 100px', background: '#fff5f5', border: '1.5px solid #e07070',
+          borderRadius: '12px', padding: '12px 14px', textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: '#C0392B', lineHeight: 1 }}>
+            {sunburnScore}
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Sunburn (UVB)
+          </div>
+        </div>
+      </div>
+
+      {/* UV coverage pills */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        <span style={pillStyle(uvb,  '#2D7FD3')}><i className={`fa-solid fa-circle fa-xs`}></i> UVB</span>
+        <span style={pillStyle(uva1, '#267C36')}><i className="fa-solid fa-circle fa-xs"></i> UVA1</span>
+        <span style={pillStyle(uva2, '#A87373')}><i className="fa-solid fa-circle fa-xs"></i> UVA2</span>
+        <span style={pillStyle(broad, '#5B4FBE')}>
+          <i className={`fa-solid ${broad ? 'fa-check' : 'fa-xmark'}`}></i> {broad ? 'Broad Spectrum' : 'Not Broad Spectrum'}
+        </span>
+        <span style={pillStyle(reefSafe, '#267C36')}>
+          <i className="fa-solid fa-fish"></i> {reefSafe ? 'Reef Safe' : 'Not Reef Safe'}
+        </span>
+      </div>
+
+      {/* Score breakdown bar */}
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-sub)', marginBottom: '4px' }}>
+          <span>Score Breakdown</span>
+          <span style={{ fontSize: '10px' }}>max 100</span>
+        </div>
+        <div style={{ display: 'flex', gap: '3px', height: '8px', borderRadius: '6px', overflow: 'hidden', background: 'var(--border)' }}>
+          {[
+            { label: 'UV Coverage', val: breakdown.uv_coverage ?? 0, max: 40, color: '#2D7FD3' },
+            { label: 'Filter Strength', val: breakdown.filter_strength ?? 0, max: 30, color: '#267C36' },
+            { label: 'Photostability', val: breakdown.photostability ?? 0, max: 20, color: '#C9A96E' },
+            { label: 'Formulation', val: breakdown.formulation ?? 0, max: 10, color: '#A87373' },
+          ].map(seg => (
+            <div key={seg.label} title={`${seg.label}: ${seg.val}/${seg.max}`}
+              style={{ width: `${(seg.val / 100) * 100}%`, background: seg.color, minWidth: seg.val > 0 ? '4px' : '0' }} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '6px' }}>
+          {[
+            { label: 'UV Coverage', val: breakdown.uv_coverage ?? 0, max: 40, color: '#2D7FD3' },
+            { label: 'Filter Strength', val: breakdown.filter_strength ?? 0, max: 30, color: '#267C36' },
+            { label: 'Photostability', val: breakdown.photostability ?? 0, max: 20, color: '#C9A96E' },
+            { label: 'Formulation', val: breakdown.formulation ?? 0, max: 10, color: '#A87373' },
+          ].map(seg => (
+            <span key={seg.label} style={{ fontSize: '10px', color: seg.color, fontWeight: 600 }}>
+              {seg.label}: {seg.val}/{seg.max}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Warnings/flags */}
+      {[...warnings, ...flags].length > 0 && (
+        <div style={{ marginBottom: '12px' }}>
+          {[...warnings, ...flags].map((w, i) => (
+            <div key={i} style={{
+              fontSize: '12px', padding: '7px 10px', borderRadius: '8px', marginBottom: '5px',
+              background: w.startsWith('🚨') ? '#fff0f0' : '#fffaf0',
+              border: `1px solid ${w.startsWith('🚨') ? '#f5c6cb' : '#fde8b0'}`,
+              color: w.startsWith('🚨') ? '#721C24' : '#856404'
+            }}>{w}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Filters detected — collapsible */}
+      {filters.length > 0 && (
+        <div>
+          <button onClick={() => setOpen(!open)} style={{
+            background: 'none', border: 'none', padding: '6px 0',
+            fontSize: '12px', color: 'var(--text-sub)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '6px'
+          }}>
+            <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'} fa-xs`}></i>
+            UV Filters Detected ({filters.length})
+          </button>
+          {open && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {filters.map((f, i) => (
+                <span key={i} style={{
+                  fontSize: '11px', padding: '3px 9px', borderRadius: '12px',
+                  background: 'var(--rose)', color: 'var(--dusty-rose-dark)',
+                  border: '1px solid var(--border)'
+                }}>{f}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <p style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '12px', fontStyle: 'italic' }}>
+        * Estimates based on filter type and position. Not lab-tested values.
+        PA rating requires PPD test. SPF requires in-vitro/in-vivo testing.
+      </p>
+    </div>
+  );
+}
+
 export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput }) {
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showIngTable, setShowIngTable] = useState(false);
+  const scoreLabel = getScoreLabel(result.main_worth_score);
 
   return (
     <>
@@ -16,6 +259,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           <ScoreCircle score={result.main_worth_score} />
           <div className="score-meta">
             <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
+            <div className="score-label-badge" style={{ display: "inline-block", background: scoreLabel.color + "20", color: scoreLabel.color, border: `1px solid ${scoreLabel.color}40`, borderRadius: "8px", padding: "2px 10px", fontSize: "0.8rem", fontWeight: 600, marginBottom: "4px" }}>{scoreLabel.label}</div>
             <p className="score-title-text">{result.score_title}</p>
             {result.worth_multipliers_applied?.length > 0 && (
               <p className="multipliers">Bonus: {result.worth_multipliers_applied.join(", ")}</p>
@@ -37,15 +281,13 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         <button className="breakdown-toggle" data-testid="breakdown-toggle" onClick={() => setShowBreakdown(!showBreakdown)} aria-expanded={showBreakdown}>
           {showBreakdown ? "Hide" : "Show"} Detailed Breakdown {showBreakdown ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
         </button>
-        {showBreakdown && (
-          <div className="breakdown" data-testid="breakdown-details">
+        <div className={"breakdown" + (showBreakdown ? " open" : "")} data-testid="breakdown-details">
             <BreakdownRow icon="fa-solid fa-chart-bar" label="Active Ingredient Value" score={result.component_scores?.A} max={45} details={result.component_details?.A} />
             <BreakdownRow icon="fa-solid fa-flask" label="Functional Formula Quality" score={result.component_scores?.B} max={20} details={result.component_details?.B} />
             <BreakdownRow icon="fa-solid fa-check-circle" label="Claim-Reality Accuracy" score={result.component_scores?.C} max={15} details={result.component_details?.C} />
             <BreakdownRow icon="fa-solid fa-shield-halved" label="Safety & Suitability" score={result.component_scores?.D} max={10} details={result.component_details?.D} />
             <BreakdownRow icon="fa-solid fa-coins" label="Price Rationality" score={result.component_scores?.E} max={10} details={result.component_details?.E} />
           </div>
-        )}
 
         {result.red_flags?.length > 0 && (
           <div className="red-flags-section" data-testid="red-flags-section">
@@ -53,6 +295,19 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             <ul className="red-flags-list">
               {result.red_flags.map((rf, i) => <li key={i} data-testid={`red-flag-${i}`}>{rf}</li>)}
             </ul>
+          </div>
+        )}
+
+        {/* Ingredient Breakdown Table */}
+        {result.identified_actives?.length > 0 && (
+          <div style={{ marginTop: "1rem" }}>
+            <button className="breakdown-toggle" onClick={() => setShowIngTable(!showIngTable)} aria-expanded={showIngTable} style={{ fontSize: "0.82rem" }}>
+              <i className="fa-solid fa-table"></i> {showIngTable ? "Hide" : "Show"} Active Ingredient Table ({result.identified_actives.length})
+              {showIngTable ? <i className="fa-solid fa-chevron-up" style={{ marginLeft: "6px" }}></i> : <i className="fa-solid fa-chevron-down" style={{ marginLeft: "6px" }}></i>}
+            </button>
+            <div className={"breakdown" + (showIngTable ? " open" : "")}>
+              <IngredientBreakdownTable actives={result.identified_actives} />
+            </div>
           </div>
         )}
       </div>
@@ -66,6 +321,11 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             <ConcernCard key={concern} concern={concern} data={data} />
           ))}
         </div>
+      )}
+
+      {/* CARD 2B: SUNSCREEN ANALYSIS — only shown when Sun Protection concern selected */}
+      {result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
+        <SunscreenAnalysisCard data={result.skin_concern_fit['Sun Protection']} />
       )}
 
       {/* CARD 3: SKIN TYPE COMPAT */}

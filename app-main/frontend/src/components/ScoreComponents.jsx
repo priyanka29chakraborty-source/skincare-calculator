@@ -66,8 +66,7 @@ export function ConcernCard({ concern, data }) {
         <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`}></i>
       </div>
       <ProgressBar pct={data.score} label={concern} />
-      {open && (
-        <div className="concern-detail">
+      <div className={"concern-detail" + (open ? " open" : "")}>
           <ul className="concern-explain">
             {data.explanation?.map((e, i) => <li key={i}>{e}</li>)}
           </ul>
@@ -76,7 +75,6 @@ export function ConcernCard({ concern, data }) {
           )}
           <p className="concern-advisory"><strong>Advisory:</strong> {data.advisory}</p>
         </div>
-      )}
     </div>
   );
 }
