@@ -96,7 +96,7 @@ SITE_ROUTING = {
     # India — Shopify
     'beaminimalist.com':  ['shopify', 'firecrawl'],
     'foxtalecare.com':    ['shopify', 'firecrawl'],
-    'foxtale.in':         ['shopify', 'firecrawl'],
+    'foxtale.in':         ['shopify', 'cloud', 'firecrawl'],
     'dotandkey.com':      ['shopify', 'firecrawl'],
     'plumgoodness.com':   ['shopify', 'firecrawl'],
     'mcaffeine.com':      ['shopify', 'firecrawl'],
@@ -232,28 +232,47 @@ def _clean_product_name(name):
 
 
 def _extract_ingredients_from_body_html(body_html):
-    """Extract INCI list from Shopify body_html field."""
+    """Extract INCI list from Shopify body_html field.
+    Handles aqueous AND non-aqueous formulas (e.g. PDRN serums, oils, anhydrous products).
+    """
     if not body_html:
         return None
     soup = BeautifulSoup(body_html, 'html.parser')
     plain = soup.get_text(separator=' ')
 
-    # Strategy 1: After "Ingredients:" label
+    # Strategy 1: After "Ingredients:" / "INCI:" label — any INCI content
     m = re.search(
-        r'(?:Ingredients|INCI|Full Ingredients?\s*(?:List)?)\s*[:\-]?\s*'
-        r'((?:Aqua|Water)[^.]{30,1500})',
+        r'(?:all\s+)?(?:Ingredients?|INCI|Full\s+Ingredients?(?:\s*List)?)\s*[:\-]\s*'
+        r'([A-Z][A-Za-z0-9\s,\(\)\-\.\/%]{40,2000})',
+        plain, re.IGNORECASE
+    )
+    if m:
+        candidate = m.group(1).strip()
+        # Must look like an INCI list: has commas, not all marketing text
+        if candidate.count(',') >= 3:
+            return candidate
+
+    # Strategy 2: Aqua/Water-led INCI block (aqueous formulas)
+    m = re.search(
+        r'((?:Aqua|Water)\s*[,/]\s*[A-Za-z][A-Za-z0-9\s,\(\)\-\.\/]{40,1500})',
         plain, re.IGNORECASE
     )
     if m:
         return m.group(1).strip()
 
-    # Strategy 2: Standalone INCI block starting with Aqua/Water
-    m = re.search(
-        r'((?:Aqua|Water)\s*,\s*[A-Za-z][A-Za-z0-9\s,\(\)\-\.\/]{40,1500})',
-        plain, re.IGNORECASE
+    # Strategy 3: Non-aqueous INCI — common anhydrous first ingredients
+    _ANHYDROUS_FIRST = (
+        'pentylene glycol', 'glycerin', 'propanediol', 'butylene glycol',
+        'caprylic', 'dimethicone', 'cyclopentasiloxane', 'squalane',
+        'jojoba', 'rosehip', 'niacinamide', 'sodium hyaluronate',
     )
-    if m:
-        return m.group(1).strip()
+    for first_ing in _ANHYDROUS_FIRST:
+        pat = re.compile(
+            rf'(?i)({re.escape(first_ing)}[^.{{}}]{{30,1500}})',
+        )
+        m = pat.search(plain)
+        if m and m.group(1).count(',') >= 3:
+            return m.group(1).strip()
 
     return None
 
@@ -786,18 +805,19 @@ def _extract_metadata(html, url):
             after = text_clean[m.end():m.end() + 3000]
             # Strip any trailing UI text
             after = _UI_TAIL_RE.sub('', after).strip()
-            # Trim at the next section heading (e.g. "How to Use", "Directions", "Disclaimer")
+            # Trim at the next section heading
             section_break = re.search(
                 r'\n\s*(?:how to use|directions|warnings?|disclaimer|storage|about the brand|why you|key benefit)',
                 after, re.I
             )
             if section_break:
                 after = after[:section_break.start()]
-            cb = re.match(r'([^.]{20,}(?:,\s*[^.]{2,}){4,})', after)
+            # Accept comma-list — does NOT require Aqua/Water (handles anhydrous products)
+            cb = re.match(r'([^.]{10,}(?:,\s*[^.,]{2,}){3,})', after)
             if cb:
                 candidate = cb.group(1).strip()
-                # Reject if it looks like marketing descriptions
-                if not _is_marketing_description(candidate):
+                # Must have enough commas to be an INCI list
+                if candidate.count(',') >= 3 and not _is_marketing_description(candidate):
                     ingredients = candidate
                     break
 
