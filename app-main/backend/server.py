@@ -197,7 +197,11 @@ async def analyze(req: AnalyzeRequest, request: Request):
         result = analyze_product(product_data)
         elapsed = round((_time.time() - t0) * 1000)
         log_analysis(category_display, req.country, skin_type_raw, concerns,
-                     result.get('main_worth_score', 0), bool(req.url_provided), None, elapsed)
+                     result.get('main_worth_score', 0), bool(req.url_provided), None, elapsed,
+                     product_name=_sanitize(req.product_name or ''),
+                     brand=_sanitize(req.brand or ''),
+                     price=req.price,
+                     ingredients=ingredients[:500] if ingredients else None)
 
         # Store in cache
         _cache_set(cache_key, result)

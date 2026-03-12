@@ -94,7 +94,7 @@ export default function InputForm({
 
       <div className="action-row">
         <button className="analyze-btn" data-testid="analyze-btn" onClick={handleAnalyze} disabled={loading}>
-          {loading ? <><i className="fa-solid fa-spinner fa-spin"></i> Analysing...</> : <>Analyse Worth &#10022;</>}
+          {loading ? <><i className="fa-solid fa-spinner fa-spin"></i> Analysing...</> : <>Analyze Product &#10022;</>}
         </button>
       </div>
       <button className="clear-btn-solo" data-testid="clear-btn" onClick={handleClear}><i className="fa-solid fa-eraser"></i> Clear All</button>

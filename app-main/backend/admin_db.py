@@ -4,6 +4,8 @@ Falls back to SQLite if AIVEN_PG_URL is not set (local dev).
 """
 import json
 import os
+import csv
+import io
 import threading
 import logging
 from datetime import datetime, timezone
@@ -66,7 +68,8 @@ if _USE_PG:
                 product_category TEXT, country TEXT, skin_type TEXT,
                 skin_concerns JSONB, main_worth_score REAL,
                 url_provided BOOLEAN DEFAULT FALSE,
-                scraping_layer TEXT, analysis_time_ms REAL
+                scraping_layer TEXT, analysis_time_ms REAL,
+                product_name TEXT, brand TEXT, price REAL, ingredients TEXT
             );
             CREATE TABLE IF NOT EXISTS api_credits (
                 id SERIAL PRIMARY KEY,
@@ -78,6 +81,12 @@ if _USE_PG:
             CREATE INDEX IF NOT EXISTS idx_fetch_domain ON fetch_logs(domain);
             CREATE INDEX IF NOT EXISTS idx_analysis_ts ON analysis_logs(timestamp);
             """)
+            # Add new columns to existing tables if upgrading
+            for col, coltype in [('product_name','TEXT'),('brand','TEXT'),('price','REAL'),('ingredients','TEXT')]:
+                try:
+                    _pg_exec(f"ALTER TABLE analysis_logs ADD COLUMN IF NOT EXISTS {col} {coltype}")
+                except Exception:
+                    pass
             logger.info("Aiven PostgreSQL DB initialized")
 
         def log_fetch(domain, full_url, layer, success, fields_fetched,
@@ -94,14 +103,17 @@ if _USE_PG:
                 logger.warning(f"log_fetch failed: {e}")
 
         def log_analysis(category, country, skin_type, concerns,
-                         worth_score, url_provided, scraping_layer, analysis_time_ms):
+                         worth_score, url_provided, scraping_layer, analysis_time_ms,
+                         product_name=None, brand=None, price=None, ingredients=None):
             try:
                 _pg_exec("""INSERT INTO analysis_logs
                     (product_category, country, skin_type, skin_concerns,
-                     main_worth_score, url_provided, scraping_layer, analysis_time_ms)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                     main_worth_score, url_provided, scraping_layer, analysis_time_ms,
+                     product_name, brand, price, ingredients)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (category, country, skin_type, Json(concerns or []),
-                     worth_score, bool(url_provided), scraping_layer, analysis_time_ms))
+                     worth_score, bool(url_provided), scraping_layer, analysis_time_ms,
+                     product_name, brand, price, ingredients))
             except Exception as e:
                 logger.warning(f"log_analysis failed: {e}")
 
@@ -117,36 +129,153 @@ if _USE_PG:
             except Exception as e:
                 logger.warning(f"increment_credits failed: {e}")
 
-        def get_recent_fetches(limit=100):
+        def get_fetch_logs(limit=200, status=None, domain=None):
             try:
+                conditions = []
+                params = []
+                if status == 'success':
+                    conditions.append("success = TRUE AND (missing_fields = '[]'::jsonb OR missing_fields IS NULL)")
+                elif status == 'partial':
+                    conditions.append("success = TRUE AND missing_fields != '[]'::jsonb")
+                elif status == 'failed':
+                    conditions.append("success = FALSE")
+                if domain:
+                    conditions.append("domain ILIKE %s")
+                    params.append(f"%{domain}%")
+                where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+                params.append(limit)
                 rows = _pg_exec(
-                    "SELECT id,timestamp,domain,full_url,layer_attempted,success,"
-                    "fields_fetched,missing_fields,response_time_ms,error_message,"
-                    "api_credits_used FROM fetch_logs ORDER BY timestamp DESC LIMIT %s",
-                    (limit,), fetch=True)
+                    f"SELECT id,timestamp,domain,full_url,layer_attempted,success,"
+                    f"fields_fetched,missing_fields,response_time_ms,error_message,"
+                    f"api_credits_used FROM fetch_logs {where} ORDER BY timestamp DESC LIMIT %s",
+                    params, fetch=True)
                 keys = ['id','timestamp','domain','full_url','layer_attempted','success',
                         'fields_fetched','missing_fields','response_time_ms','error_message','api_credits_used']
                 return [dict(zip(keys, r)) for r in rows]
             except Exception:
                 return []
 
-        def get_credit_summary():
+        def get_fetch_stats_today():
             try:
+                rows = _pg_exec("""
+                    SELECT
+                      COUNT(*) as total,
+                      SUM(CASE WHEN success THEN 1 ELSE 0 END) as success_count,
+                      SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) as fail_count,
+                      AVG(response_time_ms) as avg_ms
+                    FROM fetch_logs WHERE timestamp >= NOW() - INTERVAL '24 hours'
+                """, fetch=True)
+                r = rows[0] if rows else (0,0,0,0)
+                return {'total': r[0] or 0, 'success': r[1] or 0, 'failed': r[2] or 0, 'avg_ms': round(r[3] or 0)}
+            except Exception:
+                return {'total': 0, 'success': 0, 'failed': 0, 'avg_ms': 0}
+
+        def get_credits_summary():
+            try:
+                month = datetime.now(timezone.utc).strftime('%Y-%m')
                 rows = _pg_exec(
-                    "SELECT api_name,month,credits_used,call_count FROM api_credits ORDER BY month DESC",
-                    fetch=True)
-                return [{'api_name':r[0],'month':r[1],'credits_used':r[2],'call_count':r[3]} for r in rows]
+                    "SELECT api_name, credits_used, call_count FROM api_credits WHERE month=%s",
+                    (month,), fetch=True)
+                return {r[0]: {'used': r[1], 'calls': r[2]} for r in rows}
+            except Exception:
+                return {}
+
+        def get_site_stats(days=7):
+            try:
+                rows = _pg_exec("""
+                    SELECT domain,
+                      MAX(timestamp) as last_tested,
+                      AVG(CASE WHEN success THEN 1.0 ELSE 0.0 END)*100 as success_rate,
+                      AVG(response_time_ms) as avg_ms,
+                      COUNT(*) as total
+                    FROM fetch_logs
+                    WHERE timestamp >= NOW() - INTERVAL '1 day' * %s
+                    GROUP BY domain ORDER BY total DESC
+                """, (days,), fetch=True)
+                return [{'domain':r[0],'last_tested':str(r[1]),'success_rate':round(r[2] or 0,1),
+                         'avg_ms':round(r[3] or 0),'total':r[4]} for r in rows]
             except Exception:
                 return []
 
         def get_analysis_stats():
             try:
-                rows = _pg_exec("""
-                    SELECT country, AVG(main_worth_score), COUNT(*) FROM analysis_logs
-                    GROUP BY country ORDER BY COUNT(*) DESC LIMIT 20""", fetch=True)
-                return [{'country':r[0],'avg_score':r[1],'count':r[2]} for r in rows]
+                now = datetime.now(timezone.utc)
+                today = now.strftime('%Y-%m-%d')
+                week_start = f"NOW() - INTERVAL '7 days'"
+                month_start = now.strftime('%Y-%m-01')
+                counts = _pg_exec(f"""
+                    SELECT
+                      SUM(CASE WHEN timestamp::date = '{today}' THEN 1 ELSE 0 END),
+                      SUM(CASE WHEN timestamp >= NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END),
+                      SUM(CASE WHEN timestamp >= '{month_start}' THEN 1 ELSE 0 END),
+                      COUNT(*)
+                    FROM analysis_logs
+                """, fetch=True)[0]
+                categories = _pg_exec("""
+                    SELECT product_category, COUNT(*) FROM analysis_logs
+                    GROUP BY product_category ORDER BY COUNT(*) DESC LIMIT 10
+                """, fetch=True)
+                concerns_raw = _pg_exec("""
+                    SELECT skin_concerns FROM analysis_logs WHERE skin_concerns IS NOT NULL
+                """, fetch=True)
+                concern_counts = {}
+                for (sc,) in concerns_raw:
+                    for c in (sc if isinstance(sc, list) else []):
+                        concern_counts[c] = concern_counts.get(c, 0) + 1
+                concerns = sorted([{'name':k,'count':v} for k,v in concern_counts.items()], key=lambda x: -x['count'])
+                url_row = _pg_exec("SELECT SUM(CASE WHEN url_provided THEN 1 ELSE 0 END), SUM(CASE WHEN NOT url_provided THEN 1 ELSE 0 END) FROM analysis_logs", fetch=True)[0]
+                hourly = _pg_exec("SELECT EXTRACT(HOUR FROM timestamp)::int, COUNT(*) FROM analysis_logs GROUP BY 1 ORDER BY 1", fetch=True)
+                countries = _pg_exec("SELECT country, COUNT(*) FROM analysis_logs GROUP BY country ORDER BY COUNT(*) DESC LIMIT 20", fetch=True)
+                return {
+                    'total_today': counts[0] or 0, 'total_week': counts[1] or 0,
+                    'total_month': counts[2] or 0, 'total_all': counts[3] or 0,
+                    'categories': [{'name':r[0],'count':r[1]} for r in categories],
+                    'concerns': concerns,
+                    'url_count': url_row[0] or 0, 'manual_count': url_row[1] or 0,
+                    'hourly': [{'hour':r[0],'count':r[1]} for r in hourly],
+                    'countries': [{'name':r[0],'count':r[1]} for r in countries],
+                }
+            except Exception as e:
+                logger.warning(f"get_analysis_stats failed: {e}")
+                return {'total_today':0,'total_week':0,'total_month':0,'total_all':0,
+                        'categories':[],'concerns':[],'url_count':0,'manual_count':0,'hourly':[],'countries':[]}
+
+        def clear_old_logs(days=30):
+            try:
+                _pg_exec(f"DELETE FROM fetch_logs WHERE timestamp < NOW() - INTERVAL '1 day' * %s", (days,))
+                return 1
             except Exception:
-                return []
+                return 0
+
+        def export_fetch_logs_csv():
+            try:
+                rows = _pg_exec(
+                    "SELECT timestamp,domain,full_url,layer_attempted,success,response_time_ms,error_message FROM fetch_logs ORDER BY timestamp DESC LIMIT 5000",
+                    fetch=True)
+                buf = io.StringIO()
+                w = csv.writer(buf)
+                w.writerow(['timestamp','domain','full_url','layer','success','response_ms','error'])
+                w.writerows(rows)
+                return buf.getvalue()
+            except Exception:
+                return "timestamp,domain,full_url,layer,success,response_ms,error\n"
+
+        def export_analytics_csv():
+            try:
+                rows = _pg_exec(
+                    "SELECT timestamp,product_category,country,skin_type,skin_concerns,main_worth_score,url_provided,product_name,brand,price FROM analysis_logs ORDER BY timestamp DESC LIMIT 5000",
+                    fetch=True)
+                buf = io.StringIO()
+                w = csv.writer(buf)
+                w.writerow(['timestamp','category','country','skin_type','concerns','score','url_provided','product_name','brand','price'])
+                w.writerows(rows)
+                return buf.getvalue()
+            except Exception:
+                return "timestamp,category,country,skin_type,concerns,score,url_provided,product_name,brand,price\n"
+
+        # Keep old name as alias
+        get_recent_fetches = get_fetch_logs
+        get_credit_summary = get_credits_summary
 
     except ImportError:
         logger.warning("psycopg2 not installed, falling back to SQLite")
@@ -188,7 +317,8 @@ if not _USE_PG:
             timestamp TEXT NOT NULL,
             product_category TEXT, country TEXT, skin_type TEXT, skin_concerns TEXT,
             main_worth_score REAL, url_provided INTEGER DEFAULT 0,
-            scraping_layer TEXT, analysis_time_ms REAL
+            scraping_layer TEXT, analysis_time_ms REAL,
+            product_name TEXT, brand TEXT, price REAL, ingredients TEXT
         );
         CREATE TABLE IF NOT EXISTS api_credits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,8 +331,13 @@ if not _USE_PG:
         CREATE INDEX IF NOT EXISTS idx_analysis_ts ON analysis_logs(timestamp);
         CREATE INDEX IF NOT EXISTS idx_credits_month ON api_credits(month);
         """)
+        # Migrate existing table — add new columns if they don't exist yet
+        existing = [r[1] for r in conn.execute("PRAGMA table_info(analysis_logs)").fetchall()]
+        for col, coltype in [('product_name','TEXT'),('brand','TEXT'),('price','REAL'),('ingredients','TEXT')]:
+            if col not in existing:
+                conn.execute(f"ALTER TABLE analysis_logs ADD COLUMN {col} {coltype}")
         conn.commit()
-        logger.info("SQLite DB initialized (set AIVEN_PG_URL for persistent PostgreSQL)")
+        logger.info("SQLite DB initialized")
 
     def log_fetch(domain, full_url, layer, success, fields_fetched,
                   missing_fields, response_time_ms, error_message=None, credits=0):
@@ -220,15 +355,18 @@ if not _USE_PG:
             logger.warning(f"log_fetch failed: {e}")
 
     def log_analysis(category, country, skin_type, concerns,
-                     worth_score, url_provided, scraping_layer, analysis_time_ms):
+                     worth_score, url_provided, scraping_layer, analysis_time_ms,
+                     product_name=None, brand=None, price=None, ingredients=None):
         try:
             conn = _get_conn()
             conn.execute("""INSERT INTO analysis_logs
                 (timestamp, product_category, country, skin_type, skin_concerns,
-                 main_worth_score, url_provided, scraping_layer, analysis_time_ms)
-                VALUES (?,?,?,?,?,?,?,?,?)""",
+                 main_worth_score, url_provided, scraping_layer, analysis_time_ms,
+                 product_name, brand, price, ingredients)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (_now(), category, country, skin_type, json.dumps(concerns or []),
-                 worth_score, int(bool(url_provided)), scraping_layer, analysis_time_ms))
+                 worth_score, int(bool(url_provided)), scraping_layer, analysis_time_ms,
+                 product_name, brand, price, ingredients))
             conn.commit()
         except Exception as e:
             logger.warning(f"log_analysis failed: {e}")
@@ -246,21 +384,73 @@ if not _USE_PG:
         except Exception as e:
             logger.warning(f"increment_credits failed: {e}")
 
-    def get_recent_fetches(limit=100):
+    def get_fetch_logs(limit=200, status=None, domain=None):
         try:
             conn = _get_conn()
+            conditions = ["1=1"]
+            params = []
+            if status == 'success':
+                conditions.append("success=1 AND (missing_fields='[]' OR missing_fields IS NULL)")
+            elif status == 'partial':
+                conditions.append("success=1 AND missing_fields!='[]'")
+            elif status == 'failed':
+                conditions.append("success=0")
+            if domain:
+                conditions.append("domain LIKE ?")
+                params.append(f"%{domain}%")
+            where = " AND ".join(conditions)
+            params.append(limit)
             rows = conn.execute(
-                "SELECT * FROM fetch_logs ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
+                f"SELECT * FROM fetch_logs WHERE {where} ORDER BY timestamp DESC LIMIT ?",
+                params).fetchall()
             return [dict(r) for r in rows]
         except Exception:
             return []
 
-    def get_credit_summary():
+    def get_fetch_stats_today():
+        try:
+            conn = _get_conn()
+            today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            r = conn.execute("""
+                SELECT COUNT(*),
+                  SUM(CASE WHEN success=1 THEN 1 ELSE 0 END),
+                  SUM(CASE WHEN success=0 THEN 1 ELSE 0 END),
+                  AVG(response_time_ms)
+                FROM fetch_logs WHERE timestamp >= ?""", (today,)).fetchone()
+            return {'total': r[0] or 0, 'success': r[1] or 0, 'failed': r[2] or 0, 'avg_ms': round(r[3] or 0)}
+        except Exception:
+            return {'total': 0, 'success': 0, 'failed': 0, 'avg_ms': 0}
+
+    def get_credits_summary():
+        """Return {api_name: {used, calls}} for current month — shape expected by credits.py."""
+        month = _current_month()
         try:
             conn = _get_conn()
             rows = conn.execute(
-                "SELECT api_name, month, credits_used, call_count FROM api_credits ORDER BY month DESC"
-            ).fetchall()
+                "SELECT api_name, credits_used, call_count FROM api_credits WHERE month=?",
+                (month,)).fetchall()
+            return {r['api_name']: {'used': r['credits_used'], 'calls': r['call_count']} for r in rows}
+        except Exception:
+            return {}
+
+    # Keep old name as alias
+    def get_credit_summary():
+        return get_credits_summary()
+
+    def get_site_stats(days=7):
+        try:
+            conn = _get_conn()
+            cutoff = datetime.now(timezone.utc).strftime(f'%Y-%m-%d')
+            rows = conn.execute("""
+                SELECT domain,
+                  MAX(timestamp) as last_tested,
+                  ROUND(AVG(CASE WHEN success=1 THEN 100.0 ELSE 0.0 END),1) as success_rate,
+                  ROUND(AVG(response_time_ms)) as avg_ms,
+                  COUNT(*) as total
+                FROM fetch_logs
+                WHERE timestamp >= date('now', ?)
+                GROUP BY domain ORDER BY total DESC
+            """, (f'-{days} days',)).fetchall()
             return [dict(r) for r in rows]
         except Exception:
             return []
@@ -268,13 +458,96 @@ if not _USE_PG:
     def get_analysis_stats():
         try:
             conn = _get_conn()
-            rows = conn.execute("""
-                SELECT country, AVG(main_worth_score) as avg_score, COUNT(*) as count
-                FROM analysis_logs GROUP BY country ORDER BY count DESC LIMIT 20
+            today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            month_start = datetime.now(timezone.utc).strftime('%Y-%m-01')
+            counts = conn.execute("""
+                SELECT
+                  SUM(CASE WHEN timestamp >= ? THEN 1 ELSE 0 END),
+                  SUM(CASE WHEN timestamp >= date('now','-7 days') THEN 1 ELSE 0 END),
+                  SUM(CASE WHEN timestamp >= ? THEN 1 ELSE 0 END),
+                  COUNT(*)
+                FROM analysis_logs
+            """, (today, month_start)).fetchone()
+            categories = conn.execute("""
+                SELECT product_category, COUNT(*) as cnt FROM analysis_logs
+                GROUP BY product_category ORDER BY cnt DESC LIMIT 10
             """).fetchall()
-            return [dict(r) for r in rows]
+            concerns_raw = conn.execute(
+                "SELECT skin_concerns FROM analysis_logs WHERE skin_concerns IS NOT NULL"
+            ).fetchall()
+            concern_counts = {}
+            for row in concerns_raw:
+                try:
+                    for c in json.loads(row[0] or '[]'):
+                        concern_counts[c] = concern_counts.get(c, 0) + 1
+                except Exception:
+                    pass
+            concerns = sorted([{'name':k,'count':v} for k,v in concern_counts.items()], key=lambda x:-x['count'])
+            url_row = conn.execute("""
+                SELECT SUM(CASE WHEN url_provided=1 THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN url_provided=0 THEN 1 ELSE 0 END)
+                FROM analysis_logs""").fetchone()
+            hourly = conn.execute("""
+                SELECT CAST(strftime('%H', timestamp) AS INTEGER) as hr, COUNT(*) as cnt
+                FROM analysis_logs GROUP BY hr ORDER BY hr
+            """).fetchall()
+            countries = conn.execute("""
+                SELECT country, COUNT(*) as cnt FROM analysis_logs
+                GROUP BY country ORDER BY cnt DESC LIMIT 20
+            """).fetchall()
+            return {
+                'total_today': counts[0] or 0, 'total_week': counts[1] or 0,
+                'total_month': counts[2] or 0, 'total_all': counts[3] or 0,
+                'categories': [{'name': r[0] or 'Unknown', 'count': r[1]} for r in categories],
+                'concerns': concerns,
+                'url_count': url_row[0] or 0, 'manual_count': url_row[1] or 0,
+                'hourly': [{'hour': r[0], 'count': r[1]} for r in hourly],
+                'countries': [{'name': r[0] or 'Unknown', 'count': r[1]} for r in countries],
+            }
+        except Exception as e:
+            logger.warning(f"get_analysis_stats failed: {e}")
+            return {'total_today':0,'total_week':0,'total_month':0,'total_all':0,
+                    'categories':[],'concerns':[],'url_count':0,'manual_count':0,'hourly':[],'countries':[]}
+
+    def clear_old_logs(days=30):
+        try:
+            conn = _get_conn()
+            conn.execute("DELETE FROM fetch_logs WHERE timestamp < date('now', ?)", (f'-{days} days',))
+            conn.commit()
+            return 1
         except Exception:
-            return []
+            return 0
+
+    def export_fetch_logs_csv():
+        try:
+            conn = _get_conn()
+            rows = conn.execute(
+                "SELECT timestamp,domain,full_url,layer_attempted,success,response_time_ms,error_message FROM fetch_logs ORDER BY timestamp DESC LIMIT 5000"
+            ).fetchall()
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(['timestamp','domain','full_url','layer','success','response_ms','error'])
+            w.writerows([tuple(r) for r in rows])
+            return buf.getvalue()
+        except Exception:
+            return "timestamp,domain,full_url,layer,success,response_ms,error\n"
+
+    def export_analytics_csv():
+        try:
+            conn = _get_conn()
+            rows = conn.execute(
+                "SELECT timestamp,product_category,country,skin_type,skin_concerns,main_worth_score,url_provided,product_name,brand,price FROM analysis_logs ORDER BY timestamp DESC LIMIT 5000"
+            ).fetchall()
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(['timestamp','category','country','skin_type','concerns','score','url_provided','product_name','brand','price'])
+            w.writerows([tuple(r) for r in rows])
+            return buf.getvalue()
+        except Exception:
+            return "timestamp,category,country,skin_type,concerns,score,url_provided,product_name,brand,price\n"
+
+    # Keep old name as alias
+    get_recent_fetches = get_fetch_logs
 
 # Auto-initialize DB on import
 try:

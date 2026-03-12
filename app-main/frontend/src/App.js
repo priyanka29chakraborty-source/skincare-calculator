@@ -135,7 +135,29 @@ function App() {
     try {
       const body = isBarcode ? { barcode: fetchInput.trim() } : { url: fetchInput.trim() };
       const { data } = await axios.post(`${API}/fetch-product`, body);
-      if (data.ingredients) setIngredients(data.ingredients);
+      if (data.ingredients) {
+        // Strip emojis, section headings (e.g. "Key Ingredients:"), and normalize separators
+        const cleaned = data.ingredients
+          // Remove emojis (surrogate pairs used by JS for supplementary planes)
+          .replace(/\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDE4F\uDE80-\uDEFF]|\uD83E[\uDD00-\uDDFF]/g, '')
+          .replace(/[\u2600-\u26FF\u2700-\u27BF\uFE00-\uFEFF]/g, '')
+          // Remove section headings: "Key Ingredients:", "Active Ingredients:", etc.
+          .replace(/\s*[^\n,;]*ingredients?\s*[:：]\s*/gi, '')
+          // After emoji removal, items may be separated by 2+ spaces — convert to comma
+          .replace(/[ \t]{2,}/g, ', ')
+          // Remove leading comma/semicolon per line
+          .replace(/^\s*[,;]+\s*/gm, '')
+          // Normalize inline separators
+          .replace(/[ \t]*[,;][ \t]*/g, ', ')
+          // Newlines → comma
+          .replace(/\n+/g, ', ')
+          // Collapse duplicate commas
+          .replace(/,\s*,+/g, ', ')
+          // Trim leading/trailing junk
+          .replace(/^[,\s]+|[,\s]+$/g, '')
+          .trim();
+        setIngredients(cleaned);
+      }
       if (data.price) setPrice(String(data.price));
       if (data.size) { setSize(String(data.size)); if (data.unit) setSizeUnit(data.unit); }
       if (data.country) setCountry(data.country);
@@ -166,7 +188,7 @@ function App() {
 
       <header className="sc-header" data-testid="app-header">
         <div className="eyebrow">Skincare Analysis Tool</div>
-        <h1 className="sc-title"><i className="fa-solid fa-flask-vial"></i> Know Your Product's Worth</h1>
+        <h1 className="sc-title"><i className="fa-solid fa-flask-vial"></i> Analyze Your Skincare Product</h1>
         <p className="sc-subtitle">Science-backed ingredient analysis. Transparent scoring.</p>
       </header>
 

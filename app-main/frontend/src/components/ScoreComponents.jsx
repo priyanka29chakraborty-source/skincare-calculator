@@ -137,7 +137,7 @@ export function SkinTypeDetails({ details, score, betterSuited, formNotes }) {
       ) : (
         <div className="st-section form-notes-clean" data-testid="formulation-notes-clean">
           <h4><i className="fa-solid fa-circle-check"></i> Formulation Notes</h4>
-          <p>No red flags detected. No comedogenic, irritant, or harmful ingredients found.</p>
+          <p>No major irritation or pore-clogging risks detected.</p>
         </div>
       )}
       {score < 50 && betterSuited?.length > 0 && (

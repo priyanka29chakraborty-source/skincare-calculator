@@ -90,7 +90,7 @@ body::before {
 .fetch-btn:hover { background: var(--dusty-rose-light); color: white; }
 .fetch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.fetch-msg { background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #92400e; margin-bottom: 12px; }
+.fetch-msg { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #166534; margin-bottom: 12px; }
 .fetch-error-msg { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #b91c1c; margin-bottom: 12px; }
 
 /* Divider */
@@ -125,7 +125,7 @@ body::before {
 .skin-chip {
   padding: 10px 20px; border: 1.5px solid var(--border); border-radius: 50px;
   font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
-  background: var(--cream); color: var(--text-sub);
+  background: var(--cream); color: var(--charcoal);
   user-select: none; -webkit-user-select: none;
 }
 .skin-chip:hover, .skin-chip.active { border-color: var(--dusty-rose); background: var(--rose); color: var(--dusty-rose-dark); }

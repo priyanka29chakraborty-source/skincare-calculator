@@ -74,21 +74,20 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, f
         <div style={{ marginBottom: "0.5rem" }}>
           {userUrl ? (
             <div className="best-price-badge user-cheapest" data-testid="not-found-with-url">
-              <i className="fa-solid fa-circle-info" style={{ color: "var(--text-sub)", fontSize: "1rem" }}></i>
+              <i className="fa-solid fa-circle-check" style={{ color: "#267C36", fontSize: "1rem" }}></i>
               <div>
-                <strong style={{ color: "var(--charcoal)" }}>No other listings found for this product</strong>
+                <strong style={{ color: "#267C36" }}>Best price here!</strong>
                 <p style={{ fontSize: "0.8rem", color: "var(--text-sub)", margin: "2px 0 8px" }}>
-                  Use the original source to purchase.
+                  You are already viewing the lowest available price for this product.
                 </p>
                 <a href={userUrl} target="_blank" rel="noopener noreferrer" className="buy-here-link">
-                  <i className="fa-solid fa-store" style={{ marginRight: "5px" }}></i>
-                  Buy Here <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                  Buy Here <i className="fa-solid fa-arrow-right"></i>
                 </a>
               </div>
             </div>
           ) : (
             <p className="alt-empty" data-testid="not-found-message">
-              No other listings found for this product.
+              Best price here! No lower price found across verified listings.
             </p>
           )}
         </div>

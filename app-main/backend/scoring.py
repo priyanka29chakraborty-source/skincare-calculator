@@ -478,8 +478,8 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             raw_strength = weight * conc_factor * eq_factor
 
             conc_label = (
-                "Optimal level" if conc_factor >= 1.0 else
-                "Functional range" if conc_factor >= 0.7 else
+                "Likely optimal level" if conc_factor >= 1.0 else
+                "Likely functional range" if conc_factor >= 0.7 else
                 "Below optimal range"
             )
             ev_label = get_evidence_label(eq_factor)

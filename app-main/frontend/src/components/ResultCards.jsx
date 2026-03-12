@@ -292,10 +292,10 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           <div className="score-meta">
             <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
             {result.price_analysis?.value_tier && result.price_analysis.value_tier !== 'fair' && (
-              <div style={{ display: "inline-block", background: valueChip.color + "18", color: valueChip.color, border: `1px solid ${valueChip.color}35`, borderRadius: "8px", padding: "2px 10px", fontSize: "0.75rem", fontWeight: 600, marginBottom: "4px" }}>
-                {result.price_analysis.value_tier === 'overpriced' ? 'Note: Overpriced vs category avg' :
-                 result.price_analysis.value_tier === 'slightly_overpriced' ? 'Note: Slightly overpriced' :
-                 result.price_analysis.value_tier === 'underpriced' ? 'Good value for money' : null}
+              <div style={{ color: valueChip.color, fontSize: "0.75rem", fontWeight: 600, marginBottom: "4px" }}>
+                {result.price_analysis.value_tier === 'overpriced' ? 'But Overpriced vs Category Avg' :
+                 result.price_analysis.value_tier === 'slightly_overpriced' ? 'But Slightly Overpriced' :
+                 result.price_analysis.value_tier === 'underpriced' ? 'Good Value for Money' : null}
               </div>
             )}
             <p className="score-title-text">{result.score_title}</p>
@@ -317,7 +317,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         {result.price_analysis?.global_markup_detected && <div className="markup-alert" data-testid="markup-alert"><i className="fa-solid fa-exclamation-triangle"></i> Global Markup Detected</div>}
 
         <button className="breakdown-toggle" data-testid="breakdown-toggle" onClick={() => setShowBreakdown(!showBreakdown)} aria-expanded={showBreakdown}>
-          {showBreakdown ? "Hide" : "Show"} Detailed Breakdown {showBreakdown ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
+          {showBreakdown ? "Hide" : "Show"} Analysis Details {showBreakdown ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
         </button>
         <div className={"breakdown" + (showBreakdown ? " open" : "")} data-testid="breakdown-details">
             <BreakdownRow icon="fa-solid fa-chart-bar" label="Active Ingredients (What's Inside)" score={result.component_scores?.A} max={45} details={result.component_details?.A} />
@@ -374,6 +374,11 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         <h2 className="card-title"><i className="fa-solid fa-user-check"></i> {skinType} Skin Compatibility</h2>
         <div style={{ marginBottom: "8px", fontSize: "0.8rem", color: "var(--text-sub)" }}>
           Base texture compatibility for {skinType} skin: <strong style={{ color: getBarColor(result.skin_type_base_texture || result.skin_type_compatibility) }}>{result.skin_type_base_texture || result.skin_type_compatibility}%</strong>
+          {result.skin_type_base_texture && result.skin_type_base_texture !== result.skin_type_compatibility && (
+            <span style={{ marginLeft: "6px", color: "var(--text-sub)", fontSize: "0.75rem" }}>
+              → Final score adjusted to <strong>{result.skin_type_compatibility}%</strong> after ingredient-level risk checks (irritancy, comedogenicity, formulation penalties).
+            </span>
+          )}
         </div>
         <div className="compat-score-row">
           <span className="compat-pct" style={{ color: getBarColor(result.skin_type_compatibility) }}>{result.skin_type_compatibility}%</span>
