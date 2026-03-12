@@ -33,6 +33,7 @@ function IngredientBreakdownTable({ actives }) {
             <th style={{ padding: "6px 10px", textAlign: "center" }}>Evidence</th>
             <th style={{ padding: "6px 10px", textAlign: "left" }}>What It Does</th>
             <th style={{ padding: "6px 10px", textAlign: "center" }}>Concentration Est.</th>
+            <th style={{ padding: "6px 10px", textAlign: "center" }} title="How much this ingredient contributes to the overall active ingredient score">Score Contrib.</th>
           </tr>
         </thead>
         <tbody>
@@ -60,6 +61,15 @@ function IngredientBreakdownTable({ actives }) {
                 {a.primary_benefits || a.functional_category || "—"}
               </td>
               <td style={{ padding: "5px 10px", textAlign: "center", color: "var(--text-sub)", fontSize: "0.78rem" }}>{a.concentration}</td>
+              <td style={{ padding: "5px 10px", textAlign: "center", fontSize: "0.78rem" }} title="Contribution to active ingredient score">
+                {a.score_contribution != null ? (
+                  <span style={{
+                    padding: "2px 8px", borderRadius: "10px", fontWeight: 600,
+                    background: a.score_contribution >= 0.5 ? "#D4EDDA" : a.score_contribution >= 0.2 ? "#FFF3CD" : "#f5f5f5",
+                    color: a.score_contribution >= 0.5 ? "#155724" : a.score_contribution >= 0.2 ? "#856404" : "#666"
+                  }}>{a.score_contribution}</span>
+                ) : "—"}
+              </td>
             </tr>
           ))}
         </tbody>

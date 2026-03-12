@@ -489,6 +489,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 'position': ingredient_list.index(ing_name) + 1,
                 'evidence': ev_label,
                 'concentration': conc_label,
+                'score_contribution': round(eq_factor * conc_factor * weight, 2),
                 'primary_benefits': str(data.get('Primary_Benefits', '') or '').strip() or None,
                 'targets': [t.strip() for t in str(data.get('Skin_Concerns', '') or '').split(';') if t.strip()][:3],
                 'functional_category': str(data.get('Functional_Category', '') or '').strip() or None,

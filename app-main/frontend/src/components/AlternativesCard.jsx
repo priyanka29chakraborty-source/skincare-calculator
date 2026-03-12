@@ -5,23 +5,38 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
     .map(([k]) => k);
   const hasWeakConcerns = weakConcerns.length > 0 && concerns.length > 0;
 
+  // "Excellent" = worth score >= 75 AND all concern fits >= 75
+  const allConcernsFit = concerns.length > 0 && concerns.every(c => {
+    const v = concernFit[c];
+    return typeof v === 'object' ? (v.score >= 75) : (typeof v === 'number' && v >= 75);
+  });
+  const isExcellent = allConcernsFit && (result.main_worth_score >= 75);
+
   if (!hasWeakConcerns) return (
     <div className="sc-card result-card card-4" data-testid="card-alternatives-great" style={{ "--anim-delay": "0.45s" }}>
       <h2 className="card-title"><i className="fa-solid fa-arrow-up-right-dots"></i> Better Alternatives</h2>
-      {concerns.length > 0 ? (
-        <div className="great-value-badge" data-testid="great-value-message">
-          <i className="fa-solid fa-circle-check"></i>
-          <div>
-            <strong>Your product targets your concerns effectively!</strong>
-            <p>All concern fit scores are 75% or above. No need to look for alternatives.</p>
-          </div>
-        </div>
-      ) : (
+      {concerns.length === 0 ? (
         <div className="great-value-badge" data-testid="no-concerns-message" style={{ background: '#f8f8f4', borderColor: '#d4cfc8' }}>
           <i className="fa-solid fa-info-circle" style={{ color: '#8B7E74' }}></i>
           <div>
             <strong style={{ color: '#2C2420' }}>No skin concerns selected</strong>
             <p style={{ color: '#8B7E74' }}>Select your skin concerns above to see personalized alternatives.</p>
+          </div>
+        </div>
+      ) : isExcellent ? (
+        <div className="great-value-badge" data-testid="excellent-message">
+          <i className="fa-solid fa-trophy" style={{ color: '#C9A84C' }}></i>
+          <div>
+            <strong>Your product is already excellent for your concerns!</strong>
+            <p>Worth score {result.main_worth_score}/100 and all concern fits are 75%+. No better alternative needed.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="great-value-badge" data-testid="great-value-message">
+          <i className="fa-solid fa-circle-check"></i>
+          <div>
+            <strong>Your product targets your concerns effectively!</strong>
+            <p>All concern fit scores are 75% or above. No need to look for alternatives.</p>
           </div>
         </div>
       )}
@@ -62,7 +77,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
 
       {!altLoading && alternatives?.scored_alternatives?.length > 0 && (
         <>
-          <div className="alt-section-label">Verified Alternatives (Fully Analyzed):</div>
+          <div className="alt-section-label">Verified Alternatives (Fully Analyzed) — max 3:</div>
           <div className="scored-alt-list" data-testid="scored-alternatives-list">
             {alternatives.scored_alternatives.map((alt, i) => (
               <div key={i} className="scored-alt-card" data-testid={`scored-alt-${i}`}>
@@ -71,17 +86,33 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
                   {alt.score_delta > 0 && <span className="scored-alt-badge">+{alt.score_delta} pts</span>}
                 </div>
                 <div className="scored-alt-scores">
-                  {/* Fixed: backend sends alt.score not alt.worth_score */}
                   <div className="scored-alt-metric">
-                    <span className="scored-alt-label">Worth</span>
+                    <span className="scored-alt-label">Worth Score</span>
                     <span className="scored-alt-value">{alt.score}/100</span>
                   </div>
+                  {alt.safety_score != null && (
+                    <div className="scored-alt-metric">
+                      <span className="scored-alt-label">Safety</span>
+                      <span className="scored-alt-value">{Math.round(alt.safety_score)}/20</span>
+                    </div>
+                  )}
+                  {alt.skin_type_score != null && (
+                    <div className="scored-alt-metric">
+                      <span className="scored-alt-label">Skin Compatibility</span>
+                      <span className="scored-alt-value">{Math.round(alt.skin_type_score)}%</span>
+                    </div>
+                  )}
+                  {alt.concern_fit && Object.entries(alt.concern_fit).map(([c, pct]) => (
+                    <div key={c} className="scored-alt-metric">
+                      <span className="scored-alt-label">{c} fit</span>
+                      <span className="scored-alt-value">{pct}%</span>
+                    </div>
+                  ))}
                 </div>
                 {alt.why_better?.length > 0 && (
                   <ul className="scored-alt-reasons">{alt.why_better.map((r, j) => <li key={j}>{r}</li>)}</ul>
                 )}
                 {alt.price && <div className="scored-alt-price">{currency} {alt.price}</div>}
-                {/* Fixed: backend sends alt.link (single string), not alt.buy_links[] */}
                 {alt.link && (
                   <div className="scored-alt-links">
                     <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link buy-here-link" data-testid={`scored-alt-link-${i}`}>

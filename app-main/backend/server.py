@@ -378,110 +378,176 @@ def _serp_shopping_search(query, country, serp_key, num=10):
 @api_router.post("/find-alternatives")
 @limiter.limit("10/minute")
 async def find_alternatives(req: FindAlternativesRequest, request: Request):
-    # NEW: Check if ANY concern score < 75. If no concerns or all >= 75, skip.
+    # ── Gate 1: No concerns selected → never show alternatives ──────────────
     concern_scores = req.user_concern_fit or {}
-    if not concern_scores:
-        # No concerns selected — never show alternatives
+    if not concern_scores or not (req.user_concerns or []):
         return {
             "scored_alternatives": [], "basic_alternatives": [],
             "user_score": req.user_score, "skip_reason": "no_concerns",
         }
+
+    # ── Gate 2: worth score >= 75 AND all concern fits >= 75 → excellent ────
+    all_concerns_great = all(
+        isinstance(v, (int, float)) and v >= 75
+        for v in concern_scores.values()
+    )
+    if all_concerns_great and (req.user_score or 0) >= 75:
+        return {
+            "scored_alternatives": [], "basic_alternatives": [],
+            "user_score": req.user_score, "skip_reason": "excellent",
+        }
+
+    # ── Gate 3: All concern fits >= 75 (but score < 75) → still great fit ──
     weak_concerns = {k: v for k, v in concern_scores.items() if isinstance(v, (int, float)) and v < 75}
     if not weak_concerns:
-        # All concern scores >= 75 — great value
         return {
             "scored_alternatives": [], "basic_alternatives": [],
             "user_score": req.user_score, "skip_reason": "great_value",
         }
 
+    # ── Normalise category for locking ──────────────────────────────────────
+    category_lock = req.product_category.lower().strip()
+
+    # ── Normalise user's key actives for overlap check ──────────────────────
+    user_actives_norm = {a.lower().strip() for a in (req.key_actives or []) if a}
+
+    def _shares_active(alt_actives):
+        """Return True if alternative shares ≥1 main active with user product."""
+        if not user_actives_norm:
+            return True   # no actives to compare → don't filter
+        alt_norm = {a.lower().strip() for a in alt_actives}
+        return bool(user_actives_norm & alt_norm)
+
     serp_key = os.environ.get('SERPER_API_KEY', '')
 
-    # Build search queries
+    # ── Build search queries — always include category word ──────────────────
     search_terms = []
-    for target in (req.upgrade_targets or []):
-        upgrade = target.get('upgrade', '')
-        if upgrade:
-            search_terms.append(upgrade)
+    # Priority: key actives from user's product + category
+    for active in (req.key_actives or [])[:2]:
+        search_terms.append(f"{active} {category_lock}")
+    # Then concern + category
     for concern in (req.user_concerns or [])[:2]:
-        search_terms.append(f"{concern} {req.product_category}")
+        search_terms.append(f"{concern} {category_lock}")
     if not search_terms:
-        for active in req.key_actives[:2]:
-            search_terms.append(f"{active} {req.product_category}")
-    if not search_terms:
-        search_terms = [req.product_category]
+        search_terms = [category_lock]
 
     sites = SITE_MAP.get(req.country, SITE_MAP.get('India', []))
     site_filter = ' OR '.join(f'site:{s}' for s in sites[:3])
 
-    # Step 1: DDG search with country-specific sites
+    # ── Helper: build rich why_better list ──────────────────────────────────
+    def _build_why_better(analysis, alt_actives):
+        reasons = []
+        score_delta = analysis['main_worth_score'] - (req.user_score or 0)
+        if score_delta > 0:
+            reasons.append(f"+{score_delta} pts higher overall worth score ({analysis['main_worth_score']} vs {req.user_score})")
+
+        alt_safety = analysis['component_scores']['D']
+        safety_delta = round(alt_safety - (req.user_safety_score or 0), 1)
+        if safety_delta > 0:
+            reasons.append(f"Better safety profile (+{safety_delta} pts)")
+        elif safety_delta == 0:
+            reasons.append("Equal safety profile")
+
+        # Concern fit comparison
+        alt_concern_fit = analysis.get('skin_concern_fit', {})
+        for concern, user_fit_val in concern_scores.items():
+            alt_fit_raw = alt_concern_fit.get(concern, {})
+            alt_fit_val = alt_fit_raw.get('score', alt_fit_raw) if isinstance(alt_fit_raw, dict) else alt_fit_raw
+            if isinstance(alt_fit_val, (int, float)) and isinstance(user_fit_val, (int, float)):
+                fit_delta = round(alt_fit_val - user_fit_val)
+                if fit_delta > 0:
+                    reasons.append(f"Better {concern} fit (+{fit_delta}% → {round(alt_fit_val)}%)")
+
+        ac = analysis['price_analysis']['active_count']
+        shared = [a for a in alt_actives if a.lower() in user_actives_norm]
+        if shared:
+            reasons.append(f"Contains {', '.join(shared[:2])} — same key active(s) as your product")
+        elif ac > 0:
+            reasons.append(f"{ac} clinically-backed active{'s' if ac != 1 else ''}")
+
+        return reasons[:4]  # max 4 reasons
+
+    # ── Step 1: DDG search ───────────────────────────────────────────────────
     ddg_urls = []
-    for term in search_terms[:2]:
-        ddg_query = f"{term} {req.product_category} {site_filter}"
+    for term in search_terms[:3]:
+        ddg_query = f"best {term} skincare {site_filter}"
         results = _ddg_search(ddg_query, max_results=5)
         for r in results:
             url = r.get('href', '')
             if url and url not in ddg_urls:
                 ddg_urls.append(url)
 
-    # Step 2: Fetch ingredients via Firecrawl → ScrapeDo waterfall
+    # ── Step 2: Fetch + score DDG results ───────────────────────────────────
     scored_alternatives = []
     if ddg_urls:
-        fetch_urls = ddg_urls[:4]
+        fetch_urls = ddg_urls[:5]
         fetched_data = await fetch_multiple_products(fetch_urls, timeout=25)
         for i, product_data in enumerate(fetched_data):
-            if product_data and product_data.get('ingredients'):
-                try:
-                    alt_price = product_data.get('price') or 0
-                    analysis = analyze_product({
-                        'ingredients': product_data['ingredients'],
-                        'price': alt_price,
-                        'size_ml': product_data.get('size_ml') or req.user_size_ml or 30,
-                        'category': req.product_category,
-                        'concerns': req.user_concerns or [],
-                        'skin_type': req.user_skin_type or 'normal',
-                        'country': req.country,
-                        'currency': req.currency,
-                    })
-                    alt_score = analysis['main_worth_score']
-                    if alt_score > (req.user_score or 0):
-                        score_delta = alt_score - (req.user_score or 0)
-                        why_better = [f"+{score_delta} points higher overall ({alt_score} vs {req.user_score})"]
-                        alt_safety = analysis['component_scores']['D']
-                        safety_delta = alt_safety - (req.user_safety_score or 0)
-                        if safety_delta > 0:
-                            why_better.append(f"Better safety profile (+{safety_delta:.0f} pts)")
-                        elif safety_delta >= 0:
-                            why_better.append("Equal or better safety")
-                        ac = analysis['price_analysis']['active_count']
-                        if ac > 0:
-                            why_better.append(f"{ac} clinically-backed active{'s' if ac != 1 else ''}")
-                        scored_alternatives.append({
-                            'name': product_data.get('product_name') or fetch_urls[i].split('/')[-1].replace('-', ' ').title(),
-                            'score': alt_score,
-                            'score_delta': score_delta,
-                            'tier': analysis['main_worth_tier'],
-                            'safety_score': alt_safety,
-                            'active_count': ac,
-                            'price': alt_price if alt_price else '',
-                            'link': fetch_urls[i],
-                            'thumbnail': '',
-                            'source': fetch_urls[i].split('/')[2] if '/' in fetch_urls[i] else '',
-                            'why_better': why_better,
-                            'key_actives': [a['name'] for a in analysis.get('identified_actives', [])[:4]],
-                            'has_full_analysis': True,
-                        })
-                except Exception as e:
-                    logger.error(f"Re-scoring failed for DDG result: {e}")
+            if not (product_data and product_data.get('ingredients')):
+                continue
+            try:
+                alt_price = product_data.get('price') or 0
+                analysis = analyze_product({
+                    'ingredients': product_data['ingredients'],
+                    'price': alt_price,
+                    'size_ml': product_data.get('size_ml') or req.user_size_ml or 30,
+                    'category': category_lock,
+                    'concerns': req.user_concerns or [],
+                    'skin_type': req.user_skin_type or 'normal',
+                    'country': req.country,
+                    'currency': req.currency,
+                })
+                alt_score = analysis['main_worth_score']
+                alt_actives = [a['name'] for a in analysis.get('identified_actives', [])[:6]]
 
-    # Step 3: Fallback to SerpAPI if DDG didn't yield scored results
+                # ── Category lock: skip if product page reports a different category ──
+                scraped_cat = (product_data.get('category') or '').lower().strip()
+                if scraped_cat and scraped_cat != category_lock and category_lock not in scraped_cat and scraped_cat not in category_lock:
+                    logger.info(f"Category mismatch skipped: scraped={scraped_cat} vs lock={category_lock}")
+                    continue
+
+                # ── Active lock: must share ≥1 main active ──────────────
+                if not _shares_active(alt_actives):
+                    logger.info(f"Active mismatch skipped: {alt_actives} vs {user_actives_norm}")
+                    continue
+
+                if alt_score > (req.user_score or 0):
+                    score_delta = alt_score - (req.user_score or 0)
+                    why_better = _build_why_better(analysis, alt_actives)
+                    alt_concern_fit = analysis.get('skin_concern_fit', {})
+                    concern_fit_pct = {
+                        k: round((v.get('score', v) if isinstance(v, dict) else v))
+                        for k, v in alt_concern_fit.items()
+                        if k in concern_scores
+                    }
+                    scored_alternatives.append({
+                        'name': product_data.get('product_name') or fetch_urls[i].split('/')[-1].replace('-', ' ').title(),
+                        'score': alt_score,
+                        'score_delta': score_delta,
+                        'tier': analysis['main_worth_tier'],
+                        'safety_score': analysis['component_scores']['D'],
+                        'skin_type_score': analysis.get('skin_type_compatibility', 0),
+                        'active_count': analysis['price_analysis']['active_count'],
+                        'price': alt_price if alt_price else '',
+                        'link': fetch_urls[i],
+                        'thumbnail': '',
+                        'source': fetch_urls[i].split('/')[2] if '/' in fetch_urls[i] else '',
+                        'why_better': why_better,
+                        'key_actives': alt_actives,
+                        'concern_fit': concern_fit_pct,
+                        'has_full_analysis': True,
+                    })
+            except Exception as e:
+                logger.error(f"Re-scoring failed for DDG result: {e}")
+
+    # ── Step 3: SerpAPI fallback ─────────────────────────────────────────────
     basic_alternatives = []
     if not scored_alternatives and serp_key:
         for term in search_terms[:2]:
-            query = f"best {term} skincare"
+            query = f"best {term} {category_lock} skincare"
             results = _serp_shopping_search(query, req.country, serp_key, num=8)
             basic_alternatives.extend(results)
 
-        # Deduplicate
         seen = set()
         deduped = []
         for r in basic_alternatives:
@@ -490,49 +556,66 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
                 seen.add(r['name'])
         basic_alternatives = deduped[:8]
 
-        # Try to score top 3 SerpAPI results
         serp_urls = [r['link'] for r in basic_alternatives if r.get('link')][:3]
         if serp_urls:
             fetched = await fetch_multiple_products(serp_urls, timeout=20)
             for i, pd_item in enumerate(fetched):
-                if pd_item and pd_item.get('ingredients'):
-                    try:
-                        analysis = analyze_product({
-                            'ingredients': pd_item['ingredients'],
-                            'price': pd_item.get('price') or 0,
-                            'size_ml': pd_item.get('size_ml') or 30,
-                            'category': req.product_category,
-                            'concerns': req.user_concerns or [],
-                            'skin_type': req.user_skin_type or 'normal',
-                            'country': req.country,
-                            'currency': req.currency,
+                if not (pd_item and pd_item.get('ingredients')):
+                    continue
+                try:
+                    analysis = analyze_product({
+                        'ingredients': pd_item['ingredients'],
+                        'price': pd_item.get('price') or 0,
+                        'size_ml': pd_item.get('size_ml') or 30,
+                        'category': category_lock,
+                        'concerns': req.user_concerns or [],
+                        'skin_type': req.user_skin_type or 'normal',
+                        'country': req.country,
+                        'currency': req.currency,
+                    })
+                    alt_score = analysis['main_worth_score']
+                    alt_actives = [a['name'] for a in analysis.get('identified_actives', [])[:6]]
+
+                    # Category + active locks apply to SerpAPI results too
+                    scraped_cat = (pd_item.get('category') or '').lower().strip()
+                    if scraped_cat and scraped_cat != category_lock and category_lock not in scraped_cat and scraped_cat not in category_lock:
+                        continue
+                    if not _shares_active(alt_actives):
+                        continue
+
+                    if alt_score > (req.user_score or 0):
+                        score_delta = alt_score - (req.user_score or 0)
+                        why_better = _build_why_better(analysis, alt_actives)
+                        alt_concern_fit = analysis.get('skin_concern_fit', {})
+                        concern_fit_pct = {
+                            k: round((v.get('score', v) if isinstance(v, dict) else v))
+                            for k, v in alt_concern_fit.items()
+                            if k in concern_scores
+                        }
+                        scored_alternatives.append({
+                            'name': basic_alternatives[i]['name'],
+                            'score': alt_score,
+                            'score_delta': score_delta,
+                            'tier': analysis['main_worth_tier'],
+                            'safety_score': analysis['component_scores']['D'],
+                            'skin_type_score': analysis.get('skin_type_compatibility', 0),
+                            'active_count': analysis['price_analysis']['active_count'],
+                            'price': basic_alternatives[i].get('price', ''),
+                            'link': basic_alternatives[i].get('link', ''),
+                            'thumbnail': basic_alternatives[i].get('thumbnail', ''),
+                            'source': basic_alternatives[i].get('source', ''),
+                            'why_better': why_better,
+                            'key_actives': alt_actives,
+                            'concern_fit': concern_fit_pct,
+                            'has_full_analysis': True,
                         })
-                        alt_score = analysis['main_worth_score']
-                        if alt_score > (req.user_score or 0):
-                            score_delta = alt_score - (req.user_score or 0)
-                            scored_alternatives.append({
-                                'name': basic_alternatives[i]['name'],
-                                'score': alt_score,
-                                'score_delta': score_delta,
-                                'tier': analysis['main_worth_tier'],
-                                'safety_score': analysis['component_scores']['D'],
-                                'active_count': analysis['price_analysis']['active_count'],
-                                'price': basic_alternatives[i].get('price', ''),
-                                'link': basic_alternatives[i].get('link', ''),
-                                'thumbnail': basic_alternatives[i].get('thumbnail', ''),
-                                'source': basic_alternatives[i].get('source', ''),
-                                'why_better': [f"+{score_delta} points higher overall ({alt_score} vs {req.user_score})"],
-                                'key_actives': [a['name'] for a in analysis.get('identified_actives', [])[:4]],
-                                'has_full_analysis': True,
-                            })
-                    except Exception as e:
-                        logger.error(f"Re-scoring SerpAPI result failed: {e}")
+                except Exception as e:
+                    logger.error(f"Re-scoring SerpAPI result failed: {e}")
 
     scored_alternatives.sort(key=lambda x: x.get('score_delta', 0), reverse=True)
     scored_names = {a['name'] for a in scored_alternatives}
     basic_alternatives = [r for r in basic_alternatives if r['name'] not in scored_names][:6]
 
-    # Build a helpful message when search returned nothing
     search_message = None
     if not scored_alternatives and not basic_alternatives:
         if not serp_key:

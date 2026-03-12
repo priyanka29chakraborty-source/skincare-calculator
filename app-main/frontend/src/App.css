@@ -207,7 +207,18 @@ body::before {
   user-select: none; -webkit-user-select: none;
 }
 .breakdown-toggle:hover { color: var(--dusty-rose); }
-.breakdown { margin-top: 16px; }
+.breakdown {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.35s ease, opacity 0.3s ease;
+  margin-top: 0;
+}
+.breakdown.open {
+  max-height: 4000px;
+  opacity: 1;
+  margin-top: 16px;
+}
 
 /* Breakdown Rows */
 .bd-row { padding: 14px 0; border-bottom: 1px solid var(--border); }
