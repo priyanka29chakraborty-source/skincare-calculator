@@ -77,50 +77,50 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
 
       {!altLoading && alternatives?.scored_alternatives?.length > 0 && (
         <>
-          <div className="alt-section-label">Verified Alternatives (Fully Analyzed) — max 3:</div>
+          <div className="alt-section-label">Alternatives</div>
           <div className="scored-alt-list" data-testid="scored-alternatives-list">
             {alternatives.scored_alternatives.map((alt, i) => (
               <div key={i} className="scored-alt-card" data-testid={`scored-alt-${i}`}>
                 <div className="scored-alt-header">
                   <span className="scored-alt-name">{alt.name}</span>
-                  {alt.score_delta > 0 && <span className="scored-alt-badge">+{alt.score_delta} pts</span>}
+                  {alt.score_delta > 0 && (
+                    <span className="scored-alt-badge" style={{ fontSize: "0.72rem", padding: "2px 8px" }}>+{alt.score_delta} pts</span>
+                  )}
                 </div>
-                <div className="scored-alt-scores">
-                  <div className="scored-alt-metric">
-                    <span className="scored-alt-label">Worth Score</span>
-                    <span className="scored-alt-value">{alt.score}/100</span>
-                  </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "8px 0" }}>
+                  <span style={{ fontSize: "0.75rem", background: "#F9F6FE", border: "1px solid #e2d9f3", borderRadius: "8px", padding: "3px 8px", color: "#5a4478" }}>
+                    Worth: {alt.score}/100
+                  </span>
                   {alt.safety_score != null && (
-                    <div className="scored-alt-metric">
-                      <span className="scored-alt-label">Safety</span>
-                      <span className="scored-alt-value">{Math.round(alt.safety_score)}/20</span>
-                    </div>
+                    <span style={{ fontSize: "0.75rem", background: "#F0FAF0", border: "1px solid #b6ddb6", borderRadius: "8px", padding: "3px 8px", color: "#2d6e2d" }}>
+                      Safety: {Math.round(alt.safety_score)}/20
+                    </span>
                   )}
                   {alt.skin_type_score != null && (
-                    <div className="scored-alt-metric">
-                      <span className="scored-alt-label">Skin Compatibility</span>
-                      <span className="scored-alt-value">{Math.round(alt.skin_type_score)}%</span>
-                    </div>
+                    <span style={{ fontSize: "0.75rem", background: "#FFF4F4", border: "1px solid #f0c8c8", borderRadius: "8px", padding: "3px 8px", color: "#8b4444" }}>
+                      Skin Compat: {Math.round(alt.skin_type_score)}%
+                    </span>
                   )}
                   {alt.concern_fit && Object.entries(alt.concern_fit).map(([c, pct]) => (
-                    <div key={c} className="scored-alt-metric">
-                      <span className="scored-alt-label">{c} fit</span>
-                      <span className="scored-alt-value">{pct}%</span>
-                    </div>
+                    <span key={c} style={{ fontSize: "0.75rem", background: "#FFF8F0", border: "1px solid #f0d8b0", borderRadius: "8px", padding: "3px 8px", color: "#7a5c2e" }}>
+                      {c}: {pct}%
+                    </span>
                   ))}
                 </div>
                 {alt.why_better?.length > 0 && (
-                  <ul className="scored-alt-reasons">{alt.why_better.map((r, j) => <li key={j}>{r}</li>)}</ul>
+                  <ul className="scored-alt-reasons" style={{ margin: "6px 0", paddingLeft: "16px" }}>
+                    {alt.why_better.map((r, j) => <li key={j} style={{ fontSize: "0.78rem", marginBottom: "3px" }}>{r}</li>)}
+                  </ul>
                 )}
-                {alt.price && <div className="scored-alt-price">{currency} {alt.price}</div>}
-                {alt.link && (
-                  <div className="scored-alt-links">
-                    <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link buy-here-link" data-testid={`scored-alt-link-${i}`}>
-                      <i className="fa-solid fa-store" style={{ marginRight: "5px" }}></i>
-                      Shop on {alt.source || 'Retailer'} <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px", flexWrap: "wrap", gap: "8px" }}>
+                  {alt.price && <div className="scored-alt-price" style={{ fontSize: "0.85rem", fontWeight: 600 }}>{currency} {alt.price}</div>}
+                  {alt.link && (
+                    <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link buy-here-link" data-testid={`scored-alt-link-${i}`} style={{ fontSize: "0.78rem" }}>
+                      <i className="fa-solid fa-store" style={{ marginRight: "4px" }}></i>
+                      Shop on {alt.source || 'Retailer'} <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.65rem" }}></i>
                     </a>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             ))}
           </div>

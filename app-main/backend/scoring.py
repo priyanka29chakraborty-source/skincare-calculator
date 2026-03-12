@@ -17,8 +17,14 @@ def parse_ingredients(ingredient_list_str):
     if not ingredient_list_str:
         return []
 
-    # Strip "Ingredients:" / "Full Ingredients:" prefix
-    marker = re.search(r'(?:full\s+)?ingred\w*\s*:', ingredient_list_str, re.IGNORECASE)
+    # Replace emojis with commas (emojis often used as separators between ingredients)
+    ingredient_list_str = re.sub(
+        r'[\U0001F300-\U0001F9FF\U00002700-\U000027BF'
+        r'\U0000FE00-\U0000FE0F\U00002600-\U000026FF\U0001FA00-\U0001FAFF]',
+        ',', ingredient_list_str
+    )
+    # Strip "Key Ingredients:" / "Ingredients:" / "Full Ingredients:" prefix
+    marker = re.search(r'(?:key\s+)?(?:full\s+)?ingred\w*\s*:', ingredient_list_str, re.IGNORECASE)
     if marker:
         ingredient_list_str = ingredient_list_str[marker.end():]
 

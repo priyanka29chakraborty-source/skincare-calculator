@@ -1,17 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Playfair+Display:wght@400;700&display=swap');
 
 :root {
-  --cream: #FAF7F2;
+  --cream: #FFF8F8;
   --warm-white: #FFFFFF;
   --dusty-rose: #BF8888;
   --dusty-rose-dark: #A87373;
-  --dusty-rose-light: #D2A5A5;
-  --rose: #EFD7D7;
+  --dusty-rose-light: #D4AAAA;
+  --rose: #FAE8E8;
+  --lavender: #F9F6FE;
+  --lavender-border: #E8E0F5;
   --sage: #267C36;
-  --charcoal: #2C2420;
-  --text-sub: #8A7570;
-  --border: #EAE0DC;
-  --border-light: #f0e8df;
+  --charcoal: #1E293B;
+  --text-sub: #67768E;
+  --border: #F0E4E4;
+  --border-light: #F9F0F0;
   --gold: #C9A96E;
   --green: #22c55e;
   --yellow: #eab308;
@@ -22,8 +24,9 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  background: var(--cream);
-  font-family: 'DM Sans', sans-serif;
+  background: linear-gradient(145deg, #FFF4F4 0%, #F9F6FE 50%, #FFF8F8 100%);
+  background-attachment: fixed;
+  font-family: 'Nunito', sans-serif;
   color: var(--charcoal);
   min-height: 100vh;
   padding: 0;
@@ -31,8 +34,9 @@ body {
 body::before {
   content: ''; position: fixed; inset: 0;
   background-image:
-    radial-gradient(ellipse at 20% 20%, rgba(139,94,107,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 80%, rgba(125,158,140,0.06) 0%, transparent 60%);
+    radial-gradient(ellipse at 15% 15%, rgba(191,136,136,0.08) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(156,130,200,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(250,232,232,0.05) 0%, transparent 70%);
   pointer-events: none; z-index: 0;
 }
 
@@ -46,17 +50,19 @@ body::before {
   color: var(--dusty-rose); margin-bottom: 16px;
 }
 .sc-title {
-  font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700;
+  font-family: 'Cormorant Garamond', serif; font-size: 46px; font-weight: 700;
   color: var(--charcoal); line-height: 1.2; margin-bottom: 14px;
+  letter-spacing: -0.5px;
 }
 .sc-title i { color: var(--dusty-rose); margin-right: 10px; }
 .sc-subtitle { font-size: 15px; color: var(--text-sub); font-weight: 300; letter-spacing: 0.3px; }
 
 /* ========== INPUT CARDS ========== */
 .card {
-  background: var(--warm-white); border-radius: 20px; padding: 32px;
+  background: rgba(255,255,255,0.92); border-radius: 24px; padding: 32px;
   margin-bottom: 20px; border: 1px solid var(--border);
-  box-shadow: 0 2px 20px rgba(44,36,32,0.04);
+  box-shadow: 0 4px 32px rgba(191,136,136,0.08), 0 1px 4px rgba(191,136,136,0.04);
+  backdrop-filter: blur(8px);
 }
 .card-label {
   font-size: 10px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase;
@@ -142,7 +148,7 @@ body::before {
 .action-row { margin-top: 8px; margin-bottom: 8px; }
 .analyze-btn {
   width: 100%; padding: 18px;
-  background: linear-gradient(135deg, var(--dusty-rose) 0%, var(--dusty-rose-dark) 100%);
+  background: linear-gradient(135deg, #C18888 0%, #A87373 60%, #9A6B6B 100%);
   color: white; border: none; border-radius: 14px;
   font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 600;
   cursor: pointer; letter-spacing: 0.5px; transition: all 0.3s;
@@ -164,16 +170,18 @@ body::before {
 /* ========== RESULTS SECTION ========== */
 .sc-results { margin-top: 16px; }
 .sc-card {
-  background: var(--warm-white); border: 1px solid var(--border);
-  border-radius: 20px; padding: 32px; margin-bottom: 20px;
-  box-shadow: 0 2px 20px rgba(44,36,32,0.04); transition: box-shadow 0.2s;
+  background: rgba(255,255,255,0.94); border: 1px solid var(--border);
+  border-radius: 24px; padding: 32px; margin-bottom: 20px;
+  box-shadow: 0 4px 32px rgba(191,136,136,0.08), 0 1px 4px rgba(191,136,136,0.04);
+  transition: box-shadow 0.2s, transform 0.2s;
+  backdrop-filter: blur(8px);
   user-select: none; -webkit-user-select: none;
 }
-.sc-card:hover { box-shadow: 0 4px 24px rgba(44,36,32,0.08); }
+.sc-card:hover { box-shadow: 0 8px 40px rgba(191,136,136,0.13); transform: translateY(-1px); }
 .result-card { animation: slideUp 0.5s ease both; animation-delay: var(--anim-delay, 0s); }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-.card-title { font-family: 'Playfair Display', serif !important; font-size: 1.15rem !important; color: var(--dusty-rose-dark) !important; margin-bottom: 16px; }
+.card-title { font-family: 'Cormorant Garamond', serif !important; font-size: 1.25rem !important; color: var(--dusty-rose-dark) !important; margin-bottom: 16px; letter-spacing: 0.2px; font-weight: 600 !important; }
 .card-title i { color: var(--dusty-rose); font-size: 0.9rem; margin-right: 8px; }
 
 /* Score Circle (SVG animated) */
@@ -239,7 +247,7 @@ body::before {
 /* Concern Fit Results */
 .ampm-label { background: var(--cream); border: 1px solid var(--border); border-radius: 50px; padding: 8px 16px; font-size: 0.85rem; color: var(--dusty-rose-dark); font-weight: 600; margin-bottom: 16px; display: inline-flex; align-items: center; gap: 6px; }
 .ampm-label i { margin-right: 4px; }
-.concern-result { background: var(--cream); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; transition: box-shadow 0.2s; cursor: pointer; user-select: none; }
+.concern-result { background: linear-gradient(135deg, #FFF8F8 0%, #F9F6FE 100%); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; transition: box-shadow 0.2s, transform 0.15s; cursor: pointer; user-select: none; }
 .concern-result:hover { box-shadow: 0 2px 12px rgba(44,36,32,0.06); }
 .concern-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 6px; }
 .concern-left { display: flex; align-items: center; gap: 8px; }
@@ -295,7 +303,8 @@ body::before {
 
 /* Alternatives - Card 4 */
 .upgrade-box {
-  background: var(--cream); border: 1.5px solid var(--border); border-radius: 12px;
+  background: linear-gradient(135deg, #FFF4F4 0%, #F9F6FE 100%);
+  border: 1.5px solid var(--lavender-border); border-radius: 16px;
   padding: 16px; margin-bottom: 12px;
 }
 .upgrade-header {
@@ -324,19 +333,21 @@ body::before {
 /* Scored Alternatives - Comparison Cards */
 .scored-alt-list { display: flex; flex-direction: column; gap: 14px; }
 .scored-alt-card {
-  background: var(--cream); border: 1.5px solid var(--border); border-radius: 14px;
-  padding: 18px; transition: box-shadow 0.2s, border-color 0.2s;
+  background: linear-gradient(135deg, #FFF8F8 0%, #F9F6FE 100%);
+  border: 1.5px solid var(--border); border-radius: 16px;
+  padding: 18px; transition: box-shadow 0.2s, border-color 0.2s, transform 0.15s;
 }
-.scored-alt-card:hover { box-shadow: 0 4px 18px rgba(44,36,32,0.08); border-color: var(--dusty-rose-light); }
+.scored-alt-card:hover { box-shadow: 0 6px 24px rgba(191,136,136,0.12); border-color: var(--dusty-rose-light); transform: translateY(-1px); }
 .scored-alt-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .scored-alt-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
 .scored-alt-info { flex: 1; min-width: 0; }
 .scored-alt-name { font-weight: 700; font-size: 0.92rem; color: var(--charcoal); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scored-alt-source { font-size: 0.72rem; color: var(--text-sub); display: block; margin-top: 2px; }
 .scored-alt-badge {
-  background: var(--sage); color: white; font-weight: 800; font-size: 0.95rem;
-  padding: 6px 12px; border-radius: 50px; white-space: nowrap; flex-shrink: 0;
-  font-family: 'Playfair Display', serif;
+  background: linear-gradient(135deg, var(--dusty-rose) 0%, var(--dusty-rose-dark) 100%);
+  color: white; font-weight: 700; font-size: 0.72rem;
+  padding: 4px 10px; border-radius: 50px; white-space: nowrap; flex-shrink: 0;
+  letter-spacing: 0.3px;
 }
 
 /* Score Comparison Bars */
