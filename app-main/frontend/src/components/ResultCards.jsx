@@ -33,7 +33,7 @@ function IngredientBreakdownTable({ actives }) {
             <th style={{ padding: "6px 10px", textAlign: "center" }}>Evidence</th>
             <th style={{ padding: "6px 10px", textAlign: "left" }}>What It Does</th>
             <th style={{ padding: "6px 10px", textAlign: "center" }}>Concentration Est.</th>
-            <th style={{ padding: "6px 10px", textAlign: "center" }} title="How much this ingredient contributes to the overall active ingredient score">Score Contrib.</th>
+
           </tr>
         </thead>
         <tbody>
@@ -44,36 +44,35 @@ function IngredientBreakdownTable({ actives }) {
                 {a.name}
                 {a.targets?.length > 0 && (
                   <div style={{ marginTop: "2px", display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                    {a.targets.map((t, ti) => (
-                      <span key={ti} style={{ fontSize: "0.68rem", background: "var(--cream)", border: "1px solid var(--border)", padding: "1px 5px", borderRadius: "8px", color: "var(--text-sub)" }}>{t}</span>
+                    {a.targets.filter(t => t && t.trim()).map((t, ti) => (
+                      <span key={ti} style={{ fontSize: "10px", background: "var(--rose)", border: "1px solid var(--dusty-rose-light)", padding: "2px 6px", borderRadius: "4px", color: "var(--dusty-rose-dark)", fontWeight: 500 }}>{t}</span>
                     ))}
                   </div>
                 )}
               </td>
               <td style={{ padding: "5px 10px", textAlign: "center" }}>
                 <span style={{
-                  padding: "2px 7px", borderRadius: "10px", fontSize: "0.75rem",
-                  background: a.evidence?.toLowerCase().startsWith("strong") ? "#D4EDDA" : a.evidence?.toLowerCase().startsWith("moderate") ? "#FFF3CD" : "#F8D7DA",
-                  color: a.evidence?.toLowerCase().startsWith("strong") ? "#155724" : a.evidence?.toLowerCase().startsWith("moderate") ? "#856404" : "#721C24"
-                }}>{a.evidence}</span>
+                  fontSize: "0.75rem", fontWeight: 600,
+                  color: a.evidence?.toLowerCase().startsWith("strong") ? "#267C36" : a.evidence?.toLowerCase().startsWith("moderate") ? "#C9A96E" : "#BF8888"
+                }} title={a.evidence}>{
+                  a.evidence?.toLowerCase().startsWith("strong") ? "Strong" :
+                  a.evidence?.toLowerCase().startsWith("moderate") ? "Moderate" :
+                  a.evidence?.toLowerCase().startsWith("limited") ? "Limited" :
+                  a.evidence?.toLowerCase().startsWith("early") ? "Emerging" : "Minimal"
+                }</span>
               </td>
               <td style={{ padding: "5px 10px", color: "var(--text-sub)", fontSize: "0.78rem", maxWidth: "200px" }}>
                 {a.primary_benefits || a.functional_category || "—"}
               </td>
               <td style={{ padding: "5px 10px", textAlign: "center", color: "var(--text-sub)", fontSize: "0.78rem" }}>{a.concentration}</td>
-              <td style={{ padding: "5px 10px", textAlign: "center", fontSize: "0.78rem" }} title="Contribution to active ingredient score">
-                {a.score_contribution != null ? (
-                  <span style={{
-                    padding: "2px 8px", borderRadius: "10px", fontWeight: 600,
-                    background: a.score_contribution >= 0.5 ? "#D4EDDA" : a.score_contribution >= 0.2 ? "#FFF3CD" : "#f5f5f5",
-                    color: a.score_contribution >= 0.5 ? "#155724" : a.score_contribution >= 0.2 ? "#856404" : "#666"
-                  }}>{a.score_contribution}</span>
-                ) : "—"}
-              </td>
+
             </tr>
           ))}
         </tbody>
       </table>
+      <p style={{ fontSize: "0.72rem", color: "var(--text-sub)", marginTop: "8px", fontStyle: "italic" }}>
+        ℹ️ Concentration estimates are based on INCI position and may not reflect actual formulation.
+      </p>
     </div>
   );
 }
@@ -292,8 +291,13 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           <ScoreCircle score={result.main_worth_score} />
           <div className="score-meta">
             <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
-            <div style={{ display: "inline-block", background: valueChip.color + "20", color: valueChip.color, border: `1px solid ${valueChip.color}40`, borderRadius: "8px", padding: "2px 10px", fontSize: "0.8rem", fontWeight: 600, marginBottom: "4px" }}>{valueChip.label}</div>
-            {valueChip.subtitle && <p style={{ fontSize: "0.78rem", color: "var(--text-sub)", margin: "2px 0 4px" }}>{valueChip.subtitle}</p>}
+            {result.price_analysis?.value_tier && result.price_analysis.value_tier !== 'fair' && (
+              <div style={{ display: "inline-block", background: valueChip.color + "18", color: valueChip.color, border: `1px solid ${valueChip.color}35`, borderRadius: "8px", padding: "2px 10px", fontSize: "0.75rem", fontWeight: 600, marginBottom: "4px" }}>
+                {result.price_analysis.value_tier === 'overpriced' ? 'Note: Overpriced vs category avg' :
+                 result.price_analysis.value_tier === 'slightly_overpriced' ? 'Note: Slightly overpriced' :
+                 result.price_analysis.value_tier === 'underpriced' ? 'Good value for money' : null}
+              </div>
+            )}
             <p className="score-title-text">{result.score_title}</p>
             {result.worth_multipliers_applied?.length > 0 && (
               <p className="multipliers">Bonus: {result.worth_multipliers_applied.join(", ")}</p>
@@ -346,38 +350,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         )}
 
         {/* Active Classes Buckets */}
-        {result.active_classes && Object.values(result.active_classes).some(b => b?.length > 0) && (
-          <div style={{ marginTop: "1.2rem" }}>
-            <h4 style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-sub)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              <i className="fa-solid fa-layer-group" style={{ marginRight: "5px" }}></i>Active Ingredient Classes
-            </h4>
-            {[
-              { key: "primary",       label: "Primary Actives",  icon: "fa-solid fa-star",         color: "var(--sage)" },
-              { key: "supporting",    label: "Supporting",       icon: "fa-solid fa-circle-half-stroke", color: "var(--charcoal)" },
-              { key: "antioxidants",  label: "Antioxidants",     icon: "fa-solid fa-shield-halved", color: "var(--dusty-rose-dark)" },
-              { key: "barrier_support", label: "Barrier Support", icon: "fa-solid fa-droplet",      color: "var(--rose)" },
-            ].map(({ key, label, icon, color }) => {
-              const items = result.active_classes[key];
-              if (!items?.length) return null;
-              return (
-                <div key={key} style={{ marginBottom: "0.45rem", display: "flex", alignItems: "flex-start", gap: "6px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color, whiteSpace: "nowrap", minWidth: "110px" }}>
-                    <i className={icon} style={{ marginRight: "4px" }}></i>{label}
-                  </span>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                    {items.map((name, i) => (
-                      <span key={i} style={{
-                        fontSize: "0.72rem", padding: "2px 8px", borderRadius: "20px",
-                        background: "var(--cream)", border: "1px solid var(--border)",
-                        color: "var(--charcoal)"
-                      }}>{name}</span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+
       </div>
 
       {/* CARD 2: CONCERN FIT */}

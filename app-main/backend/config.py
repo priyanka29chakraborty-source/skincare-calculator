@@ -137,7 +137,7 @@ CATEGORY_AVERAGES_DEFAULT = CATEGORY_AVERAGES['India']
 
 WORTH_MULTIPLIERS = {
     'Concentration Transparency': 1.5,
-    'Stability Engineering': 2.0,
+    'Stability Engineering': 1.25,  # was 2.0 — doubling was extreme, 1.25 is a meaningful bonus
     'Barrier Neutrality': 1.3,
 }
 

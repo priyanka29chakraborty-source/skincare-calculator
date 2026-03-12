@@ -85,8 +85,7 @@ export function ConcernCard({ concern, data }) {
           <span style={{ fontSize: '0.75rem', color: barColor, fontWeight: 600, marginLeft: '4px' }}>{fit.label}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span title={`${data.score}/100 — most products fall between 20–60`} style={{ fontSize: '0.75rem', color: 'var(--text-sub)', cursor: 'help' }}>{data.score}/100</span>
-          <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`}></i>
+          <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`} title={`${data.score}/100 — most products fall between 20–60`}></i>
         </div>
       </div>
       <ProgressBar pct={data.score} label={concern} />

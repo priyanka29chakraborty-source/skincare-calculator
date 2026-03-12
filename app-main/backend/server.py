@@ -708,7 +708,9 @@ def _is_same_product(result_title, brand, product_name, size_ml):
 @api_router.post("/best-price")
 @limiter.limit("10/minute")
 async def best_price(req: BestPriceRequest, request: Request):
-    """Find cheapest price: DDG search → ScrapeDo/Firecrawl fetch → fallback SerpAPI."""
+    """Find cheapest price: DDG search → ScrapeDo/Firecrawl fetch → fallback SerpAPI.
+    Returns up to 3 validated results (same brand, same size, country-specific).
+    """
     sites = SITE_MAP.get(req.country, SITE_MAP.get('India', []))
     site_filter = ' OR '.join(f'site:{s}' for s in sites[:4])
 
@@ -717,43 +719,45 @@ async def best_price(req: BestPriceRequest, request: Request):
         query = f"{req.brand} {query}"
     size_query = f"{int(req.size_ml)}ml" if req.size_ml else ""
 
-    # Step 1: DDG search for exact product on country-specific sites
-    ddg_query = f"{query} {size_query} buy {site_filter}"
-    ddg_results = _ddg_search(ddg_query, max_results=8)
-    ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href')]
-
     validated = []
 
-    # Step 2: Fetch prices from DDG URLs via Firecrawl/ScrapeDo
+    # Step 1: DDG search for exact product on country-specific sites
+    ddg_query = f"{query} {size_query} buy {site_filter}"
+    ddg_results = _ddg_search(ddg_query, max_results=10)
+    ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href')]
+
     if ddg_urls:
-        fetched = await fetch_multiple_products(ddg_urls[:5], timeout=20)
+        fetched = await fetch_multiple_products(ddg_urls[:6], timeout=20)
         seen_sources = set()
         for i, pd_item in enumerate(fetched):
-            if pd_item and pd_item.get('price'):
-                source_domain = ddg_urls[i].split('/')[2] if '/' in ddg_urls[i] else ''
-                if source_domain in seen_sources:
-                    continue
-                name = pd_item.get('product_name') or ddg_results[i].get('title', '') if i < len(ddg_results) else ''
-                # Apply same product check (brand + size match)
-                if not _is_same_product(name or '', req.brand, req.product_name, req.size_ml):
-                    continue
-                seen_sources.add(source_domain)
-                validated.append({
-                    'name': name,
-                    'price': pd_item['price'],
-                    'link': ddg_urls[i],
-                    'source': source_domain,
-                    'thumbnail': '',
-                })
+            if not pd_item or not pd_item.get('price'):
+                continue
+            if i >= len(ddg_urls):
+                continue
+            source_domain = ddg_urls[i].split('/')[2] if '/' in ddg_urls[i] else ''
+            if source_domain in seen_sources:
+                continue
+            name = pd_item.get('product_name') or (ddg_results[i].get('title', '') if i < len(ddg_results) else '')
+            if not _is_same_product(name or '', req.brand, req.product_name, req.size_ml):
+                continue
+            seen_sources.add(source_domain)
+            validated.append({
+                'name': name,
+                'price': pd_item['price'],
+                'link': ddg_urls[i],
+                'source': source_domain,
+            })
 
-    # Step 3: Fallback to SerpAPI if DDG didn't yield results
-    if not validated:
+    # Step 2: Fallback to SerpAPI if DDG didn't yield 3 results
+    if len(validated) < 3:
         serp_key = os.environ.get('SERPER_API_KEY', '')
         if serp_key:
             serp_query = f"{query} {size_query}"
-            serp_results = _serp_shopping_search(serp_query, req.country, serp_key, num=10)
-            seen_sources = set()
+            serp_results = _serp_shopping_search(serp_query, req.country, serp_key, num=12)
+            seen_sources = {v['source'].lower() for v in validated}
             for item in serp_results:
+                if len(validated) >= 3:
+                    break
                 extracted_price = item.get('price')
                 if not extracted_price or not isinstance(extracted_price, (int, float)):
                     continue
@@ -769,38 +773,57 @@ async def best_price(req: BestPriceRequest, request: Request):
                     'price': extracted_price,
                     'link': item.get('link', ''),
                     'source': source,
-                    'thumbnail': item.get('thumbnail', ''),
                 })
 
-    validated.sort(key=lambda x: x['price'])
-
-    # Filter out eBay for India results
+    # Filter eBay for India
     if req.country and req.country.lower() == 'india':
         validated = [v for v in validated if 'ebay' not in v.get('source', '').lower()]
 
+    # Sort by price ascending
+    validated.sort(key=lambda x: float(x['price']) if x['price'] else 9999999)
+
+    # Keep max 3
+    validated = validated[:3]
+
+    user_price = float(req.user_price or 0)
+
     if not validated:
-        return {"best_price": None, "all_prices": [], "is_user_cheapest": False, "savings": 0}
+        # Rule 10: no results found anywhere — still show card with user URL if available
+        return {
+            "is_user_cheapest": False,
+            "not_found": True,
+            "user_url": req.user_url,
+            "user_price": user_price,
+            "all_prices": [],
+            "savings": 0,
+        }
 
-    user_price = req.user_price or 0
-    # Keep only ONE best (cheapest) result — strict single-result mode
     cheapest = validated[0]
+    cheapest_price = float(cheapest['price'])
 
-    if user_price > 0 and user_price <= cheapest['price']:
+    # Annotate savings per item vs user price
+    for item in validated:
+        item_price = float(item['price'])
+        item['savings'] = round(user_price - item_price, 2) if user_price > 0 else 0
+
+    if user_price > 0 and user_price <= cheapest_price:
+        # User's product is the cheapest
         return {
             "is_user_cheapest": True,
             "user_url": req.user_url,
             "user_price": user_price,
-            "best_price": None,
-            "all_prices": [],
+            "all_prices": validated,   # still show other options as reference
             "savings": 0,
         }
     else:
-        savings = round(user_price - cheapest['price'], 2) if user_price > 0 else 0
         return {
             "is_user_cheapest": False,
+            "not_found": False,
             "best_price": cheapest,
-            "all_prices": [],
-            "savings": savings,
+            "user_url": req.user_url,
+            "user_price": user_price,
+            "all_prices": validated,
+            "savings": round(user_price - cheapest_price, 2) if user_price > 0 else 0,
         }
 
 

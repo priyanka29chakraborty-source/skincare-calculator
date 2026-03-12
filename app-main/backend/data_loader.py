@@ -98,14 +98,14 @@ CONCERN_INCI_PREFIXES = {
 
 
 def _parse_skin_concerns(raw):
-    """Parse the Skin_Concerns column which has inconsistent formatting."""
+    """Parse Skin_Concerns column: split by ";", strip whitespace, lowercase.
+    Also accepts a row dict with pre-parsed '_skin_concerns_parsed' key for efficiency.
+    """
+    if isinstance(raw, dict):
+        return raw.get('_skin_concerns_parsed', [])
     if pd.isna(raw) or not raw:
         return []
-    raw = str(raw).strip()
-    if raw.startswith('['):
-        items = re.findall(r"'([^']*)'", raw)
-        return [i.strip().lower() for i in items if i.strip()]
-    return [t.strip().lower() for t in raw.split(';') if t.strip()]
+    return [t.strip().lower() for t in str(raw).split(';') if t.strip()]
 
 
 class DataLoader:
@@ -125,87 +125,40 @@ class DataLoader:
         self.load_data()
 
     def load_data(self):
+        # ── Single source of truth: ingredient_database_fixed1.csv ──────────────
+        # Replaces ingredient_master.csv + ingredient_science.csv.
+        # Loaded once at server start. No duplicate datasets kept in memory.
         try:
-            master_path = os.path.join(self.database_path, 'ingredient_master.csv')
-            self.ingredient_master = pd.read_csv(master_path, encoding='utf-8')
-            self.ingredient_master.columns = self.ingredient_master.columns.str.strip()
+            db_path = os.path.join(self.database_path, 'ingredient_database_fixed1.csv')
+            db = pd.read_csv(db_path, encoding='utf-8')
+            db.columns = db.columns.str.strip()
+            # Keep a reference so is_loaded() / any legacy .ingredient_master checks still work
+            self.ingredient_master = db
 
-            for _, row in self.ingredient_master.iterrows():
+            for _, row in db.iterrows():
                 inci = str(row.get('INCI_Name', '')).strip()
-                if inci and inci != 'nan':
-                    self.ingredient_lookup[inci.lower()] = row.to_dict()
-                    self.all_inci_names.append(inci)
-                    aliases = str(row.get('Aliases', ''))
-                    if aliases and aliases != 'nan':
-                        for alias in aliases.split(';'):
-                            alias = alias.strip()
-                            if alias:
-                                self.ingredient_lookup[alias.lower()] = row.to_dict()
+                if not inci or inci == 'nan':
+                    continue
+                row_dict = row.to_dict()
+                # Cleanup rule: pre-parse Skin_Concerns → split by ";", strip, lowercase
+                raw_sc = row_dict.get('Skin_Concerns', '')
+                if pd.isna(raw_sc) or not raw_sc:
+                    row_dict['_skin_concerns_parsed'] = []
+                else:
+                    row_dict['_skin_concerns_parsed'] = [
+                        t.strip().lower() for t in str(raw_sc).split(';') if t.strip()
+                    ]
+                self.ingredient_lookup[inci.lower()] = row_dict
+                self.all_inci_names.append(inci)
+                # Register aliases (semicolon-separated in Aliases column)
+                aliases = str(row_dict.get('Aliases', ''))
+                if aliases and aliases != 'nan':
+                    for alias in aliases.split(';'):
+                        alias = alias.strip()
+                        if alias and alias.lower() not in self.ingredient_lookup:
+                            self.ingredient_lookup[alias.lower()] = row_dict
 
-            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from master database")
-
-            # Supplement master with ingredient_science.csv (extra aliases, red flags, contraindications)
-            try:
-                sci_path = os.path.join(self.database_path, 'ingredient_science.csv')
-                if os.path.exists(sci_path):
-                    sci_df = pd.read_csv(sci_path, encoding='utf-8')
-                    sci_df.columns = sci_df.columns.str.strip()
-                    added_sci = 0
-                    for _, row in sci_df.iterrows():
-                        inci = str(row.get('INCI_Name', '')).strip()
-                        if not inci or inci == 'nan':
-                            continue
-                        key = inci.lower()
-                        if key not in self.ingredient_lookup:
-                            # New ingredient not in master — add it
-                            self.ingredient_lookup[key] = row.to_dict()
-                            self.all_inci_names.append(inci)
-                            added_sci += 1
-                        else:
-                            # Merge missing fields into existing entry
-                            existing = self.ingredient_lookup[key]
-                            for col in ['Contraindications', 'Red_Flag_Tags', 'Stability_Notes']:
-                                val = row.get(col)
-                                if val and str(val).strip() not in ('', 'nan') and (
-                                    not existing.get(col) or str(existing.get(col, '')).strip() in ('', 'nan')
-                                ):
-                                    existing[col] = val
-                        # Also register extra aliases from science table
-                        aliases = str(row.get('Aliases', ''))
-                        if aliases and aliases != 'nan':
-                            for alias in aliases.split(';'):
-                                alias = alias.strip()
-                                if alias and alias.lower() not in self.ingredient_lookup:
-                                    self.ingredient_lookup[alias.lower()] = self.ingredient_lookup[key]
-                    logger.info(f"Science supplement: added {added_sci} new ingredients, merged aliases")
-            except Exception as e:
-                logger.warning(f"Could not load ingredient_science.csv: {e}")
-
-            # Supplement master with ingredient_scoring.csv (scoring weights/evidence for any gaps)
-            try:
-                score_path = os.path.join(self.database_path, 'ingredient_scoring.csv')
-                if os.path.exists(score_path):
-                    score_df = pd.read_csv(score_path, encoding='utf-8')
-                    score_df.columns = score_df.columns.str.strip()
-                    for _, row in score_df.iterrows():
-                        inci = str(row.get('INCI_Name', '')).strip()
-                        if not inci or inci == 'nan':
-                            continue
-                        key = inci.lower()
-                        if key in self.ingredient_lookup:
-                            existing = self.ingredient_lookup[key]
-                            for col in ['Effect_Strength_Weight', 'Evidence_Factor', 'Evidence_Quality',
-                                        'Evidence_Level_Normalized', 'Final_Effect_Score']:
-                                val = row.get(col)
-                                if val is not None and str(val).strip() not in ('', 'nan'):
-                                    try:
-                                        float(val) if col != 'Evidence_Quality' and col != 'Evidence_Level_Normalized' else str(val)
-                                        if not existing.get(col) or str(existing.get(col, '')).strip() in ('', 'nan', '0', '0.0'):
-                                            existing[col] = val
-                                    except (ValueError, TypeError):
-                                        pass
-            except Exception as e:
-                logger.warning(f"Could not load ingredient_scoring.csv: {e}")
+            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed1.csv")
 
             # Load aliases.json and add each alias → target INCI mapping
             try:
@@ -226,7 +179,7 @@ class DataLoader:
                 logger.warning(f"Could not load aliases.json: {e}")
 
         except Exception as e:
-            logger.error(f"Error loading ingredient master: {e}")
+            logger.error(f"Error loading ingredient database: {e}")
 
         try:
             upgrade_path = os.path.join(self.database_path, 'active_upgrade_map.csv')

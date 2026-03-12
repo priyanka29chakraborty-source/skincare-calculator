@@ -65,12 +65,14 @@ function App() {
   }, [category, country, currency, skinType, concerns, price, size]);
 
   const fetchBestPrice = useCallback(async () => {
-    const pName = (productName || brand || "").trim();
-    // Only search if we have a real product name or brand (not ingredient fallback)
+    const isUrl = fetchInput.trim().startsWith('http');
+    const isBarcode = /^\d{8,14}$/.test(fetchInput.trim());
+    // Build best search name: prefer productName/brand, else use fetchInput if plain text
+    const pName = (productName || brand || (!isUrl && !isBarcode ? fetchInput : '') || '').trim();
     if (!pName) { setBestPriceLoading(false); return; }
     setBestPriceLoading(true);
     try {
-      const userUrl = fetchInput.trim().startsWith('http') ? fetchInput.trim() : null;
+      const userUrl = isUrl ? fetchInput.trim() : null;
       const { data } = await axios.post(`${API}/best-price`, {
         product_name: pName,
         brand: brand || null,

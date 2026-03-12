@@ -478,9 +478,9 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             raw_strength = weight * conc_factor * eq_factor
 
             conc_label = (
-                "likely at optimal functional level based on INCI position (estimate only)" if conc_factor >= 1.0 else
-                "likely within functional range based on INCI position (estimate only)" if conc_factor >= 0.7 else
-                "may be below typical functional range; estimated from INCI position"
+                "Optimal level" if conc_factor >= 1.0 else
+                "Functional range" if conc_factor >= 0.7 else
+                "Below optimal range"
             )
             ev_label = get_evidence_label(eq_factor)
 
@@ -496,9 +496,9 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 'evidence': ev_label,
                 'concentration': conc_label,
                 'score_contribution': round(eq_factor * conc_factor * weight, 2),
-                'primary_benefits': str(data.get('Primary_Benefits', '') or '').strip() or None,
-                'targets': [t.strip() for t in str(data.get('Skin_Concerns', '') or '').split(';') if t.strip()][:3],
-                'functional_category': str(data.get('Functional_Category', '') or '').strip() or None,
+                'primary_benefits': (lambda v: None if (not v or str(v).lower() in ('nan','none','')) else str(v).strip())(data.get('Primary_Benefits', '')),
+                'targets': [t.strip() for t in str(data.get('Skin_Concerns', '') or '').split(';') if t.strip() and t.strip() not in ('', ' ')][:3],
+                'functional_category': (lambda v: None if (not v or str(v).lower() in ('nan','none','')) else str(v).strip())(data.get('Functional_Category', '')),
             })
 
     active_contributions.sort(key=lambda x: x['strength'], reverse=True)
@@ -516,7 +516,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     clinical_count = sum(1 for a in active_contributions if a['eq_factor'] >= 0.7)
     component_details['A'].append(f"{len(actives_found)} active ingredient{'s' if len(actives_found) != 1 else ''} with clinical backing" if clinical_count > 0 else "No clinically-backed actives found")
     for ac in active_contributions[:3]:
-        component_details['A'].append(f"{ac['name']} {ac['conc_label']} ({ac['ev_label']} evidence)")
+        component_details['A'].append(f"{ac['name']} ({ac['ev_label']})")
 
     # --- Component B: Functional Formula Quality (Max 20) ---
     formula_score = 10.0
@@ -575,9 +575,19 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     if has_humectant and has_emollient and has_occlusive:
         formula_score += 2
 
+    # Broader preservative check - common systems that may not match exact keywords
+    _BROAD_PRESERVATIVES = [
+        'phenoxyethanol', 'ethylhexylglycerin', 'sodium benzoate', 'potassium sorbate',
+        'caprylyl glycol', 'benzyl alcohol', 'dehydroacetic acid', 'chlorphenesin',
+        'sodium hydroxymethylglycinate', 'methylisothiazolinone', 'chloromethylisothiazolinone',
+        'iodopropynyl', 'dmdm hydantoin', 'imidazolidinyl urea', 'diazolidinyl urea',
+        'ferment', 'lactobacillus', 'leuconostoc'  # ferment-based preservation
+    ]
+    if not has_preservative:
+        has_preservative = any(p in ' '.join(ingredient_list).lower() for p in _BROAD_PRESERVATIVES)
     if not has_preservative and len(ingredient_list) > 5:
-        formula_score -= 8
-        component_details['B'].append("No preservative system detected (-8)")
+        formula_score -= 4  # reduced penalty from -8 to -4
+        component_details['B'].append("No standard preservative detected (-4)")
 
     if has_delivery_system:
         formula_score += 3
@@ -625,8 +635,6 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             component_details['B'].append("Standard formulation with adequate support")
         else:
             component_details['B'].append("Basic formulation, limited functional support")
-    if has_humectant and has_emollient:
-        component_details['B'].append("Good humectant-emollient balance")
     if has_preservative:
         component_details['B'].append("Preservative system present")
 
@@ -794,25 +802,51 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     total_score = min(100, max(0, total_score))
     active_ratio = len(actives_found) / len(ingredient_list) if ingredient_list else 0
 
-    # --- Active Classes: four buckets ---
+    # --- Active Classes: four buckets (scale-aware tiered classification) ---
+    # DB has two ESW scales:
+    #   UV filters:      ESW 5.0  → always Primary
+    #   Regular actives: ESW 0-1  → Primary ≥0.80, Supporting ≥0.50, else Antioxidant/Barrier
     ANTIOXIDANT_NAMES = {
         'tocopherol', 'ascorbic acid', 'ferulic acid', 'resveratrol', 'astaxanthin',
         'coenzyme q10', 'ergothioneine', 'green tea', 'egcg', 'idebenone', 'quercetin',
     }
     BARRIER_FUNC_CATS = {'barrier', 'emollient', 'occlusive', 'humectant'}
+    UV_FUNC_CATS = {'uv filter', 'mineral uv filter', 'organic uv filter', 'sunscreen'}
+
     primary_actives = []
     supporting_actives = []
     antioxidant_actives = []
     barrier_actives = []
     classified_names = set()
 
+    def _classify_active(weight, func_cat_lower, ing_class_lower):
+        """Scale-aware classification. UV filters use 5.0 scale; regular actives use 0–1 scale."""
+        if any(uv in func_cat_lower for uv in UV_FUNC_CATS) or 'uv filter' in ing_class_lower:
+            return 'primary'   # UV filters always primary — their ESW=5.0 is a different scale
+        if weight >= 0.80:
+            return 'primary'
+        elif weight >= 0.50:
+            return 'supporting'
+        elif weight >= 0.30:
+            return 'antioxidant'
+        else:
+            return 'barrier_support'
+
     for ac in active_contributions:
         name = ac['name']
         classified_names.add(name.lower())
-        if ac['weight'] >= 2:
+        data = data_loader.get_ingredient_data(name)
+        func_cat_lower = str(data.get('Functional_Category', '') if data else '').lower()
+        ing_class_lower = str(data.get('Ingredient_Class', '') if data else '').lower()
+        bucket = _classify_active(ac['weight'], func_cat_lower, ing_class_lower)
+        if bucket == 'primary':
             primary_actives.append(name)
-        else:
+        elif bucket == 'supporting':
             supporting_actives.append(name)
+        elif bucket == 'antioxidant':
+            antioxidant_actives.append(name)
+        else:
+            barrier_actives.append(name)
 
     for ing_name in ingredient_list:
         ing_lower = ing_name.lower()
@@ -1837,12 +1871,8 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                 score -= 15
                 penalty.append(f"{ing} (Drying)")
 
-            has_oil_ctrl = any(x in ing_str for x in ['niacinamide', 'zinc pca', 'salicylic'])
-            has_hydrating = any(x in ing_str for x in ['glycerin', 'sodium hyaluronate', 'hyaluronic'])
-            if has_oil_ctrl and has_hydrating:
-                score = min(100, int(score * 1.1))
-                bonus.append("Balanced formula (oil control + hydration)")
-                why_bullets.append("Good balance of oil control and hydration")
+            # NOTE: has_oil_ctrl / has_hydrating intentionally checked per-ingredient
+            # but appended only via post-loop flag (see after loop) to avoid compounding
 
             look_for_suggestions = ["Look for lightweight formulas with Niacinamide + Hyaluronic Acid for balanced care."]
 
@@ -1856,7 +1886,16 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
 
             look_for_suggestions = ["Normal skin tolerates most formulations well."]
 
-    score = max(0, min(100, score))
+    # Post-loop: combination skin balanced formula bonus — applied ONCE
+    if skin_type == 'combination':
+        _has_oil_ctrl = any(x in ing_str for x in ['niacinamide', 'zinc pca', 'salicylic'])
+        _has_hydrating = any(x in ing_str for x in ['glycerin', 'sodium hyaluronate', 'hyaluronic'])
+        if _has_oil_ctrl and _has_hydrating:
+            score = min(100, int(score * 1.1))
+            bonus.append("Balanced formula (oil control + hydration)")
+            why_bullets.append("Good balance of oil control and hydration")
+
+    score = max(0, min(97, score))  # Cap at 97 — 100% is never scientifically credible
 
     # Compute net penalty for risk_level
     net_penalty = base_score - score
@@ -1901,7 +1940,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
         'better_suited': better_suited,
         'comedogenic_warnings': list({w['name']: w for w in comedogenic_warnings}.values()),
         'allergen_warnings': list({w['name']: w for w in allergen_warnings}.values()),
-        'why_bullets': why_bullets[:4],
+        'why_bullets': list(dict.fromkeys(why_bullets))[:3],
         'helpful_ingredients': helpful_ingredients[:4],
         'look_for': look_for_suggestions,
         'formulation_notes': formulation_notes,

@@ -61,7 +61,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
             <p className="upgrade-why-title">Why It Helps:</p>
             <ul className="upgrade-reasons">
               <li>{sug.reason}</li>
-              {sug.active && <li>Key active: {sug.active}</li>}
+              {sug.active && <li>Key active ingredient: <strong>{sug.active}</strong></li>}
             </ul>
             <p style={{ fontSize: "0.74rem", color: "var(--text-sub)", marginTop: "6px", fontStyle: "italic" }}>
               <i className="fa-solid fa-circle-info" style={{ marginRight: "4px" }}></i>
