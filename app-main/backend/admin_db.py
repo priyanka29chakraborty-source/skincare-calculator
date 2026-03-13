@@ -437,8 +437,11 @@ if _USE_PG:
         get_recent_fetches = get_fetch_logs
         get_credit_summary = get_credits_summary
 
-    except ImportError:
-        logger.warning("psycopg2 not installed, falling back to SQLite")
+    except ImportError as e:
+        logger.warning(f"psycopg2 import failed ({e}), falling back to SQLite")
+        _USE_PG = False
+    except Exception as e:
+        logger.warning(f"PostgreSQL setup failed ({e}), falling back to SQLite")
         _USE_PG = False
 
 # ─── SQLite fallback ──────────────────────────────────────────────────
