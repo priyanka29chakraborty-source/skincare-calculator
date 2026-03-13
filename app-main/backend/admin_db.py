@@ -12,7 +12,27 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-AIVEN_PG_URL = os.environ.get('AIVEN_PG_URL', '')
+_RAW_PG_URL = os.environ.get('AIVEN_PG_URL', '')
+
+def _build_pg_url(url: str) -> str:
+    """Ensure sslmode=require is always present.
+    Render sometimes strips the '=require' part from env vars containing '='.
+    """
+    if not url:
+        return url
+    # Already has sslmode=require — nothing to do
+    if 'sslmode=require' in url:
+        return url
+    # Has sslmode but truncated (e.g. '?sslmode' or '&sslmode')
+    if 'sslmode' in url:
+        import re
+        url = re.sub(r'[?&]sslmode[^&]*', '', url)
+    # Append correctly
+    if '?' in url:
+        return url + '&sslmode=require'
+    return url + '?sslmode=require'
+
+AIVEN_PG_URL = _build_pg_url(_RAW_PG_URL)
 _USE_PG = bool(AIVEN_PG_URL)
 
 # ─── PostgreSQL backend ───────────────────────────────────────────────
@@ -47,7 +67,6 @@ if _USE_PG:
                     conn.rollback()
                 except Exception:
                     pass
-                # Reset connection on failure so next call reconnects
                 global _pg_conn
                 _pg_conn = None
                 logger.error(f"PG query error: {e}")
@@ -249,7 +268,6 @@ if _USE_PG:
                 return []
 
         def get_layer_stats(days=7):
-            """Return per-scraper-layer success rates for the Scraper Monitoring panel."""
             try:
                 rows = _pg_exec("""
                     SELECT layer_attempted,
@@ -328,7 +346,6 @@ if _USE_PG:
                         'hourly': [], 'countries': []}
 
         def get_ingredient_trends(days=7, limit=10):
-            """Return most-analyzed ingredient actives over the last N days."""
             try:
                 rows = _pg_exec("""
                     SELECT jsonb_array_elements(identified_actives)->>'name' as ing_name,
@@ -378,7 +395,6 @@ if _USE_PG:
                 return "timestamp,category,country,skin_type,concerns,score,fetch_type,product_name,brand,price\n"
 
         def get_recent_analyses(limit=50):
-            """Return recent analysis_logs rows for the Recent Analyses table."""
             try:
                 rows = _pg_exec(
                     """SELECT id, timestamp, product_name, brand, price, product_category,
@@ -394,7 +410,6 @@ if _USE_PG:
                 return []
 
         def get_flagged_analyses(limit=100, include_resolved=False):
-            """Return flagged analyses for admin review."""
             try:
                 where = "" if include_resolved else "WHERE is_flagged = TRUE AND flag_reason IS NOT NULL AND (resolved IS NULL OR resolved = FALSE)"
                 rows = _pg_exec(f"""
@@ -412,7 +427,6 @@ if _USE_PG:
                 return []
 
         def get_flagged_count():
-            """Count of unresolved flagged analyses."""
             try:
                 rows = _pg_exec(
                     "SELECT COUNT(*) FROM analysis_logs WHERE is_flagged = TRUE AND flag_reason IS NOT NULL",
@@ -422,7 +436,6 @@ if _USE_PG:
                 return 0
 
         def resolve_flag(analysis_id):
-            """Mark a flagged analysis as reviewed/resolved."""
             try:
                 _pg_exec(
                     "UPDATE analysis_logs SET is_flagged = FALSE WHERE id = %s",
@@ -610,7 +623,6 @@ if not _USE_PG:
                     'success_rate': 0, 'failed_domain': '-'}
 
     def get_credits_summary():
-        """Return {api_name: {used, calls}} for current month."""
         month = _current_month()
         try:
             conn = _get_conn()
@@ -669,7 +681,6 @@ if not _USE_PG:
             return []
 
     def get_layer_stats(days=7):
-        """Return per-scraper-layer success rates."""
         try:
             conn = _get_conn()
             rows = conn.execute("""
@@ -754,7 +765,6 @@ if not _USE_PG:
                     'hourly': [], 'countries': []}
 
     def get_ingredient_trends(days=7, limit=10):
-        """Return most-analyzed ingredient actives over the last N days."""
         try:
             conn = _get_conn()
             rows = conn.execute("""
@@ -816,7 +826,6 @@ if not _USE_PG:
             return "timestamp,category,country,skin_type,concerns,score,fetch_type,product_name,brand,price\n"
 
     def get_recent_analyses(limit=50):
-        """Return recent analysis_logs rows for the Recent Analyses table."""
         try:
             conn = _get_conn()
             rows = conn.execute(
@@ -830,7 +839,6 @@ if not _USE_PG:
             return []
 
     def get_flagged_analyses(limit=100, include_resolved=False):
-        """Return flagged analyses for admin review."""
         try:
             conn = _get_conn()
             where = "" if include_resolved else "WHERE is_flagged=1 AND flag_reason IS NOT NULL"
@@ -846,7 +854,6 @@ if not _USE_PG:
             return []
 
     def get_flagged_count():
-        """Count of unresolved flagged analyses."""
         try:
             conn = _get_conn()
             r = conn.execute(
@@ -857,7 +864,6 @@ if not _USE_PG:
             return 0
 
     def resolve_flag(analysis_id):
-        """Mark a flagged analysis as reviewed/resolved."""
         try:
             conn = _get_conn()
             conn.execute("UPDATE analysis_logs SET is_flagged=0 WHERE id=?", (analysis_id,))
