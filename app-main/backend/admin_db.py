@@ -29,7 +29,7 @@ if _USE_PG:
             global _pg_conn
             with _pg_lock:
                 if _pg_conn is None or _pg_conn.closed:
-                    _pg_conn = psycopg.connect(AIVEN_PG_URL)
+                    _pg_conn = psycopg.connect(conninfo=AIVEN_PG_URL)
                 return _pg_conn
 
         def _pg_exec(query, params=None, fetch=False):
