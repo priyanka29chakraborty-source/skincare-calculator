@@ -112,6 +112,7 @@ class AnalyzeRequest(BaseModel):
     product_name: Optional[str] = None
     brand: Optional[str] = None
     url_provided: Optional[bool] = False
+    fetch_type: Optional[str] = None  # "url" | "barcode" | "manual" — set by frontend
     active_concentrations: Optional[dict] = None  # scraped from product page
 
 
@@ -196,12 +197,46 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
         result = analyze_product(product_data)
         elapsed = round((_time.time() - t0) * 1000)
+
+        # Determine fetch_type: explicit value from request takes priority, then
+        # infer from url_provided. Default is 'manual'.
+        if req.fetch_type in ('url', 'barcode', 'manual'):
+            fetch_type = req.fetch_type
+        elif req.url_provided:
+            fetch_type = 'url'
+        else:
+            fetch_type = 'manual'
+
+        # Extract identified_actives names list for ingredient trend tracking
+        identified_actives = result.get('identified_actives', []) or []
+        ingredient_count = result.get('ingredient_count', 0) or 0
+        score = result.get('main_worth_score', 0) or 0
+
+        # ── Flagging logic ───────────────────────────────────────────────────
+        # Flag if result looks like garbage data (bad scrape or empty input)
+        is_flagged = False
+        flag_reason = None
+        if score < 15:
+            is_flagged = True
+            flag_reason = 'Extremely low score (<15) — manual data quality check needed'
+        elif score < 25 and ingredient_count >= 5:
+            is_flagged = True
+            flag_reason = f'Low score ({score:.0f}) despite {ingredient_count} ingredients — possible scraped garbage'
+        elif ingredient_count <= 2 and fetch_type == 'url':
+            is_flagged = True
+            flag_reason = f'URL fetch returned only {ingredient_count} ingredient(s) — scrape likely failed'
+
         log_analysis(category_display, req.country, skin_type_raw, concerns,
-                     result.get('main_worth_score', 0), bool(req.url_provided), None, elapsed,
+                     score, bool(req.url_provided), None, elapsed,
                      product_name=_sanitize(req.product_name or ''),
                      brand=_sanitize(req.brand or ''),
                      price=req.price,
-                     ingredients=ingredients[:500] if ingredients else None)
+                     ingredients=ingredients[:500] if ingredients else None,
+                     fetch_type=fetch_type,
+                     identified_actives=identified_actives,
+                     ingredient_count=ingredient_count,
+                     is_flagged=is_flagged,
+                     flag_reason=flag_reason)
 
         # Store in cache
         _cache_set(cache_key, result)

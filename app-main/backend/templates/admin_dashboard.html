@@ -18,15 +18,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .header-actions a:hover,.header-actions button:hover{background:var(--bg)}
 .logout-btn{color:var(--red)!important;border-color:var(--red)!important}
 .warning-banner{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 24px;margin:16px 24px 0;border-radius:10px;font-size:0.85rem;display:flex;align-items:center;gap:8px}
-.warning-banner i{color:var(--red);font-size:1rem}
+.warning-banner i{color:var(--red)}
 .tabs{display:flex;gap:4px;padding:16px 24px 0;overflow-x:auto}
-.tab{padding:10px 18px;border-radius:10px 10px 0 0;cursor:pointer;font-size:0.82rem;font-weight:600;background:transparent;color:var(--text-sub);border:1px solid transparent;border-bottom:none;transition:all .2s;white-space:nowrap}
+.tab{padding:10px 18px;border-radius:10px 10px 0 0;cursor:pointer;font-size:0.82rem;font-weight:600;background:transparent;color:var(--text-sub);border:1px solid transparent;border-bottom:none;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .tab.active{background:var(--card);color:var(--text);border-color:var(--border)}
 .tab:hover:not(.active){color:var(--text)}
+.tab-badge{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.65rem;font-weight:700;line-height:1.6;display:none}
+.tab-badge.visible{display:inline-block}
 .content{background:var(--card);margin:0 24px 24px;border-radius:0 12px 12px 12px;border:1px solid var(--border);padding:24px;min-height:400px}
-.section{display:none}
-.section.active{display:block}
-.section-title{font-family:'Playfair Display',serif;font-size:1.15rem;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section{display:none}.section.active{display:block}
+.section-title{font-family:'Playfair Display',serif;font-size:1.15rem;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .section-title i{color:var(--accent)}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
@@ -36,68 +37,62 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .stat-label{font-size:0.72rem;color:var(--text-sub);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
 .stat-value{font-size:1.5rem;font-weight:700;color:var(--text)}
 .stat-sub{font-size:0.7rem;color:var(--text-sub);margin-top:2px}
-/* Health dots */
 .health-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .health-item{display:flex;align-items:center;gap:10px;padding:14px;background:var(--bg);border-radius:10px;border:1px solid var(--border)}
 .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
-.dot.green{background:var(--green)}
-.dot.yellow{background:var(--yellow)}
-.dot.red{background:var(--red)}
-.health-info{flex:1;min-width:0}
-.health-name{font-weight:600;font-size:0.82rem}
-.health-meta{font-size:0.7rem;color:var(--text-sub)}
-/* Credit bars */
+.dot.green{background:var(--green)}.dot.yellow{background:var(--yellow)}.dot.red{background:var(--red)}
+.health-info{flex:1;min-width:0}.health-name{font-weight:600;font-size:0.82rem}.health-meta{font-size:0.7rem;color:var(--text-sub)}
 .credit-bar-wrap{margin-bottom:14px;padding:12px 16px;background:var(--bg);border-radius:10px;border:1px solid var(--border)}
 .credit-header{display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.82rem;font-weight:600}
 .credit-track{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
 .credit-fill{height:100%;border-radius:4px;transition:width .5s}
-.credit-fill.ok{background:var(--green)}
-.credit-fill.warn{background:var(--yellow)}
-.credit-fill.danger{background:var(--red)}
+.credit-fill.ok{background:var(--green)}.credit-fill.warn{background:var(--yellow)}.credit-fill.danger{background:var(--red)}
 .credit-meta{display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-sub);margin-top:4px}
-/* Tables */
 table{width:100%;border-collapse:collapse;font-size:0.78rem}
 th{text-align:left;padding:10px 12px;background:var(--bg);font-weight:600;color:var(--text-sub);text-transform:uppercase;font-size:0.68rem;letter-spacing:0.5px;border-bottom:1px solid var(--border)}
-td{padding:10px 12px;border-bottom:1px solid var(--border)}
-tr.row-green{background:#f0fdf4}
-tr.row-yellow{background:#fefce8}
-tr.row-red{background:#fef2f2}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{background:#fef2f2}
 .badge{padding:3px 8px;border-radius:6px;font-size:0.68rem;font-weight:600}
-.badge-green{background:#dcfce7;color:#166534}
-.badge-yellow{background:#fef9c3;color:#854d0e}
-.badge-red{background:#fee2e2;color:#991b1b}
-/* Filter bar */
+.badge-green{background:#dcfce7;color:#166534}.badge-yellow{background:#fef9c3;color:#854d0e}
+.badge-red{background:#fee2e2;color:#991b1b}.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-purple{background:#ede9fe;color:#5b21b6}.badge-gray{background:#f3f4f6;color:#374151}
 .filter-bar{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
 .filter-btn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:0.75rem;cursor:pointer;font-weight:500;transition:all .2s}
 .filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .filter-input{padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.78rem;background:var(--card);outline:none;width:200px}
 .filter-input:focus{border-color:var(--accent)}
-/* Charts */
 .chart-container{background:var(--bg);border-radius:10px;padding:16px;border:1px solid var(--border);margin-bottom:16px}
 .chart-title{font-weight:600;font-size:0.82rem;margin-bottom:10px;color:var(--text)}
 .chart-wrap{position:relative;max-height:250px}
-/* Buttons */
 .btn{padding:8px 16px;border-radius:8px;border:none;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all .2s}
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#A06060}
-.btn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
-.btn-secondary:hover{background:var(--border)}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#A06060}
+.btn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:var(--border)}
 .btn-danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.btn-success{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}.btn-success:hover{background:#bbf7d0}
 .btn-sm{padding:5px 10px;font-size:0.7rem}
-/* Site test */
 .test-result{font-size:0.72rem;padding:6px 10px;border-radius:6px;margin-top:6px;display:none}
 .test-result.show{display:block}
-/* Config */
 .config-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
 .config-item{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg);border-radius:8px;font-size:0.8rem;border:1px solid var(--border)}
-.config-item .check{color:var(--green);font-size:0.9rem}
-.config-item .cross{color:var(--red);font-size:0.9rem}
+.config-item .check{color:var(--green)}.config-item .cross{color:var(--red)}
 .spinner{animation:spin 1s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
-.mt-16{margin-top:16px}
-.mb-16{margin-bottom:16px}
-.gap-8{gap:8px}
-.flex{display:flex;align-items:center}
+.mt-16{margin-top:16px}.mb-16{margin-bottom:16px}.gap-8{gap:8px}.flex{display:flex;align-items:center}
+.trend-list{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.trend-item{display:flex;align-items:center;gap:10px;font-size:0.8rem}
+.trend-bar-bg{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.trend-bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .5s}
+.trend-count{font-size:0.7rem;color:var(--text-sub);min-width:28px;text-align:right}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-sub);font-size:0.85rem}
+.empty-state i{font-size:2rem;margin-bottom:10px;display:block;opacity:0.3}
+/* Flagged panel */
+.flag-reason{font-size:0.7rem;color:#991b1b;background:#fef2f2;border-radius:4px;padding:3px 8px;margin-top:3px;display:inline-block;max-width:320px;line-height:1.4}
+.flag-stats{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.flag-stat{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px 20px;min-width:120px}
+.flag-stat .num{font-size:1.6rem;font-weight:700;color:#991b1b}
+.flag-stat .lbl{font-size:0.7rem;color:#991b1b;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
+.ingredients-preview{font-size:0.68rem;color:var(--text-sub);max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-top:2px}
+.resolved-row td{opacity:0.45;text-decoration:line-through}
 </style>
 </head>
 <body>
@@ -119,17 +114,22 @@ tr.row-red{background:#fef2f2}
   <div class="tab" data-tab="credits"><i class="fa-solid fa-coins"></i> Credits</div>
   <div class="tab" data-tab="analytics"><i class="fa-solid fa-chart-line"></i> Analytics</div>
   <div class="tab" data-tab="sites"><i class="fa-solid fa-globe"></i> Sites</div>
+  <div class="tab" data-tab="scrapers"><i class="fa-solid fa-robot"></i> Scrapers</div>
+  <div class="tab" data-tab="flagged"><i class="fa-solid fa-flag"></i> Flagged <span class="tab-badge" id="flag-badge">0</span></div>
   <div class="tab" data-tab="config"><i class="fa-solid fa-gear"></i> Config</div>
 </div>
 
 <div class="content">
-  <!-- Section 1: Health -->
+
+  <!-- Health -->
   <div class="section active" id="sec-health">
-    <div class="section-title"><i class="fa-solid fa-heart-pulse"></i> Live Health Monitor <span id="health-time" style="font-size:0.7rem;color:var(--text-sub);font-family:'DM Sans';font-weight:400;margin-left:auto"></span></div>
+    <div class="section-title"><i class="fa-solid fa-heart-pulse"></i> Live Health Monitor
+      <span id="health-time" style="font-size:0.7rem;color:var(--text-sub);font-family:'DM Sans';font-weight:400;margin-left:auto"></span>
+    </div>
     <div class="health-grid" id="health-grid"></div>
   </div>
 
-  <!-- Section 2: Fetch Logs -->
+  <!-- Fetch Logs -->
   <div class="section" id="sec-logs">
     <div class="section-title"><i class="fa-solid fa-list"></i> Fetch Attempt Logs</div>
     <div class="grid-4 mb-16" id="log-stats"></div>
@@ -140,40 +140,119 @@ tr.row-red{background:#fef2f2}
       <button class="filter-btn" data-filter="failed">Failed</button>
       <input class="filter-input" placeholder="Filter by domain..." id="domain-filter">
     </div>
-    <div style="overflow-x:auto"><table><thead><tr><th>Time</th><th>Domain</th><th>Layer</th><th>Fields Fetched</th><th>Missing</th><th>Response</th><th>Status</th></tr></thead><tbody id="log-body"></tbody></table></div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Time</th><th>Domain</th><th>Layer</th><th>Fields Fetched</th><th>Missing</th><th>Response</th><th>Status</th></tr></thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
   </div>
 
-  <!-- Section 3: Credits -->
+  <!-- Credits -->
   <div class="section" id="sec-credits">
     <div class="section-title"><i class="fa-solid fa-coins"></i> API Credit Tracker</div>
     <div id="credit-bars"></div>
   </div>
 
-  <!-- Section 4: Analytics -->
+  <!-- Analytics -->
   <div class="section" id="sec-analytics">
     <div class="section-title"><i class="fa-solid fa-chart-line"></i> Tool Usage Analytics</div>
     <div class="grid-4 mb-16" id="analytics-stats"></div>
     <div class="grid-2">
       <div class="chart-container"><div class="chart-title">Product Categories</div><div class="chart-wrap"><canvas id="chart-categories"></canvas></div></div>
-      <div class="chart-container"><div class="chart-title">Skin Concerns</div><div class="chart-wrap"><canvas id="chart-concerns"></canvas></div></div>
-      <div class="chart-container"><div class="chart-title">URL vs Manual Entry</div><div class="chart-wrap"><canvas id="chart-entry"></canvas></div></div>
+      <div class="chart-container"><div class="chart-title">Top Skin Concerns</div><div class="chart-wrap"><canvas id="chart-concerns"></canvas></div></div>
+      <div class="chart-container"><div class="chart-title">Entry Method</div><div class="chart-wrap"><canvas id="chart-entry"></canvas></div></div>
       <div class="chart-container"><div class="chart-title">Busiest Hours (UTC)</div><div class="chart-wrap"><canvas id="chart-hourly"></canvas></div></div>
+    </div>
+    <div class="chart-container mt-16">
+      <div class="chart-title"><i class="fa-solid fa-flask" style="color:var(--accent)"></i> Top Ingredients This Week</div>
+      <ul class="trend-list" id="ingredient-trends"><li style="color:var(--text-sub);font-size:0.8rem;padding:8px 0">Loading…</li></ul>
     </div>
     <div class="mt-16">
       <div class="chart-title">Top Countries</div>
       <table><thead><tr><th>Country</th><th>Analyses</th></tr></thead><tbody id="country-table"></tbody></table>
     </div>
+    <div class="mt-16">
+      <div class="chart-title" style="margin-bottom:10px">
+        <i class="fa-solid fa-clock-rotate-left" style="color:var(--accent)"></i> Recent Analyses
+        <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">URL fetches, barcode scans, and manual inputs</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Time</th><th>Product</th><th>Brand</th><th>Category</th><th>Skin Type</th><th>Ingredients</th><th>Score</th><th>Method</th><th>Country</th></tr></thead>
+          <tbody id="recent-analyses-body"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
-  <!-- Section 5: Sites -->
+  <!-- Sites -->
   <div class="section" id="sec-sites">
     <div class="section-title"><i class="fa-solid fa-globe"></i> Site Fetch Success Rate
-      <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="testAllSites()"><i class="fa-solid fa-play"></i> Test All Sites</button>
+      <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">Auto-detected from fetch logs only</span>
+      <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="testAllSites()"><i class="fa-solid fa-play"></i> Test Known Sites</button>
     </div>
-    <div style="overflow-x:auto"><table><thead><tr><th>Site</th><th>Last Tested</th><th>Success Rate (7d)</th><th>Avg Response</th><th>Missing Fields</th><th>Status</th><th>Action</th></tr></thead><tbody id="sites-body"></tbody></table></div>
+    <div id="sites-empty" class="empty-state" style="display:none"><i class="fa-solid fa-globe"></i>No site data yet. Run some URL analyses first.</div>
+    <div style="overflow-x:auto" id="sites-table-wrap">
+      <table>
+        <thead><tr><th>Domain</th><th>Last Fetched</th><th>Success Rate (7d)</th><th>Avg Response</th><th>Common Missing</th><th>Attempts</th><th>Status</th><th>Test</th></tr></thead>
+        <tbody id="sites-body"></tbody>
+      </table>
+    </div>
   </div>
 
-  <!-- Section 6: Config -->
+  <!-- Scrapers -->
+  <div class="section" id="sec-scrapers">
+    <div class="section-title"><i class="fa-solid fa-robot"></i> Scraper Layer Monitoring (7 days)</div>
+    <div class="grid-3 mb-16" id="scraper-summary"></div>
+    <div class="chart-container">
+      <div class="chart-title">Scraper Layer Share</div>
+      <div class="chart-wrap"><canvas id="chart-layers"></canvas></div>
+    </div>
+    <table style="margin-top:16px">
+      <thead><tr><th>Layer</th><th>Total Attempts</th><th>Successes</th><th>Success Rate</th><th>Status</th></tr></thead>
+      <tbody id="layer-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Flagged -->
+  <div class="section" id="sec-flagged">
+    <div class="section-title"><i class="fa-solid fa-flag"></i> Flagged Analyses — Quality Review
+      <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">Auto-flagged when score looks wrong for the input data</span>
+      <label style="margin-left:auto;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="show-resolved" onchange="loadFlagged()"> Show resolved
+      </label>
+    </div>
+
+    <!-- Flag reason key -->
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.78rem;color:#78350f">
+      <strong>Flagging rules:</strong>
+      &nbsp;① Score &lt; 15 → extreme quality check needed &nbsp;|&nbsp;
+      ② Score &lt; 25 with ≥ 5 ingredients → possible scraper garbage &nbsp;|&nbsp;
+      ③ URL fetch returned ≤ 2 ingredients → scrape likely failed
+    </div>
+
+    <div class="flag-stats">
+      <div class="flag-stat"><div class="num" id="flag-total">—</div><div class="lbl">Total Flagged</div></div>
+      <div class="flag-stat"><div class="num" id="flag-score15">—</div><div class="lbl">Score &lt; 15</div></div>
+      <div class="flag-stat"><div class="num" id="flag-garbage">—</div><div class="lbl">Low score / many ings</div></div>
+      <div class="flag-stat"><div class="num" id="flag-noings">—</div><div class="lbl">URL ≤ 2 ingredients</div></div>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th><th>Product / Ingredients preview</th><th>Brand</th>
+            <th>Score</th><th>Ings</th><th>Method</th><th>Flag Reason</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="flagged-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Config -->
   <div class="section" id="sec-config">
     <div class="section-title"><i class="fa-solid fa-gear"></i> Database & Config</div>
     <div class="grid-3 mb-16" id="db-stats"></div>
@@ -185,44 +264,65 @@ tr.row-red{background:#fef2f2}
     </div>
     <div id="config-msg" class="mt-16" style="font-size:0.8rem"></div>
   </div>
-</div>
+
+</div><!-- .content -->
 
 <script>
 const API = '/api/admin';
 const COLORS = ['#BF8888','#C9A87C','#8BA89C','#9B8EC4','#D4A574','#7BAFD4','#D48BA5','#8BC9A8'];
-let chartInstances = {};
 
-// Tab switching
+// TEST_URLS: only used to enable the Test button for known domains.
+// The sites table itself shows only real fetch_log domains.
+const TEST_URLS = {
+  'nykaa.com': 'https://www.nykaa.com/minimalist-10-niacinamide-5-zinc-face-serum/p/587953',
+  'amazon.in': 'https://www.amazon.in/dp/B08PZYN2YY',
+  'foxtale.in': 'https://foxtale.in/products/glow-sunscreen',
+  'beaminimalist.com': 'https://beaminimalist.com/products/niacinamide-10-zinc-1',
+  'purplle.com': 'https://www.purplle.com/product/minimalist-10-niacinamide-5-zinc-face-serum-30ml',
+  'sephora.com': 'https://www.sephora.com/product/the-ordinary-niacinamide-10-zinc-1-P447866',
+  'theordinary.com': 'https://theordinary.com/en-in/niacinamide-10-zinc-1-100436.html',
+};
+
+let chartInstances = {};
+const _loaded = {};
+
+// ── Tab switching ────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+    const id = tab.dataset.tab;
+    document.getElementById('sec-' + id).classList.add('active');
+    if (!_loaded[id]) { _loaded[id] = true; _loaders[id] && _loaders[id](); }
   });
 });
 
-// Fetch helper
 async function api(path) {
   const r = await fetch(API + path);
   if (r.status === 401) { window.location = API + '/login'; return null; }
   return r.json();
 }
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
 
-// ─── Section 1: Health ─────────────────────────
+// ── Health ───────────────────────────────────────────────────────────────
 async function loadHealth() {
   const d = await api('/health-check');
   if (!d) return;
-  const grid = document.getElementById('health-grid');
-  const names = {backend:'Flask Backend',csv_database:'CSV Database',firecrawl:'Firecrawl API',scrapdo:'ScrapeDo API',scraperapi:'ScraperAPI',huggingface:'HuggingFace API',exchangerate:'ExchangeRate API',openbeautyfacts:'Open Beauty Facts',duckduckgo:'DuckDuckGo Search'};
-  grid.innerHTML = '';
-  for (const [k,v] of Object.entries(d)) {
-    grid.innerHTML += `<div class="health-item"><div class="dot ${v.status}"></div><div class="health-info"><div class="health-name">${names[k]||k}</div><div class="health-meta">${v.time_ms}ms &middot; ${v.checked}${v.error ? ' &middot; '+v.error : ''}</div></div></div>`;
-  }
+  const names = {backend:'Backend Server',csv_database:'CSV Database',firecrawl:'Firecrawl API',
+    scrapdo:'ScrapeDo API',scraperapi:'ScraperAPI',huggingface:'HuggingFace API',
+    exchangerate:'ExchangeRate API',openbeautyfacts:'Open Beauty Facts',duckduckgo:'DuckDuckGo Search'};
+  document.getElementById('health-grid').innerHTML = Object.entries(d).map(([k,v]) =>
+    `<div class="health-item"><div class="dot ${v.status}"></div><div class="health-info">
+      <div class="health-name">${names[k]||k}</div>
+      <div class="health-meta">${v.time_ms}ms &middot; ${v.checked}${v.error?' &middot; '+v.error:''}</div>
+    </div></div>`).join('');
   document.getElementById('health-time').textContent = 'Last checked: ' + new Date().toLocaleTimeString();
 }
 
-// ─── Section 2: Fetch Logs ─────────────────────
+// ── Fetch Logs ───────────────────────────────────────────────────────────
 let currentFilter = 'all';
 async function loadLogs() {
   const domain = document.getElementById('domain-filter').value;
@@ -233,58 +333,52 @@ async function loadLogs() {
   if (!d) return;
   const s = d.stats;
   document.getElementById('log-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value">${s.total}</div></div>
-    <div class="stat-card"><div class="stat-label">Success Rate</div><div class="stat-value">${s.success_rate}%</div></div>
-    <div class="stat-card"><div class="stat-label">Most Failed</div><div class="stat-value" style="font-size:1rem">${s.failed_domain}</div></div>
-    <div class="stat-card"><div class="stat-label">Avg Time</div><div class="stat-value">${s.avg_time_ms}ms</div></div>`;
+    <div class="stat-card"><div class="stat-label">Today Fetches</div><div class="stat-value">${s.total}</div></div>
+    <div class="stat-card"><div class="stat-label">Success Rate</div><div class="stat-value">${s.total > 0 ? s.success_rate : 0}%</div></div>
+    <div class="stat-card"><div class="stat-label">Most Failed Domain</div><div class="stat-value" style="font-size:0.95rem">${s.failed_domain||'-'}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Response</div><div class="stat-value">${s.avg_ms}ms</div></div>`;
   const tbody = document.getElementById('log-body');
   tbody.innerHTML = '';
   for (const log of d.logs) {
-    const fetched = JSON.parse(log.fields_fetched || '[]');
-    const missing = JSON.parse(log.missing_fields || '[]');
-    let cls = 'row-red';
-    let badge = '<span class="badge badge-red">Failed</span>';
-    if (log.success && missing.length === 0) { cls = 'row-green'; badge = '<span class="badge badge-green">Full</span>'; }
-    else if (log.success) { cls = 'row-yellow'; badge = '<span class="badge badge-yellow">Partial</span>'; }
-    const ts = log.timestamp ? log.timestamp.substring(0,19).replace('T',' ') : '';
+    const fetched = JSON.parse(log.fields_fetched||'[]');
+    const missing = JSON.parse(log.missing_fields||'[]');
+    let cls='row-red', badge='<span class="badge badge-red">Failed</span>';
+    if (log.success && missing.length===0){cls='row-green';badge='<span class="badge badge-green">Full</span>';}
+    else if (log.success){cls='row-yellow';badge='<span class="badge badge-yellow">Partial</span>';}
+    const ts = log.timestamp?log.timestamp.substring(0,19).replace('T',' '):'';
     tbody.innerHTML += `<tr class="${cls}"><td style="white-space:nowrap">${ts}</td><td>${log.domain||'-'}</td><td>${log.layer_attempted||'-'}</td><td>${fetched.join(', ')||'-'}</td><td>${missing.join(', ')||'-'}</td><td>${Math.round(log.response_time_ms||0)}ms</td><td>${badge}</td></tr>`;
   }
 }
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentFilter = btn.dataset.filter;
-    loadLogs();
+    btn.classList.add('active'); currentFilter = btn.dataset.filter; loadLogs();
   });
 });
-document.getElementById('domain-filter').addEventListener('input', () => { clearTimeout(window._df); window._df = setTimeout(loadLogs, 400); });
+document.getElementById('domain-filter').addEventListener('input', () => {
+  clearTimeout(window._df); window._df = setTimeout(loadLogs, 400);
+});
 
-// ─── Section 3: Credits ────────────────────────
+// ── Credits ──────────────────────────────────────────────────────────────
 async function loadCredits() {
   const d = await api('/credits');
   if (!d) return;
-  const container = document.getElementById('credit-bars');
-  const wc = document.getElementById('warnings-container');
-  container.innerHTML = '';
-  wc.innerHTML = '';
-  for (const w of d.warnings) {
-    wc.innerHTML += `<div class="warning-banner"><i class="fa-solid fa-triangle-exclamation"></i> ${w}</div>`;
-  }
-  for (const c of d.credits) {
-    const fillClass = c.pct >= 80 ? 'danger' : c.pct >= 60 ? 'warn' : 'ok';
-    const limitText = c.unlimited ? 'Unlimited' : `${c.used}/${c.limit} used`;
-    const remainText = c.unlimited ? `${c.calls} calls` : `${c.remaining} remaining`;
-    container.innerHTML += `<div class="credit-bar-wrap">
+  document.getElementById('warnings-container').innerHTML = d.warnings.map(w =>
+    `<div class="warning-banner"><i class="fa-solid fa-triangle-exclamation"></i> ${w}</div>`).join('');
+  document.getElementById('credit-bars').innerHTML = d.credits.map(c => {
+    const fillClass = c.pct>=80?'danger':c.pct>=60?'warn':'ok';
+    const limitText = c.unlimited?'Unlimited':`${c.used} / ${c.limit} used`;
+    const remainText = c.unlimited?`${c.calls} calls total`:`${c.remaining} remaining`;
+    const renewText = c.next_renewal?`Renewal: ${c.next_renewal} (${c.days_remaining}d away)`:`${c.days_remaining} days left`;
+    return `<div class="credit-bar-wrap">
       <div class="credit-header"><span>${c.display_name}</span><span>${limitText}</span></div>
       <div class="credit-track"><div class="credit-fill ${fillClass}" style="width:${c.unlimited?0:c.pct}%"></div></div>
-      <div class="credit-meta"><span>${remainText}</span><span>Resets in ${c.days_remaining} days</span></div>
+      <div class="credit-meta"><span>${remainText}</span><span>${renewText}</span></div>
     </div>`;
-  }
+  }).join('');
 }
 
-// ─── Section 4: Analytics ──────────────────────
-function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+// ── Analytics ────────────────────────────────────────────────────────────
 async function loadAnalytics() {
   const d = await api('/analytics');
   if (!d) return;
@@ -294,129 +388,302 @@ async function loadAnalytics() {
     <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value">${d.total_month}</div></div>
     <div class="stat-card"><div class="stat-label">All Time</div><div class="stat-value">${d.total_all}</div></div>`;
 
-  // Categories pie
   destroyChart('chart-categories');
-  const catCtx = document.getElementById('chart-categories').getContext('2d');
-  chartInstances['chart-categories'] = new Chart(catCtx, {type:'doughnut',data:{labels:d.categories.map(c=>c.name),datasets:[{data:d.categories.map(c=>c.count),backgroundColor:COLORS}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11}}}}}});
+  if (d.categories.length) chartInstances['chart-categories'] = new Chart(
+    document.getElementById('chart-categories').getContext('2d'),
+    {type:'doughnut',data:{labels:d.categories.map(c=>c.name),datasets:[{data:d.categories.map(c=>c.count),backgroundColor:COLORS}]},
+     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11}}}}}});
 
-  // Concerns bar
   destroyChart('chart-concerns');
-  const conCtx = document.getElementById('chart-concerns').getContext('2d');
-  chartInstances['chart-concerns'] = new Chart(conCtx, {type:'bar',data:{labels:d.concerns.slice(0,8).map(c=>c.name),datasets:[{data:d.concerns.slice(0,8).map(c=>c.count),backgroundColor:'#BF8888'}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{display:false}}}}});
+  if (d.concerns.length) chartInstances['chart-concerns'] = new Chart(
+    document.getElementById('chart-concerns').getContext('2d'),
+    {type:'bar',data:{labels:d.concerns.slice(0,8).map(c=>c.name),datasets:[{data:d.concerns.slice(0,8).map(c=>c.count),backgroundColor:'#BF8888'}]},
+     options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{display:false}}}}});
 
-  // Entry donut
   destroyChart('chart-entry');
-  const entCtx = document.getElementById('chart-entry').getContext('2d');
-  chartInstances['chart-entry'] = new Chart(entCtx, {type:'doughnut',data:{labels:['URL Fetch','Manual Entry'],datasets:[{data:[d.url_count,d.manual_count],backgroundColor:['#BF8888','#C9A87C']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'}}}});
+  const ftc = d.fetch_type_counts||{};
+  chartInstances['chart-entry'] = new Chart(
+    document.getElementById('chart-entry').getContext('2d'),
+    {type:'doughnut',data:{labels:['URL Fetch','Barcode Scan','Manual Entry'],
+      datasets:[{data:[ftc['url']||0,ftc['barcode']||0,ftc['manual']||0],backgroundColor:['#BF8888','#9B8EC4','#C9A87C']}]},
+     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'}}}});
 
-  // Hourly bar
   destroyChart('chart-hourly');
-  const hrCtx = document.getElementById('chart-hourly').getContext('2d');
   const hours = Array.from({length:24},(_,i)=>i);
-  const hourMap = {};
-  d.hourly.forEach(h => hourMap[h.hour] = h.count);
-  chartInstances['chart-hourly'] = new Chart(hrCtx, {type:'bar',data:{labels:hours.map(h=>h+':00'),datasets:[{data:hours.map(h=>hourMap[h]||0),backgroundColor:'#8BA89C'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
+  const hourMap = {}; d.hourly.forEach(h=>hourMap[h.hour]=h.count);
+  chartInstances['chart-hourly'] = new Chart(
+    document.getElementById('chart-hourly').getContext('2d'),
+    {type:'bar',data:{labels:hours.map(h=>h+':00'),datasets:[{data:hours.map(h=>hourMap[h]||0),backgroundColor:'#8BA89C'}]},
+     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
 
-  // Countries table
-  document.getElementById('country-table').innerHTML = d.countries.map(c => `<tr><td>${c.name}</td><td>${c.count}</td></tr>`).join('');
+  document.getElementById('country-table').innerHTML =
+    d.countries.map(c=>`<tr><td>${c.name}</td><td>${c.count}</td></tr>`).join('');
+
+  // Ingredient trends
+  const td = await api('/ingredient-trends');
+  const tel = document.getElementById('ingredient-trends');
+  if (!td||!td.trends||!td.trends.length) {
+    tel.innerHTML = '<li style="color:var(--text-sub);font-size:0.8rem;padding:8px 0">No trend data yet — will populate as analyses run.</li>';
+  } else {
+    const max = td.trends[0].count||1;
+    tel.innerHTML = td.trends.map(t=>`<li class="trend-item">
+      <span style="min-width:140px;font-weight:500">${t.name}</span>
+      <div class="trend-bar-bg"><div class="trend-bar-fill" style="width:${Math.round(t.count/max*100)}%"></div></div>
+      <span class="trend-count">${t.count}</span></li>`).join('');
+  }
+
+  // Recent analyses
+  const ftBadge = {url:'<span class="badge badge-blue">URL</span>',barcode:'<span class="badge badge-purple">Barcode</span>',manual:'<span class="badge badge-gray">Manual</span>'};
+  const ra = await api('/recent-analyses');
+  const raBody = document.getElementById('recent-analyses-body');
+  if (!ra||!ra.analyses||!ra.analyses.length) {
+    raBody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-clock-rotate-left"></i>No analyses logged yet.</td></tr>';
+  } else {
+    raBody.innerHTML = ra.analyses.map(a => {
+      const ts = a.timestamp?a.timestamp.substring(0,16).replace('T',' '):'';
+      const score = a.main_worth_score!=null?Math.round(a.main_worth_score):'-';
+      const scoreColor = score>=75?'var(--green)':score>=50?'var(--yellow)':'var(--red)';
+      const ft = a.fetch_type||'manual';
+      const badge = ftBadge[ft]||`<span class="badge badge-gray">${ft}</span>`;
+      const flagIcon = a.is_flagged?'<i class="fa-solid fa-flag" style="color:var(--red);margin-left:4px" title="Flagged"></i>':'';
+      return `<tr class="${a.is_flagged?'row-red':''}">
+        <td style="white-space:nowrap;font-size:0.72rem">${ts}</td>
+        <td style="font-weight:500">${a.product_name||'<em style="color:var(--text-sub)">—</em>'}${flagIcon}</td>
+        <td>${a.brand||'—'}</td>
+        <td>${a.product_category||'—'}</td>
+        <td>${a.skin_type||'—'}</td>
+        <td>${a.ingredient_count||0}</td>
+        <td style="font-weight:700;color:${scoreColor}">${score}</td>
+        <td>${badge}</td>
+        <td>${a.country||'—'}</td>
+      </tr>`;
+    }).join('');
+  }
 }
 
-// ─── Section 5: Sites ──────────────────────────
-let testUrls = {};
+// ── Sites ────────────────────────────────────────────────────────────────
 async function loadSites() {
   const d = await api('/site-stats');
   if (!d) return;
-  testUrls = d.test_urls;
+  const sites = d.sites||[];
+  const emptyEl = document.getElementById('sites-empty');
+  const tableWrap = document.getElementById('sites-table-wrap');
   const tbody = document.getElementById('sites-body');
   tbody.innerHTML = '';
-  // Show test URLs as rows (even if no stats yet)
-  const allDomains = new Set([...d.sites.map(s=>s.domain), ...Object.keys(d.test_urls)]);
-  for (const domain of allDomains) {
-    const stat = d.sites.find(s => s.domain === domain);
-    const rate = stat ? stat.success_rate : '-';
-    const rateClass = rate === '-' ? '' : rate >= 90 ? 'badge-green' : rate >= 60 ? 'badge-yellow' : 'badge-red';
-    const statusDot = rate === '-' ? 'yellow' : rate >= 90 ? 'green' : rate >= 60 ? 'yellow' : 'red';
-    tbody.innerHTML += `<tr>
-      <td><strong>${domain}</strong></td>
-      <td>${stat ? stat.last_tested?.substring(0,16).replace('T',' ') : 'Never'}</td>
+  if (!sites.length) { emptyEl.style.display='block'; tableWrap.style.display='none'; return; }
+  emptyEl.style.display = 'none'; tableWrap.style.display = '';
+  for (const stat of sites) {
+    const rate = stat.success_rate;
+    const rateClass = rate>=90?'badge-green':rate>=60?'badge-yellow':'badge-red';
+    const dot = rate>=90?'green':rate>=60?'yellow':'red';
+    const warnHtml = stat.health_warning?`<span style="color:var(--red);font-size:0.68rem;font-weight:600;display:block;margin-top:2px">⚠ Scraper likely broken</span>`:'';
+    const testUrl = TEST_URLS[stat.domain];
+    tbody.innerHTML += `<tr class="${stat.health_warning?'row-red':''}">
+      <td><strong>${stat.domain}</strong>${warnHtml}</td>
+      <td style="font-size:0.72rem">${stat.last_tested?stat.last_tested.substring(0,16).replace('T',' '):'—'}</td>
       <td><span class="badge ${rateClass}">${rate}%</span></td>
-      <td>${stat ? Math.round(stat.avg_time) + 'ms' : '-'}</td>
-      <td style="font-size:0.7rem">${stat && stat.missing_fields.length ? stat.missing_fields.join(', ') : '-'}</td>
-      <td><div class="dot ${statusDot}" style="display:inline-block"></div></td>
-      <td><button class="btn btn-secondary btn-sm" onclick="testSite('${domain}',this)" ${!d.test_urls[domain]?'disabled':''}><i class="fa-solid fa-play"></i> Test</button>
-        <div class="test-result" id="tr-${domain.replace(/\./g,'-')}"></div>
-      </td>
+      <td>${Math.round(stat.avg_ms)}ms</td>
+      <td style="font-size:0.7rem">${stat.missing_fields&&stat.missing_fields.length?stat.missing_fields.join(', '):'—'}</td>
+      <td>${stat.total}</td>
+      <td><div class="dot ${dot}" style="display:inline-block"></div></td>
+      <td>${testUrl
+        ?`<button class="btn btn-secondary btn-sm" onclick="testSite('${stat.domain}','${testUrl}',this)"><i class="fa-solid fa-play"></i> Test</button>
+           <div class="test-result" id="tr-${stat.domain.replace(/\./g,'-')}"></div>`
+        :'<span style="color:var(--text-sub);font-size:0.7rem">—</span>'}</td>
     </tr>`;
   }
 }
-
-async function testSite(domain, btn) {
-  const url = testUrls[domain];
-  if (!url) return;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner spinner"></i>';
-  const el = document.getElementById('tr-' + domain.replace(/\./g, '-'));
+async function testSite(domain, url, btn) {
+  btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner spinner"></i>';
+  const el = document.getElementById('tr-'+domain.replace(/\./g,'-'));
   try {
-    const r = await fetch(API + '/test-site', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    const r = await fetch(API+'/test-site',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
     const d = await r.json();
-    el.className = 'test-result show';
-    el.style.background = d.success ? '#f0fdf4' : '#fef2f2';
-    el.innerHTML = d.success
-      ? `<strong>${d.source}</strong> | ${d.time_ms}ms | Fetched: ${d.fetched.join(', ')} ${d.missing.length ? '| Missing: '+d.missing.join(', ') : ''}`
-      : `Failed | ${d.time_ms}ms`;
-  } catch(e) { el.className='test-result show'; el.style.background='#fef2f2'; el.innerHTML='Error: '+e.message; }
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fa-solid fa-play"></i> Test';
+    el.className='test-result show'; el.style.background=d.success?'#f0fdf4':'#fef2f2';
+    el.innerHTML = d.success?`<strong>${d.source}</strong> | ${d.time_ms}ms | Fetched: ${d.fetched.join(', ')}${d.missing.length?' | Missing: '+d.missing.join(', '):''}` : `Failed | ${d.time_ms}ms`;
+  } catch(e){el.className='test-result show';el.style.background='#fef2f2';el.innerHTML='Error: '+e.message;}
+  btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-play"></i> Test';
 }
-
 async function testAllSites() {
-  const domains = Object.keys(testUrls);
-  for (const domain of domains) {
-    const btn = document.querySelector(`button[onclick="testSite('${domain}',this)"]`);
-    if (btn && !btn.disabled) {
-      await testSite(domain, btn);
-      await new Promise(r => setTimeout(r, 2000));
-    }
+  for (const [domain,url] of Object.entries(TEST_URLS)) {
+    const btn = document.querySelector(`button[onclick*="testSite('${domain}'"]`);
+    if (btn&&!btn.disabled){await testSite(domain,url,btn);await new Promise(r=>setTimeout(r,2000));}
   }
 }
 
-// ─── Section 6: Config ─────────────────────────
+// ── Scrapers ─────────────────────────────────────────────────────────────
+async function loadScrapers() {
+  const d = await api('/layer-stats');
+  if (!d) return;
+  const layers = d.layers||[];
+  const total = layers.reduce((s,l)=>s+l.total,0);
+  document.getElementById('scraper-summary').innerHTML = layers.slice(0,3).map(l=>{
+    const share = total>0?Math.round(l.total/total*100):0;
+    return `<div class="stat-card"><div class="stat-label">${l.layer}</div>
+      <div class="stat-value">${l.success_rate}%</div>
+      <div class="stat-sub">${share}% of fetches &middot; ${l.total} attempts</div></div>`;
+  }).join('')||'<div class="empty-state"><i class="fa-solid fa-robot"></i>No data yet.</div>';
+  destroyChart('chart-layers');
+  if (layers.length) chartInstances['chart-layers'] = new Chart(
+    document.getElementById('chart-layers').getContext('2d'),
+    {type:'doughnut',data:{labels:layers.map(l=>l.layer),datasets:[{data:layers.map(l=>l.total),backgroundColor:COLORS}]},
+     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11}}}}}});
+  document.getElementById('layer-body').innerHTML = layers.length
+    ?layers.map(l=>{
+        const rc=l.success_rate>=70?'badge-green':l.success_rate>=50?'badge-yellow':'badge-red';
+        const dot=l.success_rate>=70?'green':l.success_rate>=50?'yellow':'red';
+        const warn=l.success_rate<50?`<span style="color:var(--red);font-size:0.68rem;margin-left:6px">⚠ Below 50%</span>`:'';
+        return `<tr class="${l.success_rate<50?'row-red':''}">
+          <td><strong>${l.layer}</strong>${warn}</td><td>${l.total}</td><td>${l.success}</td>
+          <td><span class="badge ${rc}">${l.success_rate}%</span></td>
+          <td><div class="dot ${dot}" style="display:inline-block"></div></td></tr>`;
+      }).join('')
+    :'<tr><td colspan="5" class="empty-state"><i class="fa-solid fa-robot"></i>No scraper data yet.</td></tr>';
+}
+
+// ── Flagged Analyses ──────────────────────────────────────────────────────
+async function loadFlagged() {
+  const showResolved = document.getElementById('show-resolved').checked;
+  const d = await api('/flagged-analyses' + (showResolved ? '?resolved=true' : ''));
+  if (!d) return;
+  const analyses = d.analyses || [];
+
+  // Stats breakdown
+  let cnt15=0, cntGarbage=0, cntNoIngs=0;
+  analyses.forEach(a => {
+    const r = a.flag_reason || '';
+    if (r.includes('Extremely low')) cnt15++;
+    else if (r.includes('possible scraped garbage') || r.includes('Low score')) cntGarbage++;
+    else if (r.includes('too few') || r.includes('only ')) cntNoIngs++;
+  });
+  document.getElementById('flag-total').textContent = analyses.length;
+  document.getElementById('flag-score15').textContent = cnt15;
+  document.getElementById('flag-garbage').textContent = cntGarbage;
+  document.getElementById('flag-noings').textContent = cntNoIngs;
+
+  // Update tab badge
+  const badge = document.getElementById('flag-badge');
+  if (analyses.length > 0) { badge.textContent = analyses.length; badge.classList.add('visible'); }
+  else { badge.classList.remove('visible'); }
+
+  const ftBadge = {url:'<span class="badge badge-blue">URL</span>',barcode:'<span class="badge badge-purple">Barcode</span>',manual:'<span class="badge badge-gray">Manual</span>'};
+  const tbody = document.getElementById('flagged-body');
+  if (!analyses.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">
+      <i class="fa-solid fa-circle-check" style="color:var(--green)"></i>
+      No flagged analyses${showResolved?'':' — everything looks clean!'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = analyses.map(a => {
+    const ts = a.timestamp?a.timestamp.substring(0,16).replace('T',' '):'';
+    const score = a.main_worth_score!=null?Math.round(a.main_worth_score):'-';
+    const scoreColor = score<15?'var(--red)':score<25?'#d97706':'var(--text)';
+    const ft = a.fetch_type||'manual';
+    const badge = ftBadge[ft]||`<span class="badge badge-gray">${ft}</span>`;
+    const ingsPreview = a.ingredients?`<div class="ingredients-preview" title="${a.ingredients}">${a.ingredients}</div>`:'';
+    const isResolved = !a.flag_reason; // resolved rows have flag_reason cleared
+    return `<tr class="${isResolved?'resolved-row':'row-red'}" id="flag-row-${a.id}">
+      <td style="white-space:nowrap;font-size:0.72rem">${ts}</td>
+      <td style="font-weight:500">${a.product_name||'<em style="color:var(--text-sub)">Unknown product</em>'}${ingsPreview}</td>
+      <td>${a.brand||'—'}</td>
+      <td style="font-weight:700;color:${scoreColor}">${score}</td>
+      <td>${a.ingredient_count||0}</td>
+      <td>${badge}</td>
+      <td><span class="flag-reason">${a.flag_reason||'Resolved'}</span></td>
+      <td>${isResolved
+        ? '<span style="color:var(--text-sub);font-size:0.7rem">Resolved</span>'
+        : `<button class="btn btn-success btn-sm" onclick="resolveFlag(${a.id},this)">
+             <i class="fa-solid fa-check"></i> Resolve
+           </button>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function resolveFlag(id, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner spinner"></i>';
+  try {
+    const r = await fetch(API + '/resolve-flag/' + id, {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      const row = document.getElementById('flag-row-' + id);
+      if (row) {
+        row.classList.add('resolved-row');
+        row.classList.remove('row-red');
+        btn.parentElement.innerHTML = '<span style="color:var(--text-sub);font-size:0.7rem">Resolved</span>';
+      }
+      // Refresh badge count
+      const countRes = await api('/flagged-count');
+      if (countRes) {
+        const badge = document.getElementById('flag-badge');
+        badge.textContent = countRes.count;
+        if (countRes.count > 0) badge.classList.add('visible');
+        else badge.classList.remove('visible');
+      }
+    }
+  } catch(e) { btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-check"></i> Resolve'; }
+}
+
+// ── Config ───────────────────────────────────────────────────────────────
 async function loadConfig() {
   const d = await api('/db-info');
   if (!d) return;
   document.getElementById('db-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Ingredients</div><div class="stat-value">${d.ingredient_count}</div><div class="stat-sub">ingredient_master.csv</div></div>
-    <div class="stat-card"><div class="stat-label">Synergy Combos</div><div class="stat-value">${d.synergy_count}</div><div class="stat-sub">clinical_synergy_registry.csv</div></div>
-    <div class="stat-card"><div class="stat-label">UV/Sun DB</div><div class="stat-value">${d.uv_count}</div><div class="stat-sub">uv_sun_tanning_db.csv</div></div>`;
-  const grid = document.getElementById('keys-grid');
-  grid.innerHTML = '';
-  for (const [key, set] of Object.entries(d.keys_status)) {
-    grid.innerHTML += `<div class="config-item">${set ? '<i class="fa-solid fa-circle-check check"></i>' : '<i class="fa-solid fa-circle-xmark cross"></i>'} ${key}</div>`;
-  }
+    <div class="stat-card"><div class="stat-label">Ingredients</div><div class="stat-value">${d.ingredient_count}</div><div class="stat-sub">ingredient_database_fixed2.csv</div></div>
+    <div class="stat-card"><div class="stat-label">Synergy Combos</div><div class="stat-value">${d.synergy_count}</div></div>
+    <div class="stat-card"><div class="stat-label">UV / Sun DB</div><div class="stat-value">${d.uv_count}</div></div>`;
+  document.getElementById('keys-grid').innerHTML = Object.entries(d.keys_status).map(([key,set])=>
+    `<div class="config-item">${set?'<i class="fa-solid fa-circle-check check"></i>':'<i class="fa-solid fa-circle-xmark cross"></i>'} ${key}</div>`).join('');
 }
-
 async function reloadCSV() {
-  const r = await fetch(API + '/reload-csv', {method:'POST'});
+  const r = await fetch(API+'/reload-csv',{method:'POST'});
   const d = await r.json();
-  document.getElementById('config-msg').innerHTML = d.status === 'ok'
-    ? `<span style="color:var(--green)"><i class="fa-solid fa-check"></i> CSV reloaded: ${d.ingredients} ingredients</span>`
-    : `<span style="color:var(--red)">Error: ${d.message}</span>`;
+  document.getElementById('config-msg').innerHTML = d.status==='ok'
+    ?`<span style="color:var(--green)"><i class="fa-solid fa-check"></i> CSV reloaded: ${d.ingredients} ingredients</span>`
+    :`<span style="color:var(--red)">Error: ${d.message}</span>`;
   loadConfig();
 }
-
 async function clearOldLogs() {
-  if (!confirm('Delete all logs older than 30 days?')) return;
-  const r = await fetch(API + '/clear-old-logs', {method:'POST'});
+  if (!confirm('Delete all fetch logs older than 30 days?')) return;
+  const r = await fetch(API+'/clear-old-logs',{method:'POST'});
   const d = await r.json();
-  document.getElementById('config-msg').innerHTML = `<span style="color:var(--green)"><i class="fa-solid fa-check"></i> Deleted ${d.deleted} old log entries</span>`;
+  document.getElementById('config-msg').innerHTML =
+    `<span style="color:var(--green)"><i class="fa-solid fa-check"></i> Cleared ${d.deleted} old log entries</span>`;
 }
 
-// ─── Auto-refresh ──────────────────────────────
-function loadAll() { loadHealth(); loadLogs(); loadCredits(); loadAnalytics(); loadSites(); loadConfig(); }
-loadAll();
+// ── Loader map ───────────────────────────────────────────────────────────
+const _loaders = {
+  health:loadHealth, logs:loadLogs, credits:loadCredits, analytics:loadAnalytics,
+  sites:loadSites, scrapers:loadScrapers, flagged:loadFlagged, config:loadConfig,
+};
+
+// Boot: load immediately-visible panels + flagged count for badge
+loadHealth(); loadLogs(); loadCredits();
+_loaded['health']=true; _loaded['logs']=true; _loaded['credits']=true;
+
+// Load flag badge count on startup without loading full table
+(async()=>{
+  const d = await api('/flagged-count');
+  if (d && d.count > 0) {
+    const badge = document.getElementById('flag-badge');
+    badge.textContent = d.count;
+    badge.classList.add('visible');
+  }
+})();
+
 setInterval(loadHealth, 60000);
 setInterval(loadLogs, 30000);
 setInterval(loadCredits, 60000);
+// Refresh flagged count every 5 minutes
+setInterval(async()=>{
+  const d = await api('/flagged-count');
+  if (d) {
+    const badge = document.getElementById('flag-badge');
+    badge.textContent = d.count;
+    if (d.count>0) badge.classList.add('visible');
+    else badge.classList.remove('visible');
+  }
+}, 300000);
 </script>
 </body>
 </html>

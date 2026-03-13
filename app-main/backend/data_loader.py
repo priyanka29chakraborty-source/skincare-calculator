@@ -125,11 +125,11 @@ class DataLoader:
         self.load_data()
 
     def load_data(self):
-        # ── Single source of truth: ingredient_database_fixed1.csv ──────────────
+        # ── Single source of truth: ingredient_database_fixed2.csv ──────────────
         # Replaces ingredient_master.csv + ingredient_science.csv.
         # Loaded once at server start. No duplicate datasets kept in memory.
         try:
-            db_path = os.path.join(self.database_path, 'ingredient_database_fixed1.csv')
+            db_path = os.path.join(self.database_path, 'ingredient_database_fixed2.csv')
             db = pd.read_csv(db_path, encoding='utf-8')
             db.columns = db.columns.str.strip()
             # Keep a reference so is_loaded() / any legacy .ingredient_master checks still work
@@ -158,7 +158,7 @@ class DataLoader:
                         if alias and alias.lower() not in self.ingredient_lookup:
                             self.ingredient_lookup[alias.lower()] = row_dict
 
-            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed1.csv")
+            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed2.csv")
 
             # Load aliases.json and add each alias → target INCI mapping
             try:

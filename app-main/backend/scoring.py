@@ -237,7 +237,29 @@ def _parse_optimal(raw, min_eff_raw):
     return val
 
 
+def is_support_ingredient(data):
+    """Return True for humectants, emollients, occlusives and other functional/support
+    ingredient classes. These get a flat concentration credit (0.7) and should never
+    trigger 'below effective concentration' messaging — their presence matters more
+    than their exact percentage.
+    """
+    ing_class = str(data.get('Ingredient_Class', '')).lower().strip()
+    func = str(data.get('Functional_Category', '')).lower()
+    if ing_class in {"functional", "humectant", "emollient", "occlusive",
+                     "surfactant", "preservative"}:
+        return True
+    if any(k in func for k in ["humectant", "emollient", "occlusive",
+                                "barrier", "texture", "solvent"]):
+        return True
+    return False
+
+
 def get_concentration_factor(estimated_pct, data):
+    # Support ingredients (humectants, emollients, etc.) get a flat functional
+    # credit. Exact % doesn't determine whether they "work" — presence does.
+    if is_support_ingredient(data):
+        return 0.7
+
     min_eff_raw = data.get('Min_Effective_%', 0)
     optimal_raw = data.get('Optimal_%', 0)
     max_safe_raw = data.get('Max_Safe_%', 100)
@@ -478,9 +500,9 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             raw_strength = weight * conc_factor * eq_factor
 
             conc_label = (
-                "Likely optimal level" if conc_factor >= 1.0 else
-                "Likely functional range" if conc_factor >= 0.7 else
-                "Below optimal range"
+                "likely at optimal functional level" if conc_factor >= 1.0 else
+                "likely within functional range" if conc_factor >= 0.7 else
+                "may be below typical functional range"
             )
             ev_label = get_evidence_label(eq_factor)
 
@@ -883,8 +905,8 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             'active_ratio': round(active_ratio * 100, 1),
             'price_per_active': round(price / len(actives_found), 2) if actives_found else price
         },
-        'tier_badge': get_tier_badge(total_score),
-        'score_title': get_score_title(total_score),
+        'tier_badge': get_tier_badge(total_score, value_tier),
+        'score_title': get_score_title(total_score, value_tier),
         'value_tier': value_tier,
         'ratio': round(ratio, 2),
         'identified_actives': identified_actives,
@@ -895,27 +917,37 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     }
 
 
-def get_tier_badge(score):
+def get_tier_badge(score, value_tier=None):
     if score >= 90:
-        return "Exceptional Value"
+        return "Exceptional Formula"
     if score >= 75:
+        if value_tier in {"overpriced", "slightly_overpriced"}:
+            return "Worth Buying but Pricey"
         return "Worth Buying"
     if score >= 60:
+        if value_tier in {"fair", "underpriced"}:
+            return "Acceptable & Fairly Priced"
         return "Acceptable but Overpriced"
     if score >= 40:
-        return "Poor Value"
-    return "Marketing-Driven Product"
+        return "Questionable Value"
+    return "Mostly Marketing"
 
 
-def get_score_title(score):
+def get_score_title(score, value_tier=None):
     if score >= 90:
-        return "Outstanding formulation at fair price"
+        return "Outstanding formulation with strong actives"
     if score >= 75:
-        return "Solid product with good value"
+        if value_tier == "underpriced":
+            return "Excellent actives for the price"
+        if value_tier == "fair":
+            return "Strong formula at reasonable price"
+        return "Strong formula, paying brand premium"
     if score >= 60:
-        return "Good formula, paying brand premium"
+        if value_tier in {"fair", "underpriced"}:
+            return "Good formula at acceptable value"
+        return "Good formula, on the pricey side"
     if score >= 40:
-        return "Overpriced - alternatives exist"
+        return "Limited actives for the cost"
     return "Mostly marketing, minimal substance"
 
 
@@ -1551,6 +1583,9 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                         for p in present_actives_data if p['inci'].lower().startswith(pfx.lower()))
         ]
 
+        # Is this a hydration-type concern? Used for floor + comp_b boost + messaging.
+        is_hydration = concern.lower() in {"hydration", "barrier repair", "dryness"}
+
         # --- Component A: Effective Active Strength (0-50%) ---
         # For each relevant active: Evidence_Factor × Concentration_Factor × Synergy_Factor
         comp_a = 0
@@ -1572,12 +1607,15 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             est_conc = concentrations.get(raw_name, 0.3)
             conc_factor = get_concentration_factor(est_conc, data)
 
-            if conc_factor >= 1.0:
-                conc_info.append(f"{info['inci']} — likely at optimal functional level (INCI estimate)")
-            elif conc_factor >= 0.7:
-                conc_info.append(f"{info['inci']} — likely within functional range (INCI estimate)")
-            else:
-                conc_info.append(f"{info['inci']} — may be below typical functional range (INCI estimate)")
+            # Only add conc_info bullet for true clinical actives, not support ingredients.
+            # Support ingredients (humectants, emollients, etc.) don't need a % judgment.
+            if not is_support_ingredient(data):
+                if conc_factor >= 1.0:
+                    conc_info.append(f"{info['inci']} — likely at optimal functional level (INCI estimate)")
+                elif conc_factor >= 0.7:
+                    conc_info.append(f"{info['inci']} — likely within functional range (INCI estimate)")
+                else:
+                    conc_info.append(f"{info['inci']} — may be below typical functional range (INCI estimate)")
 
             # Synergy factor (check if this active pairs with another present active)
             syn_factor = 1.0
@@ -1647,6 +1685,14 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         else:
             comp_b = 0
 
+        # Hydration-specific comp_b boost: multiple humectants present even without
+        # full barrier/antioxidant stack should still get meaningful support credit.
+        if is_hydration:
+            if has_humectant and has_barrier and support_count >= 2:
+                comp_b = max(comp_b, 18)
+            elif has_humectant and support_count >= 2:
+                comp_b = max(comp_b, 14)
+
         # --- Component C: Intelligent Synergy Bonus (0-10%) ---
         comp_c = 0
         synergy_found = []
@@ -1690,17 +1736,50 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
 
         final = max(0, min(100, comp_a + comp_b + comp_c + comp_d))
 
+        # Hydration floor: a product with ≥3 classic humectants and minimal penalty
+        # should never appear as near-useless, even with few formal "ideal actives".
+        if is_hydration:
+            _hydrator_keywords = [
+                "glycerin", "butylene glycol", "propanediol", "beta-glucan",
+                "hyaluronic", "sodium hyaluronate", "polyglutamic"
+            ]
+            hydrator_count = sum(
+                1 for ing in ingredient_list
+                if any(k in ing.lower() for k in _hydrator_keywords)
+            )
+            if hydrator_count >= 3 and comp_d >= -10:
+                final = max(final, 45)
+        else:
+            hydrator_count = 0  # used in explanation logic below
+
         # Build explanation (max 4 bullets, neutral tone)
         explanation = []
-        if present_actives_data:
+
+        # First bullet: override for well-stocked hydration products
+        if is_hydration and final >= 45 and hydrator_count >= 3:
+            explanation.append(
+                "Solid hydrating base with multiple humectants; not a high-powered treatment serum."
+            )
+        elif present_actives_data:
             if comp_a >= 30:
                 explanation.append("Strong clinically supported ingredients present")
             elif comp_a >= 15:
                 explanation.append("Some clinically supported ingredients present")
             else:
-                explanation.append("Limited active ingredients for this concern")
+                # No prominent actives but supporters present
+                if support_count >= 2 or support_flags >= 2:
+                    explanation.append(
+                        "Supportive formula for this concern, but missing the strongest treatment actives."
+                    )
+                else:
+                    explanation.append("Limited active ingredients for this concern")
         else:
-            explanation.append("No key active ingredients found for this concern")
+            if support_count >= 2 or support_flags >= 2:
+                explanation.append(
+                    "Supportive formula for this concern, but missing the strongest treatment actives."
+                )
+            else:
+                explanation.append("No key active ingredients found for this concern")
 
         if conc_info:
             explanation.append(conc_info[0])
@@ -1771,6 +1850,39 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                                  'stinging', 'sensitive-skin red flag']
             if flag and flag != 'nan' and any(kw in flag.lower() for kw in allergen_keywords):
                 allergen_warnings.append({'name': ing, 'flag': flag})
+
+        # Enrich helpful_ingredients using Primary_Benefits and Skin_Concerns from DB.
+        # This surfaces formulator-style labels ("Glycerin (hydration)") instead of
+        # generic text, and aligns with the updated ingredient database columns.
+        if data:
+            primary_benefit = str(data.get('Primary_Benefits', '') or '').strip()
+            concerns_map = str(data.get('Skin_Concerns', '') or '').lower()
+
+            # For dry / combination skin: flag hydration and barrier ingredients
+            if skin_type in {'dry', 'combination'}:
+                pb_lower = primary_benefit.lower()
+                if any(k in pb_lower for k in ['hydration', 'barrier', 'moisture']):
+                    # Grab first benefit token as a short label
+                    benefit_label = primary_benefit.split(';')[0].strip().lower()
+                    enriched = f"{ing} ({benefit_label})"
+                    if enriched not in helpful_ingredients:
+                        helpful_ingredients.append(enriched)
+
+            # For oily skin: flag sebum-regulation / acne-targeting ingredients
+            if skin_type == 'oily':
+                if 'acne' in concerns_map or 'sebum' in concerns_map or 'pore' in concerns_map:
+                    enriched = f"{ing} (acne support)"
+                    if enriched not in helpful_ingredients:
+                        helpful_ingredients.append(enriched)
+
+            # For sensitive skin: flag soothing / anti-inflammatory ingredients
+            if skin_type == 'sensitive':
+                pb_lower = primary_benefit.lower()
+                if any(k in pb_lower for k in ['sooth', 'calm', 'anti-inflam']):
+                    benefit_label = primary_benefit.split(';')[0].strip().lower()
+                    enriched = f"{ing} ({benefit_label})"
+                    if enriched not in helpful_ingredients:
+                        helpful_ingredients.append(enriched)
 
         if skin_type == 'oily':
             if data:

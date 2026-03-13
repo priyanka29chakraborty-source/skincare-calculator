@@ -253,6 +253,50 @@ async def get_site_stats(request: Request):
     return {'sites': stats, 'test_urls': TEST_URLS}
 
 
+@admin_router.get("/layer-stats")
+async def get_layer_stats(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    return {'layers': admin_db.get_layer_stats(days=7)}
+
+
+@admin_router.get("/ingredient-trends")
+async def get_ingredient_trends(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    return {'trends': admin_db.get_ingredient_trends(days=7, limit=10)}
+
+
+@admin_router.get("/recent-analyses")
+async def get_recent_analyses(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    return {'analyses': admin_db.get_recent_analyses(limit=50)}
+
+
+@admin_router.get("/flagged-count")
+async def flagged_count(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    return {'count': admin_db.get_flagged_count()}
+
+
+@admin_router.get("/flagged-analyses")
+async def get_flagged_analyses(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    resolved = request.query_params.get('resolved', 'false').lower() == 'true'
+    return {'analyses': admin_db.get_flagged_analyses(limit=200, include_resolved=resolved)}
+
+
+@admin_router.post("/resolve-flag/{analysis_id}")
+async def resolve_flag(analysis_id: int, request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    ok = admin_db.resolve_flag(analysis_id)
+    return {'ok': ok}
+
+
 @admin_router.post("/test-site")
 async def test_site(request: Request):
     if not _verify_session(request):
