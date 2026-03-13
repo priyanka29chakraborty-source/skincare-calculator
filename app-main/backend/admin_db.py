@@ -19,7 +19,7 @@ _USE_PG = bool(AIVEN_PG_URL)
 
 if _USE_PG:
     try:
-        import psycopg2
+        import psycopg
         from psycopg2.extras import Json
         from psycopg2.pool import ThreadedConnectionPool
 
