@@ -20,23 +20,20 @@ _USE_PG = bool(AIVEN_PG_URL)
 if _USE_PG:
     try:
         import psycopg
-        from psycopg2.extras import Json
-        from psycopg2.pool import ThreadedConnectionPool
+        from psycopg.types.json import Jsonb
 
-        _pg_pool = None
         _pg_lock = threading.Lock()
+        _pg_conn = None
 
-        def _get_pg_pool():
-            global _pg_pool
-            if _pg_pool is None:
-                with _pg_lock:
-                    if _pg_pool is None:
-                        _pg_pool = ThreadedConnectionPool(1, 10, AIVEN_PG_URL)
-            return _pg_pool
+        def _get_pg_conn():
+            global _pg_conn
+            with _pg_lock:
+                if _pg_conn is None or _pg_conn.closed:
+                    _pg_conn = psycopg.connect(AIVEN_PG_URL)
+                return _pg_conn
 
         def _pg_exec(query, params=None, fetch=False):
-            pool = _get_pg_pool()
-            conn = pool.getconn()
+            conn = _get_pg_conn()
             try:
                 with conn.cursor() as cur:
                     cur.execute(query, params)
@@ -46,11 +43,15 @@ if _USE_PG:
                         return rows
                     conn.commit()
             except Exception as e:
-                conn.rollback()
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                # Reset connection on failure so next call reconnects
+                global _pg_conn
+                _pg_conn = None
                 logger.error(f"PG query error: {e}")
                 raise
-            finally:
-                pool.putconn(conn)
 
         def init_db():
             _pg_exec("""
@@ -86,7 +87,6 @@ if _USE_PG:
             CREATE INDEX IF NOT EXISTS idx_fetch_domain ON fetch_logs(domain);
             CREATE INDEX IF NOT EXISTS idx_analysis_ts ON analysis_logs(timestamp);
             """)
-            # Migrate existing tables — add new columns if upgrading
             for col, coltype in [
                 ('product_name', 'TEXT'), ('brand', 'TEXT'), ('price', 'REAL'),
                 ('ingredients', 'TEXT'), ('fetch_type', 'TEXT'), ('identified_actives', 'JSONB'),
@@ -106,7 +106,7 @@ if _USE_PG:
                      missing_fields, response_time_ms, error_message, api_credits_used)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                     (domain, full_url, layer, bool(success),
-                     Json(fields_fetched or []), Json(missing_fields or []),
+                     Jsonb(fields_fetched or []), Jsonb(missing_fields or []),
                      response_time_ms, error_message, credits))
             except Exception as e:
                 logger.warning(f"log_fetch failed: {e}")
@@ -123,10 +123,10 @@ if _USE_PG:
                      analysis_time_ms, product_name, brand, price, ingredients,
                      identified_actives, ingredient_count, is_flagged, flag_reason)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (category, country, skin_type, Json(concerns or []),
+                    (category, country, skin_type, Jsonb(concerns or []),
                      worth_score, bool(url_provided), fetch_type, scraping_layer,
                      analysis_time_ms, product_name, brand, price, ingredients,
-                     Json(identified_actives or []), int(ingredient_count),
+                     Jsonb(identified_actives or []), int(ingredient_count),
                      bool(is_flagged), flag_reason))
             except Exception as e:
                 logger.warning(f"log_analysis failed: {e}")
@@ -185,7 +185,6 @@ if _USE_PG:
                 fail_count = r[2] or 0
                 avg_ms = round(r[3] or 0)
                 success_rate = round(success_count / total * 100, 1) if total > 0 else 0
-                # Most failed domain in last 24h
                 fd_rows = _pg_exec("""
                     SELECT domain, COUNT(*) as cnt FROM fetch_logs
                     WHERE timestamp >= NOW() - INTERVAL '24 hours' AND success = FALSE
@@ -226,7 +225,6 @@ if _USE_PG:
                 for r in rows:
                     domain = r[0]
                     success_rate = round(r[2] or 0, 1)
-                    # Collect most common missing fields for this domain
                     mf_rows = _pg_exec("""
                         SELECT jsonb_array_elements_text(missing_fields) as field,
                                COUNT(*) as cnt
@@ -303,7 +301,6 @@ if _USE_PG:
                 concerns = sorted(
                     [{'name': k, 'count': v} for k, v in concern_counts.items()],
                     key=lambda x: -x['count'])
-                # fetch_type counts: url / barcode / manual
                 ft_rows = _pg_exec("""
                     SELECT fetch_type, COUNT(*) FROM analysis_logs
                     GROUP BY fetch_type
@@ -348,7 +345,7 @@ if _USE_PG:
 
         def clear_old_logs(days=30):
             try:
-                _pg_exec(f"DELETE FROM fetch_logs WHERE timestamp < NOW() - INTERVAL '1 day' * %s", (days,))
+                _pg_exec("DELETE FROM fetch_logs WHERE timestamp < NOW() - INTERVAL '1 day' * %s", (days,))
                 return 1
             except Exception:
                 return 0
@@ -438,7 +435,7 @@ if _USE_PG:
         get_credit_summary = get_credits_summary
 
     except ImportError as e:
-        logger.warning(f"psycopg2 import failed ({e}), falling back to SQLite")
+        logger.warning(f"psycopg import failed ({e}), falling back to SQLite")
         _USE_PG = False
     except Exception as e:
         logger.warning(f"PostgreSQL setup failed ({e}), falling back to SQLite")
@@ -499,7 +496,6 @@ if not _USE_PG:
         CREATE INDEX IF NOT EXISTS idx_analysis_ts ON analysis_logs(timestamp);
         CREATE INDEX IF NOT EXISTS idx_credits_month ON api_credits(month);
         """)
-        # Migrate existing table — add new columns if they don't exist yet
         existing = [r[1] for r in conn.execute("PRAGMA table_info(analysis_logs)").fetchall()]
         for col, coltype in [
             ('product_name', 'TEXT'), ('brand', 'TEXT'), ('price', 'REAL'),
@@ -599,7 +595,6 @@ if not _USE_PG:
             fail_count = r[2] or 0
             avg_ms = round(r[3] or 0)
             success_rate = round(success_count / total * 100, 1) if total > 0 else 0
-            # Most failed domain today
             fd = conn.execute("""
                 SELECT domain, COUNT(*) as cnt FROM fetch_logs
                 WHERE timestamp >= ? AND success=0
@@ -646,7 +641,6 @@ if not _USE_PG:
             for r in rows:
                 domain = r['domain']
                 success_rate = r['success_rate'] or 0
-                # Collect most common missing fields for this domain
                 mf_rows = conn.execute("""
                     SELECT missing_fields FROM fetch_logs
                     WHERE domain=? AND missing_fields IS NOT NULL
@@ -731,7 +725,6 @@ if not _USE_PG:
             concerns = sorted(
                 [{'name': k, 'count': v} for k, v in concern_counts.items()],
                 key=lambda x: -x['count'])
-            # fetch_type breakdown: url / barcode / manual
             ft_rows = conn.execute("""
                 SELECT fetch_type, COUNT(*) as cnt FROM analysis_logs
                 GROUP BY fetch_type
