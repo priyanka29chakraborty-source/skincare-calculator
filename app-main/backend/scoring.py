@@ -8,6 +8,44 @@ from config import (
 )
 
 
+def extract_concentrations_from_inci(ingredient_list_str):
+    """Scan raw INCI text for explicit percentage annotations and return a dict
+    of {normalized_lower_name: float_pct}. This must be called BEFORE any stripping
+    of percentages from the text.
+
+    Handles patterns like:
+      "Niacinamide 10%", "10% Niacinamide", "Salicylic Acid (2%)", "2% Salicylic Acid"
+    """
+    if not ingredient_list_str:
+        return {}
+
+    found = {}
+    patterns = [
+        # "10% Niacinamide" — number precedes name
+        re.compile(r'([\d]+\.?\d*)\s*%\s*\(?\s*([a-zA-Z][a-zA-Z0-9 \-\/]{2,40}?)\s*\)?(?=[,;\n\|+&\.]|$)', re.I),
+        # "Niacinamide 10%" or "Niacinamide (10%)"
+        re.compile(r'([a-zA-Z][a-zA-Z0-9 \-\/]{2,40}?)\s+\(?(\d+\.?\d*)\s*%\)?', re.I),
+    ]
+    for pat in patterns:
+        for m in pat.finditer(ingredient_list_str):
+            g = m.groups()
+            try:
+                if g[0][0].isdigit():
+                    pct, raw_name = float(g[0]), g[1]
+                else:
+                    raw_name, pct = g[0], float(g[1])
+                if not (0 < pct <= 60):
+                    continue
+                # Normalize the same way parse_ingredients() does: strip parens, lowercase
+                norm = re.sub(r'\([^)]*\)', '', raw_name).strip().strip('.-/ ').lower()
+                if len(norm) > 2 and not norm[0].isdigit():
+                    if norm not in found:
+                        found[norm] = pct
+            except (ValueError, IndexError):
+                pass
+    return found
+
+
 def parse_ingredients(ingredient_list_str):
     """Normalize and parse an INCI ingredient list.
     Handles: comma/semicolon/linebreak separators, parenthetical descriptors
@@ -108,12 +146,13 @@ def estimate_concentration(ingredient_list, known_concentrations=None):
     # Apply known overrides first
     known = known_concentrations or {}
 
-    # High-potency ingredients that are effective even at <1% (end of list is fine)
+    # High-potency ingredients that are genuinely effective at sub-1% concentrations.
+    # Only include actives with documented micro-dose efficacy — NOT standard-range
+    # actives like niacinamide (needs 2-10%), caffeine (5%+), or tocopherol (1%+).
     HIGH_POTENCY_KEYWORDS = [
         'peptide', 'retinol', 'retinal', 'retinyl', 'adapalene', 'tretinoin',
         'ascorbic acid', 'ferulic', 'tranexamic', 'kojic', 'bakuchiol',
         'alpha arbutin', 'azelaic', 'salicylic', 'glycolic', 'lactic',
-        'niacinamide', 'caffeine', 'tocopherol',
     ]
 
     start_idx = 0
@@ -274,7 +313,8 @@ def get_concentration_factor(estimated_pct, data):
         max_safe = 100
 
     if min_eff == 0 and optimal == 0:
-        return 0.7
+        # No threshold data in DB — treat as unknown effectiveness, not likely effective
+        return 0.5
 
     if estimated_pct < min_eff:
         return 0.0
@@ -502,6 +542,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             conc_label = (
                 "likely at optimal functional level" if conc_factor >= 1.0 else
                 "likely within functional range" if conc_factor >= 0.7 else
+                "concentration range unknown" if conc_factor >= 0.5 else
                 "may be below typical functional range"
             )
             ev_label = get_evidence_label(eq_factor)
@@ -518,7 +559,14 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 'evidence': ev_label,
                 'concentration': conc_label,
                 'score_contribution': round(eq_factor * conc_factor * weight, 2),
-                'primary_benefits': (lambda v: None if (not v or str(v).lower() in ('nan','none','')) else str(v).strip())(data.get('Primary_Benefits', '')),
+                'primary_benefits': (lambda d: (
+                    # Try Primary_Benefits first
+                    (lambda v: str(v).strip() if v and str(v).lower() not in ('nan', 'none', '') else None)(d.get('Primary_Benefits', ''))
+                    # Fall back to Functional_Category
+                    or (lambda v: str(v).strip() if v and str(v).lower() not in ('nan', 'none', '') else None)(d.get('Functional_Category', ''))
+                    # Final fallback: first Skin_Concern from the semicolon list
+                    or (lambda v: str(v).split(';')[0].strip() if v and str(v).lower() not in ('nan', 'none', '') else None)(d.get('Skin_Concerns', ''))
+                ))(data),
                 'targets': [t.strip() for t in str(data.get('Skin_Concerns', '') or '').split(';') if t.strip() and t.strip() not in ('', ' ')][:3],
                 'functional_category': (lambda v: None if (not v or str(v).lower() in ('nan','none','')) else str(v).strip())(data.get('Functional_Category', '')),
             })
@@ -597,13 +645,13 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     if has_humectant and has_emollient and has_occlusive:
         formula_score += 2
 
-    # Broader preservative check - common systems that may not match exact keywords
+    # Broader preservative check - includes both synthetic and natural preservation systems
     _BROAD_PRESERVATIVES = [
         'phenoxyethanol', 'ethylhexylglycerin', 'sodium benzoate', 'potassium sorbate',
         'caprylyl glycol', 'benzyl alcohol', 'dehydroacetic acid', 'chlorphenesin',
         'sodium hydroxymethylglycinate', 'methylisothiazolinone', 'chloromethylisothiazolinone',
         'iodopropynyl', 'dmdm hydantoin', 'imidazolidinyl urea', 'diazolidinyl urea',
-        'ferment', 'lactobacillus', 'leuconostoc'  # ferment-based preservation
+        'ferment', 'lactobacillus', 'leuconostoc',  # natural/ferment-based preservation
     ]
     if not has_preservative:
         has_preservative = any(p in ' '.join(ingredient_list).lower() for p in _BROAD_PRESERVATIVES)
@@ -690,33 +738,52 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     safety_score = 10.0
     safety_details = []
 
+    # Track deductions per risk class so no single class can wipe out the entire score.
+    # This preserves distinction between "one mild flag" and "many serious flags".
+    _fragrance_deducted = 0.0
+    _alcohol_deducted = 0.0
+    _allergen_deducted = 0.0
+    _irritation_deducted = 0.0
+    _pregnancy_deducted = 0.0
+
     for i, ing_name in enumerate(ingredient_list):
         ing_lower = ing_name.lower()
         data = data_loader.get_ingredient_data(ing_name)
 
         if 'fragrance' in ing_lower or 'parfum' in ing_lower:
-            if i < 10:
-                safety_score -= 4
+            if i < 10 and _fragrance_deducted < 4.0:
+                deduct = min(4.0, 4.0 - _fragrance_deducted)
+                safety_score -= deduct
+                _fragrance_deducted += deduct
                 safety_details.append(f"Contains fragrance ({ing_name})")
         if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower:
-            if i < 10:
-                safety_score -= 3
+            if i < 10 and _alcohol_deducted < 3.0:
+                deduct = min(3.0, 3.0 - _alcohol_deducted)
+                safety_score -= deduct
+                _alcohol_deducted += deduct
                 safety_details.append(f"Contains denatured alcohol ({ing_name})")
         if 'essential oil' in ing_lower or 'limonene' in ing_lower or 'linalool' in ing_lower:
-            safety_score -= 3
-            safety_details.append(f"Contains potential allergen ({ing_name})")
+            if _allergen_deducted < 4.0:
+                deduct = min(2.0, 4.0 - _allergen_deducted)
+                safety_score -= deduct
+                _allergen_deducted += deduct
+                safety_details.append(f"Contains potential allergen ({ing_name})")
 
         if data:
             irritation = str(data.get('Irritation_Risk', 'Low')).lower()
-            if irritation == 'high':
-                safety_score -= 3
+            if irritation == 'high' and _irritation_deducted < 3.0:
+                deduct = min(3.0, 3.0 - _irritation_deducted)
+                safety_score -= deduct
+                _irritation_deducted += deduct
                 safety_details.append(f"{ing_name} has high irritation risk")
             elif irritation == 'medium':
                 safety_score -= 0.5
 
             pregnancy = str(data.get('Pregnancy_Safety', 'Safe')).lower()
-            if 'avoid' in pregnancy or 'restricted' in pregnancy:
-                safety_score -= 4
+            if ('avoid' in pregnancy or 'restricted' in pregnancy) and _pregnancy_deducted < 4.0:
+                deduct = min(4.0, 4.0 - _pregnancy_deducted)
+                safety_score -= deduct
+                _pregnancy_deducted += deduct
                 safety_details.append(f"{ing_name} flagged for pregnancy safety")
 
     safety_score = round(max(0, min(10, safety_score)), 1)
@@ -2119,15 +2186,23 @@ def get_upgrade_suggestions(ingredient_list, concerns):
 
 
 def analyze_product(product_data):
-    ingredient_list = parse_ingredients(product_data.get("ingredients", ""))
+    raw_ingredients_str = product_data.get("ingredients", "")
+    ingredient_list = parse_ingredients(raw_ingredients_str)
 
-    # Parse known concentrations from product name (e.g. "10% Niacinamide Serum")
-    # and merge with any concentrations scraped from the product page
+    # Parse known concentrations from three sources (highest to lowest priority):
+    # 1. Scraped from product page (most precise — already normalized by product_fetcher)
+    # 2. Parsed from INCI string itself (e.g. "Niacinamide 10%, Zinc PCA 1%")
+    # 3. Parsed from product name (e.g. "10% Niacinamide Serum")
     product_name = product_data.get("product_name", "") or ""
     known_from_name = _parse_concentrations_from_name(product_name)
+    known_from_inci = extract_concentrations_from_inci(raw_ingredients_str)
     scraped_conc = product_data.get("active_concentrations") or {}  # from product_fetcher
-    # scraped_conc takes priority over name-parsed (more precise), name over positional
-    known_concentrations = {**known_from_name, **{k.lower(): v for k, v in scraped_conc.items()}}
+    # Merge: scraped > inci-inline > name-parsed  (later keys overwrite earlier ones)
+    known_concentrations = {
+        **known_from_name,
+        **known_from_inci,
+        **{k.lower(): v for k, v in scraped_conc.items()},
+    }
 
     main_score = calculate_main_worth_score(
         ingredient_list,

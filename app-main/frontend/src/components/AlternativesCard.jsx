@@ -93,7 +93,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
                   </span>
                   {alt.safety_score != null && (
                     <span style={{ fontSize: "0.75rem", background: "#F0FAF0", border: "1px solid #b6ddb6", borderRadius: "8px", padding: "3px 8px", color: "#2d6e2d" }}>
-                      Safety: {Math.round(alt.safety_score)}/10
+                      Safety: {Math.round(alt.safety_score)}/20
                     </span>
                   )}
                   {alt.skin_type_score != null && (

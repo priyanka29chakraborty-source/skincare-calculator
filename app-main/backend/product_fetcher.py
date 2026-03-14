@@ -873,39 +873,108 @@ def _extract_metadata(html, url):
             ingredients = ingredients[:3000]
 
     # --- Active Concentrations ---
-    # Scan the ENTIRE page text for "X% ingredient" patterns regardless of section heading.
-    # This catches concentrations listed under "Why You'll Love It", "Hero Ingredient",
-    # "Product Description", "Key Ingredients", etc.
+    # Search for "X% ingredient" patterns, preferring the ingredients/description region.
+    # Stop-word filtering prevents promo language like "30% off" from being captured.
     active_concentrations = {}
+
+    _CONC_STOP_WORDS = {
+        'off', 'discount', 'cashback', 'save', 'savings', 'offer', 'deal', 'mrp',
+        'price', 'ml', 'g', 'spf', 'pa', 'uv', 'sale', 'flat', 'extra', 'more',
+        'free', 'buy', 'get', 'earn', 'points', 'reward', 'tax', 'gst', 'vat',
+    }
+
+    def _normalize_conc_name(raw_name):
+        """Normalize a scraped concentration name to match parsed ingredient tokens.
+        Strips parenthetical descriptors and lowercases — same logic as parse_ingredients().
+        """
+        name = raw_name.strip()
+        # Strip parenthetical descriptors: "(Vitamin B3)", "(Provitamin B5)", etc.
+        name = re.sub(r'\([^)]*\)', '', name).strip()
+        # Strip trailing/leading punctuation
+        name = name.strip('.-/ ')
+        # Lowercase
+        return name.lower()
+
+    def _is_valid_conc_name(name_clean):
+        """Return True only if the name looks like a real cosmetic ingredient."""
+        if not name_clean or len(name_clean) <= 2:
+            return False
+        if name_clean[0].isdigit():
+            return False
+        # Reject pure numbers
+        if re.match(r'^[\d\.\s]+$', name_clean):
+            return False
+        # Reject single-word stop words
+        parts = name_clean.split()
+        if all(p in _CONC_STOP_WORDS for p in parts):
+            return False
+        # Reject if first word is a stop word (catches "off season", "discount code", etc.)
+        if parts and parts[0] in _CONC_STOP_WORDS:
+            return False
+        return True
+
     _conc_patterns = [
         # "10% Niacinamide" or "10 % niacinamide"
-        re.compile(r'([\d]+\.?\d*)\s*%\s+([a-zA-Z][a-zA-Z0-9 \-/\(\)]{2,40}?)(?=\s*[,.\|+&\n<]|$)', re.I),
+        re.compile(r'([\d]+\.?\d*)\s*%\s+([a-zA-Z][a-zA-Z0-9 \-\/\(\)]{2,40}?)(?=\s*[,\.\|+&\n<]|$)', re.I),
         # "Niacinamide 10%" or "Niacinamide (10%)"
-        re.compile(r'([a-zA-Z][a-zA-Z0-9 \-/\(\)]{2,40}?)\s+\(?(\d+\.?\d*)\s*%\)?', re.I),
+        re.compile(r'([a-zA-Z][a-zA-Z0-9 \-\/\(\)]{2,40}?)\s+\(?(\d+\.?\d*)\s*%\)?', re.I),
     ]
-    # Search full text (not just 3000 chars — concentrations can appear anywhere)
-    for pat in _conc_patterns:
-        for m in pat.finditer(text):
-            g = m.groups()
-            try:
-                if g[0][0].isdigit():
-                    pct, raw_name = float(g[0]), g[1].strip().lower()
-                else:
-                    raw_name, pct = g[0].strip().lower(), float(g[1])
-                # Normalize name to align with INCI parsing: drop parenthetical descriptors
-                # like "(vitamin b3)", strip inline % fragments, collapse whitespace.
-                name = re.sub(r'\([^)]*\)', '', raw_name).strip()
-                name = re.sub(r'\s*[\d.]+\s*(?:%|percent)\s*', '', name, flags=re.IGNORECASE).strip()
-                name = re.sub(r'\s+', ' ', name)
-                # Sanity check: valid % range, name not a number, not too short
-                if not name or len(name) <= 2 or name[0].isdigit():
-                    continue
-                if 0 < pct <= 100:
-                    # Don't overwrite with less specific match
-                    if name not in active_concentrations:
-                        active_concentrations[name] = pct
-            except (ValueError, IndexError):
-                pass
+
+    # Priority regions: prefer ingredients/description section text; fall back to full text.
+    # Concentrations in the ingredient/description region are more trustworthy than promo banners.
+    _PRIO_REGION_RE = re.compile(
+        r'(?:ingredients?|inci|composition|key\s+ingredients?|active\s+ingredients?'
+        r'|hero\s+ingredient|description|why\s+you|product\s+detail|about\s+(?:the\s+)?product)'
+        r'\s*[:\-]?\s*(.{20,2000})',
+        re.I | re.DOTALL
+    )
+    priority_text = ''
+    pm = _PRIO_REGION_RE.search(text)
+    if pm:
+        priority_text = pm.group(1)[:2000]
+
+    def _extract_concs_from_region(region_text, priority):
+        """Extract concentration matches from a text region.
+        priority=0 means high-trust (ingredient section), priority=1 means low-trust (full text).
+        Lower priority number wins when merging.
+        """
+        results = {}
+        for pat in _conc_patterns:
+            for m in pat.finditer(region_text):
+                g = m.groups()
+                try:
+                    if g[0][0].isdigit():
+                        pct, raw_name = float(g[0]), g[1]
+                    else:
+                        raw_name, pct = g[0], float(g[1])
+                    if not (0 < pct <= 60):
+                        continue
+                    norm = _normalize_conc_name(raw_name)
+                    if not _is_valid_conc_name(norm):
+                        continue
+                    # Handle "Alpha Arbutin + Kojic Acid" combined names — split on +
+                    sub_names = [s.strip() for s in re.split(r'\s*\+\s*', norm)]
+                    for sub in sub_names:
+                        sub_clean = _normalize_conc_name(sub)
+                        if _is_valid_conc_name(sub_clean):
+                            existing_priority, _ = results.get(sub_clean, (99, 0))
+                            if priority < existing_priority:
+                                results[sub_clean] = (priority, pct)
+                except (ValueError, IndexError):
+                    pass
+        return results
+
+    # Merge: priority region first (trust=0), then full page text (trust=1)
+    conc_with_priority = {}
+    if priority_text:
+        for k, v in _extract_concs_from_region(priority_text, 0).items():
+            conc_with_priority[k] = v
+    for k, v in _extract_concs_from_region(text, 1).items():
+        existing_priority = conc_with_priority.get(k, (99, 0))[0]
+        if v[0] < existing_priority:
+            conc_with_priority[k] = v
+
+    active_concentrations = {k: v[1] for k, v in conc_with_priority.items()}
 
     # --- Category ---
     category = _detect_category(product_name or '') or _detect_category(text[:500])

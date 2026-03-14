@@ -66,8 +66,20 @@ export default function InputForm({
             <textarea className="field-textarea" data-testid="ingredients-input" value={ingredients} onChange={e => setIngredients(e.target.value)}
               placeholder="Aqua, Niacinamide, Pentylene Glycol, Zinc PCA, Sodium Hyaluronate..." />
             {fetchMsg && ingredients && (
-              <div className="inci-warning-note">
-                Note: Some websites do not show the full ingredient list. Please cross-check this INCI with the product packaging to ensure it is complete.
+              <div style={{
+                marginTop: "6px",
+                padding: "7px 12px",
+                borderRadius: "6px",
+                background: "#FFF8E1",
+                border: "1px solid #FFD54F",
+                fontSize: "0.78rem",
+                color: "#7A5C00",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "7px",
+              }}>
+                <i className="fa-solid fa-triangle-exclamation" style={{ marginTop: "2px", flexShrink: 0 }}></i>
+                <span>Some websites do not show the full INCI. Please cross-check this list with the product packaging or label photo to ensure all ingredients are present.</span>
               </div>
             )}
           </div>
