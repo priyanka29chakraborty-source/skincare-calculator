@@ -135,6 +135,7 @@ class FindAlternativesRequest(BaseModel):
     user_concerns: Optional[List[str]] = []
     user_price: Optional[float] = 0
     user_size_ml: Optional[float] = 30
+    user_product_name: Optional[str] = None
 
 
 @api_router.get("/")
@@ -444,6 +445,30 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
             "user_score": req.user_score, "skip_reason": "great_value",
         }
 
+    # ── Helper: detect if a result is the same product as the user's ────────
+    def _is_same_as_user_product(alt_name):
+        """Return True if alt_name is too similar to the user's product name."""
+        user_name = (req.user_product_name or '').strip().lower()
+        if not user_name or not alt_name:
+            return False
+        alt_lower = alt_name.strip().lower()
+        # Exact match
+        if user_name == alt_lower:
+            return True
+        # One contains the other (handles minor title differences)
+        if user_name in alt_lower or alt_lower in user_name:
+            return True
+        # Token overlap >= 80%: strip punctuation, compare word sets
+        def _tokens(s):
+            return set(re.sub(r'[^\w\s]', '', s).split())
+        u_tok = _tokens(user_name)
+        a_tok = _tokens(alt_lower)
+        if u_tok and a_tok:
+            overlap = len(u_tok & a_tok) / max(len(u_tok), len(a_tok))
+            if overlap >= 0.8:
+                return True
+        return False
+
     # ── Normalise category for locking ──────────────────────────────────────
     category_lock = req.product_category.lower().strip()
 
@@ -539,6 +564,12 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
                 alt_score = analysis['main_worth_score']
                 alt_actives = [a['name'] for a in analysis.get('identified_actives', [])[:6]]
 
+                # ── Skip if this is the same product as the user's ───────────
+                alt_name_candidate = product_data.get('product_name') or fetch_urls[i].split('/')[-1].replace('-', ' ').title()
+                if _is_same_as_user_product(alt_name_candidate):
+                    logger.info(f"Skipping same product as user: {alt_name_candidate}")
+                    continue
+
                 # ── Category lock: skip if product page reports a different category ──
                 scraped_cat = (product_data.get('category') or '').lower().strip()
                 if scraped_cat and scraped_cat != category_lock and category_lock not in scraped_cat and scraped_cat not in category_lock:
@@ -560,7 +591,7 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
                         if k in concern_scores
                     }
                     scored_alternatives.append({
-                        'name': product_data.get('product_name') or fetch_urls[i].split('/')[-1].replace('-', ' ').title(),
+                        'name': alt_name_candidate,
                         'score': alt_score,
                         'score_delta': score_delta,
                         'tier': analysis['main_worth_tier'],
@@ -620,6 +651,10 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
                     if scraped_cat and scraped_cat != category_lock and category_lock not in scraped_cat and scraped_cat not in category_lock:
                         continue
                     if not _shares_active(alt_actives):
+                        continue
+                    # Skip if this is the same product as the user's
+                    if _is_same_as_user_product(basic_alternatives[i]['name']):
+                        logger.info(f"Skipping same product as user (serp): {basic_alternatives[i]['name']}")
                         continue
 
                     if alt_score > (req.user_score or 0):

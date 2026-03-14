@@ -58,6 +58,7 @@ function App() {
         user_concerns: concerns,
         user_price: parseFloat(price) || 0,
         user_size_ml: parseFloat(size) || 30,
+        user_product_name: productName || '',
       });
       setAlternatives(data);
     } catch { setAlternatives(null); }
@@ -104,7 +105,8 @@ function App() {
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
       const concernFit = data.skin_concern_fit || {};
       const weakConcerns = Object.entries(concernFit).filter(([, v]) => typeof v === 'object' ? v.score < 75 : v < 75);
-      if (weakConcerns.length > 0 && concerns.length > 0) fetchAlts(data);
+      // Only search for alternatives if score < 75 AND there are weak concern fits
+      if (data.main_worth_score < 75 && weakConcerns.length > 0 && concerns.length > 0) fetchAlts(data);
       fetchBestPrice();
     } catch (e) { setError(e.response?.data?.error || "Analysis failed"); }
     finally { setLoading(false); }
