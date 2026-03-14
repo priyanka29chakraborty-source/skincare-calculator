@@ -280,19 +280,29 @@ def _extract_ingredients_from_body_html(body_html):
 def _parse_size(text, product_name=None):
     """Extract size (value + unit) from text. Returns (float, str) or (None, 'ml')."""
     search_text = (product_name or '') + ' ' + (text or '')
-    matches = re.findall(
-        r'(?<!SPF\s)(?<!spf\s)(\d+\.?\d*)\s*(ml|g|fl\s*\.?\s*oz|oz)\b',
+    # Identify SPF token spans so we can skip size numbers that are the SPF value itself
+    # e.g. "SPF50ml" or "SPF 50ml" — the 50 is the SPF value, not a product size
+    # But "SPF50 60ml" or "Sunscreen SPF50 60ml" — 60ml is a separate real size
+    _SPF_CONTEXT = re.compile(r'\bSPF\s*\d+', re.I)
+    spf_spans = [(m.start(), m.end()) for m in _SPF_CONTEXT.finditer(search_text)]
+    matches = list(re.finditer(
+        r'(\d+\.?\d*)\s*(ml|g|fl\s*\.?\s*oz|oz)\b',
         search_text, re.IGNORECASE
-    )
-    for val_str, unit_str in matches:
-        val = float(val_str)
-        if 5 <= val <= 1000:
-            unit = unit_str.lower().replace(' ', '').replace('.', '')
-            if unit in ('oz', 'floz'):
-                return val * 29.5735, 'ml'
-            elif unit == 'g':
-                return val, 'g'
-            return val, 'ml'
+    ))
+    for m in matches:
+        val = float(m.group(1))
+        if not (5 <= val <= 1000):
+            continue
+        # Skip only if the size number's start position is strictly INSIDE an SPF token span
+        # This catches "SPF50ml" and "SPF 50ml" but NOT "SPF50 60ml"
+        if any(sp_start <= m.start() < sp_end for sp_start, sp_end in spf_spans):
+            continue
+        unit = m.group(2).lower().replace(' ', '').replace('.', '')
+        if unit in ('oz', 'floz'):
+            return val * 29.5735, 'ml'
+        elif unit == 'g':
+            return val, 'g'
+        return val, 'ml'
     return None, 'ml'
 
 
@@ -727,10 +737,27 @@ def _extract_metadata(html, url):
                 price = best_p1
 
     # --- Size ---
-    # Search in product name, og:title, and first 5000 chars of text
+    # Build a rich search string from all possible size-bearing locations:
+    # product name, og:title, meta description, JSON-LD variant titles, variant selectors
     og_title_el = soup.find('meta', property='og:title')
     og_title_str = og_title_el['content'] if og_title_el and og_title_el.get('content') else ''
-    size_search_text = ' '.join(filter(None, [product_name, og_title_str, text[:5000]]))
+    meta_desc_el = soup.find('meta', attrs={'name': 'description'})
+    meta_desc_str = meta_desc_el['content'] if meta_desc_el and meta_desc_el.get('content') else ''
+
+    # Pull variant/option text from common size-picker elements
+    variant_texts = []
+    for el in soup.find_all(True, attrs={
+        'class': re.compile(r'variant|size|volume|option|quantity|sku', re.I)
+    }):
+        t = el.get_text(strip=True)
+        if t and len(t) <= 30:
+            variant_texts.append(t)
+
+    size_search_text = ' '.join(filter(None, [
+        product_name, og_title_str, meta_desc_str,
+        ' '.join(variant_texts[:10]),
+        text[:5000]
+    ]))
     size_ml, size_unit = _parse_size(size_search_text, product_name)
 
     # --- Ingredients ---
@@ -868,40 +895,75 @@ def _extract_metadata(html, url):
                     ingredients = candidate5
 
     # Strategy 6: Table-based ingredient pages (e.g. Dot & Key, Foxtale style)
-    # Pattern: HTML table where first column is ingredient name, remaining cols are metadata
+    # Pattern A: Proper <table> with header row containing "Ingredient"
     if not ingredients:
         for tbl in soup.find_all('table'):
             rows = tbl.find_all('tr')
             if len(rows) < 4:
                 continue
-            # Check if header row contains "Ingredient" column
             header_cells = [td.get_text(strip=True).lower() for td in rows[0].find_all(['th', 'td'])]
             if not any('ingredient' in h for h in header_cells):
                 continue
-            # Find which column index is the ingredient name
-            ing_col = next((i for i, h in enumerate(header_cells) if h in ('ingredient', 'ingredients', 'inci')), 0)
+            # Find the column that holds the INCI name (first column matching "ingredient")
+            ing_col = next((i for i, h in enumerate(header_cells) if 'ingredient' in h), 0)
             names = []
             for row in rows[1:]:
                 cells = row.find_all(['td', 'th'])
                 if len(cells) > ing_col:
                     name = cells[ing_col].get_text(strip=True)
-                    if name and len(name) > 2 and not name.lower() in ('ingredient', 'ingredients', 'inci'):
+                    if name and 2 < len(name) <= 80 and name.lower() not in ('ingredient', 'ingredients', 'inci'):
                         names.append(name)
             if len(names) >= 4:
                 ingredients = ', '.join(names)
                 break
 
+    # Strategy 7: Div/span grid layout — detect "Synthetic/Natural/Lab Synthesized" noise
+    # pattern in direct children of a container, extract only the ingredient name children.
+    if not ingredients:
+        _GRID_NOISE_FULL = re.compile(
+            r'^(synthetic|natural|lab\s+synthesized|plant|mineral|animal|marine|water'
+            r'|ingredient\s+type|source|benefit|ingredient)$',
+            re.I
+        )
+        _GRID_BENEFIT = re.compile(
+            r'\b(brightens?|moisturi[sz]|moisturizer|reduces?|exfoliat|repairs?|nourish'
+            r'|soothes?|hydrat|antioxidant|anti[\-\s]aging|anti[\-\s]inflammatory'
+            r'|humectant|emollient|preservative|thickener|stabilizer|chelating'
+            r'|conditioning|antimicrobial|brightening|diluent|solvent|emulsifier'
+            r'|pH\s+adjuster|penetration)\b',
+            re.I
+        )
+        for container in soup.find_all(['div', 'ul', 'section'], recursive=True):
+            children = [c for c in container.children
+                        if hasattr(c, 'get_text') and c.get_text(strip=True)]
+            if len(children) < 8:
+                continue
+            child_texts = [c.get_text(strip=True) for c in children]
+            noise_count = sum(1 for t in child_texts if _GRID_NOISE_FULL.match(t))
+            if noise_count < 4:
+                continue
+            names = []
+            for t in child_texts:
+                if _GRID_NOISE_FULL.match(t):
+                    continue
+                if _GRID_BENEFIT.search(t):
+                    continue
+                if len(t) > 80 or len(t) < 2:
+                    continue
+                if re.match(r'^[A-Za-z0-9]', t):
+                    names.append(t)
+            if len(names) >= 6:
+                ingredients = ', '.join(names)
+                break
+
     # --- Brand (additional fallbacks for sites missing JSON-LD/meta) ---
     if not brand:
-        # Try og:site_name — often the brand name for D2C brand sites
         og_site = soup.find('meta', property='og:site_name')
         if og_site and og_site.get('content'):
             candidate = og_site['content'].strip()
-            # Only use if it's short (brand name, not a tagline)
             if candidate and len(candidate) <= 40 and 'skincare' not in candidate.lower():
                 brand = candidate
     if not brand:
-        # Try common class/id patterns for brand name
         for sel in [{'class': re.compile(r'brand[-_]?name|product[-_]?brand|vendor', re.I)},
                     {'id': re.compile(r'brand[-_]?name|product[-_]?brand', re.I)}]:
             el = soup.find(True, attrs=sel)
@@ -911,8 +973,6 @@ def _extract_metadata(html, url):
                     brand = candidate
                     break
     if not brand and product_name:
-        # As last resort: first word of product name is often the brand
-        # But only if it's capitalized and not a generic word
         _GENERIC_STARTS = {'the', 'a', 'an', 'new', 'best', 'pure', 'natural', 'organic', 'advanced'}
         first_word = product_name.split()[0] if product_name.split() else ''
         if first_word and first_word[0].isupper() and first_word.lower() not in _GENERIC_STARTS and len(first_word) >= 3:
@@ -922,52 +982,72 @@ def _extract_metadata(html, url):
     if ingredients:
         ingredients = re.sub(r'^(?:Ingredients|INCI|Composition)\s*[:\-]\s*', '', ingredients, flags=re.I)
         ingredients = re.sub(r'\s*(?:How to use|Directions|Warning|Disclaimer|Storage).*$', '', ingredients, flags=re.I)
-        # Strip any trailing "Read more" / UI tails
         ingredients = _UI_TAIL_RE.sub('', ingredients).strip().rstrip(',').strip()
 
-        # ── Post-process: strip ingredient-table column words ──────────────────
-        # Some sites render ingredients as a table:
-        # "Niacinamide  Synthetic  Lab Synthesized  Reduces Pigmentation"
-        # These column values appear as repeated words in the extracted text.
-        # We strip them by removing known non-INCI column tokens from each token.
-        _TABLE_COL_TOKENS = re.compile(
-            r'\b(synthetic|natural|lab\s+synthesized|plant|mineral|animal|marine'
-            r'|diluent\s*&?\s*solvent|humectant\s*&?\s*moisturi[sz]er?'
-            r'|antioxidant\s*&?\s*brightening|emulsifier\s*&?\s*stabilizer'
-            r'|thickener\s*&?\s*stabilizer|preservative\s*&?\s*anti[\-\s]fungal'
-            r'|preservative\s*&?\s*anti[\-\s]microbial|skin\s+conditioning\s*&?\s*antimicrobial'
-            r'|ph\s+adjuster|ingredient\s+type|source|benefit|ingredient)\b',
-            re.I
-        )
-        # Check if the extracted text looks like a table dump:
-        # markers: "Synthetic", "Natural", "Lab Synthesized", "Plant" repeated many times
+        # ── Post-processor: two-step table-dump cleaner ────────────────────────
+        # Fires when the extracted text still contains table metadata words mixed
+        # in with ingredient names (happens when HTML structure is already lost
+        # and the text_clean path was used instead of the soup-based strategies).
+        #
+        # Format: "Aqua Natural Water Diluent & Solvent Niacinamide Synthetic Lab Synthesized ..."
+        # Each entry is: [NAME] [Synthetic|Natural] [Lab Synthesized|Plant|Water] [benefit text]
+        #
+        # Algorithm:
+        #   Step 1: Remove header row junk.
+        #   Step 2: Replace the TYPE+SOURCE columns ("Synthetic Lab Synthesized" etc.) with "|".
+        #   Step 3: Each fragment between "|" has the ingredient name at its TAIL and
+        #           benefit text at its HEAD. Walk backwards past benefit words to get the name.
         _TABLE_MARKER_RE = re.compile(r'\b(synthetic|lab\s+synthesized|natural|plant)\b', re.I)
         if len(_TABLE_MARKER_RE.findall(ingredients)) >= 4:
-            # This is a table dump — extract only the ingredient names.
-            # Strategy: split by whitespace runs of 2+, keep tokens that look like INCI names
-            # (start with capital letter, no all-caps single words like "NATURAL")
-            tokens = re.split(r'\s{2,}|\t+', ingredients)
-            inci_tokens = []
-            for tok in tokens:
-                tok = tok.strip().strip(',;')
-                if not tok:
+            # Step 1: strip header row
+            cleaned = re.sub(
+                r'^.*?(?:Ingredient\s+Type\s+Source\s+Benefit|Key\s+Ingredients.*?Benefit)\s*',
+                '', ingredients, flags=re.I | re.DOTALL
+            ).strip()
+            # Step 2: replace TYPE+SOURCE with separator
+            cleaned = re.sub(
+                r'\b(Synthetic|Natural)\s+(Lab\s+Synthesized|Plant|Water|Mineral|Animal|Marine)\b',
+                ' | ', cleaned, flags=re.I
+            )
+            # Step 3: extract name from tail of each fragment
+            _BENEFIT_STOP = re.compile(
+                r'^(Brightens?|Moisturi[sz]|Moisturizer|Reduces?|Exfoliat|Repairs?'
+                r'|Nourish|Soothes?|Hydrat|Antioxidant|Improves?|Retains?|Conditions?'
+                r'|Helps|Anti|Humectant|Emollient|Emulsifier|Preservative|Thickener'
+                r'|Diluent|Solvent|Stabilizer|Chelating|Antimicrobial|pH|Adjuster'
+                r'|Penetration|Brightening|Hydrator|Enhances?|Rich|Fungal|Microbial'
+                r'|Aging|Conditioning)\b',
+                re.I
+            )
+            _STOP_SINGLE = {
+                '&', 'Clear', 'Pores', 'Tone', 'Skin', 'Moisture', 'Barrier',
+                'Aging', 'Repair', 'Irritation', 'Pigmentation', 'Puffiness',
+            }
+            parts = cleaned.split(' | ')
+            extracted = []
+            for part in parts:
+                part = part.strip()
+                if not part:
                     continue
-                # Skip pure column-value tokens
-                if _TABLE_COL_TOKENS.fullmatch(tok.strip()):
-                    continue
-                # Skip short all-caps tokens (column headers)
-                if tok.isupper() and len(tok) <= 12:
-                    continue
-                # Skip tokens that are only column words
-                cleaned_tok = _TABLE_COL_TOKENS.sub('', tok).strip()
-                if not cleaned_tok:
-                    continue
-                # Keep if it looks like an ingredient name (has letters, reasonable length)
-                if re.search(r'[a-zA-Z]{3,}', cleaned_tok) and len(cleaned_tok) <= 80:
-                    inci_tokens.append(cleaned_tok)
-
-            if len(inci_tokens) >= 4:
-                ingredients = ', '.join(inci_tokens)
+                words = part.split()
+                name_words = []
+                for w in reversed(words):
+                    if _BENEFIT_STOP.match(w) or w in _STOP_SINGLE:
+                        break
+                    name_words.insert(0, w)
+                name = ' '.join(name_words).strip().strip('&.,; ')
+                if (name and 2 <= len(name) <= 80
+                        and re.match(r'^[A-Za-z0-9]', name)
+                        and not _BENEFIT_STOP.match(name.split()[0])):
+                    extracted.append(name)
+            if len(extracted) >= 4:
+                seen = set()
+                deduped = []
+                for n in extracted:
+                    if n.lower() not in seen:
+                        seen.add(n.lower())
+                        deduped.append(n)
+                ingredients = ', '.join(deduped)
 
         if len(ingredients) > 3000:
             ingredients = ingredients[:3000]

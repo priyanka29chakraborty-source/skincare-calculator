@@ -276,7 +276,6 @@ function SunscreenAnalysisCard({ data }) {
 
 export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput }) {
   const [showBreakdown, setShowBreakdown] = useState(false);
-  const [showIngTable, setShowIngTable] = useState(false);
   const valueChip = getValueChip(
     result.price_analysis?.value_tier,
     result.price_analysis?.ratio
@@ -336,17 +335,9 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           </div>
         )}
 
-        {/* Ingredient Breakdown Table */}
+        {/* Ingredient Breakdown Table — always visible, no toggle */}
         {result.identified_actives?.length > 0 && (
-          <div style={{ marginTop: "1rem" }}>
-            <button className="breakdown-toggle" onClick={() => setShowIngTable(!showIngTable)} aria-expanded={showIngTable} style={{ fontSize: "0.82rem" }}>
-              <i className="fa-solid fa-table"></i> {showIngTable ? "Hide" : "Show"} Active Ingredient Table ({result.identified_actives.length})
-              {showIngTable ? <i className="fa-solid fa-chevron-up" style={{ marginLeft: "6px" }}></i> : <i className="fa-solid fa-chevron-down" style={{ marginLeft: "6px" }}></i>}
-            </button>
-            <div className={"breakdown" + (showIngTable ? " open" : "")}>
-              <IngredientBreakdownTable actives={result.identified_actives} />
-            </div>
-          </div>
+          <IngredientBreakdownTable actives={result.identified_actives} />
         )}
 
         {/* Active Classes Buckets */}
@@ -372,6 +363,14 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       {/* CARD 3: SKIN TYPE COMPAT */}
       <div className="sc-card result-card card-3" data-testid="card-skin-type" style={{ "--anim-delay": "0.3s" }}>
         <h2 className="card-title"><i className="fa-solid fa-user-check"></i> {skinType} Skin Compatibility</h2>
+        <div style={{ marginBottom: "8px", fontSize: "0.8rem", color: "var(--text-sub)" }}>
+          Base texture compatibility for {skinType} skin: <strong style={{ color: getBarColor(result.skin_type_base_texture || result.skin_type_compatibility) }}>{result.skin_type_base_texture || result.skin_type_compatibility}%</strong>
+          {result.skin_type_base_texture && result.skin_type_base_texture !== result.skin_type_compatibility && (
+            <span style={{ marginLeft: "6px", color: "var(--text-sub)", fontSize: "0.75rem" }}>
+              → Final score adjusted to <strong>{result.skin_type_compatibility}%</strong> after ingredient-level risk checks (irritancy, comedogenicity, formulation penalties).
+            </span>
+          )}
+        </div>
         <div className="compat-score-row">
           <span className="compat-pct" style={{ color: getBarColor(result.skin_type_compatibility) }}>{result.skin_type_compatibility}%</span>
           <ProgressBar pct={result.skin_type_compatibility} label="compat" />
