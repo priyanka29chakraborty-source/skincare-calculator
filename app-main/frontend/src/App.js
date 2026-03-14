@@ -63,8 +63,8 @@ function App() {
       setAlternatives(data);
     } catch { setAlternatives(null); }
     finally { setAltLoading(false); }
-  }, [category, country, currency, skinType, concerns, price, size]);
-
+  }, [category, country, currency, skinType, concerns, price, size, productName]);
+  
   const fetchBestPrice = useCallback(async () => {
     const isUrl = fetchInput.trim().startsWith('http');
     const isBarcode = /^\d{8,14}$/.test(fetchInput.trim());
