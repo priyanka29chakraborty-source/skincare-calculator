@@ -879,9 +879,9 @@ def _extract_metadata(html, url):
     active_concentrations = {}
     _conc_patterns = [
         # "10% Niacinamide" or "10 % niacinamide"
-        re.compile(r'([\d]+\.?\d*)\s*%\s+([a-zA-Z][a-zA-Z0-9 \-\/\(\)]{2,40}?)(?=\s*[,\.\|+&\n<]|$)', re.I),
+        re.compile(r'([\d]+\.?\d*)\s*%\s+([a-zA-Z][a-zA-Z0-9 \-/\(\)]{2,40}?)(?=\s*[,.\|+&\n<]|$)', re.I),
         # "Niacinamide 10%" or "Niacinamide (10%)"
-        re.compile(r'([a-zA-Z][a-zA-Z0-9 \-\/\(\)]{2,40}?)\s+\(?(\d+\.?\d*)\s*%\)?', re.I),
+        re.compile(r'([a-zA-Z][a-zA-Z0-9 \-/\(\)]{2,40}?)\s+\(?(\d+\.?\d*)\s*%\)?', re.I),
     ]
     # Search full text (not just 3000 chars — concentrations can appear anywhere)
     for pat in _conc_patterns:
@@ -889,11 +889,18 @@ def _extract_metadata(html, url):
             g = m.groups()
             try:
                 if g[0][0].isdigit():
-                    pct, name = float(g[0]), g[1].strip().lower()
+                    pct, raw_name = float(g[0]), g[1].strip().lower()
                 else:
-                    name, pct = g[0].strip().lower(), float(g[1])
+                    raw_name, pct = g[0].strip().lower(), float(g[1])
+                # Normalize name to align with INCI parsing: drop parenthetical descriptors
+                # like "(vitamin b3)", strip inline % fragments, collapse whitespace.
+                name = re.sub(r'\([^)]*\)', '', raw_name).strip()
+                name = re.sub(r'\s*[\d.]+\s*(?:%|percent)\s*', '', name, flags=re.IGNORECASE).strip()
+                name = re.sub(r'\s+', ' ', name)
                 # Sanity check: valid % range, name not a number, not too short
-                if 0 < pct <= 100 and len(name) > 2 and not name[0].isdigit():
+                if not name or len(name) <= 2 or name[0].isdigit():
+                    continue
+                if 0 < pct <= 100:
                     # Don't overwrite with less specific match
                     if name not in active_concentrations:
                         active_concentrations[name] = pct
