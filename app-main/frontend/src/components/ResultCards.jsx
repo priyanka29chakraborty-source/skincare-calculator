@@ -23,6 +23,21 @@ function getValueChip(valueTier, ratio) {
 // Ingredient breakdown table
 function IngredientBreakdownTable({ actives }) {
   if (!actives || actives.length === 0) return null;
+
+  const formatBenefits = (benefits, functionalCategory) => {
+    if (!benefits || typeof benefits !== "string") {
+      return functionalCategory || "";
+    }
+    const parts = benefits
+      .split(/[;,]/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (parts.length === 0) {
+      return functionalCategory || "";
+    }
+    return parts.slice(0, 3).join("; ");
+  };
+
   return (
     <div className="ingredient-breakdown-table" style={{ marginTop: "1rem", overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
@@ -62,7 +77,7 @@ function IngredientBreakdownTable({ actives }) {
                 }</span>
               </td>
               <td style={{ padding: "5px 10px", color: "var(--text-sub)", fontSize: "0.78rem", maxWidth: "200px" }}>
-                {a.primary_benefits || a.functional_category || "—"}
+                {formatBenefits(a.primary_benefits, a.functional_category) || "—"}
               </td>
               <td style={{ padding: "5px 10px", textAlign: "center", color: "var(--text-sub)", fontSize: "0.78rem" }}>{a.concentration}</td>
 
@@ -234,8 +249,8 @@ function SunscreenAnalysisCard({ data }) {
             <div key={i} style={{
               fontSize: '12px', padding: '7px 10px', borderRadius: '8px', marginBottom: '5px',
               background: w.startsWith('🚨') ? '#fff0f0' : '#fffaf0',
-              border: `1px solid ${w.startsWith('🚨') ? '#f5c6cb' : '#fde8b0'}`,
-              color: w.startsWith('🚨') ? '#721C24' : '#856404'
+              border: `1px solid ${w.startswith('🚨') ? '#f5c6cb' : '#fde8b0'}`,
+              color: w.startswith('🚨') ? '#721C24' : '#856404'
             }}>{w}</div>
           ))}
         </div>
@@ -281,6 +296,10 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
     result.price_analysis?.value_tier,
     result.price_analysis?.ratio
   );
+
+  const compatScore = result.skin_type_compatibility ?? 0;
+  const displayCompat = compatScore >= 96 ? 100 : compatScore;
+  const baseCompat = result.skin_type_base_texture || displayCompat;
 
   return (
     <>
@@ -373,16 +392,16 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       <div className="sc-card result-card card-3" data-testid="card-skin-type" style={{ "--anim-delay": "0.3s" }}>
         <h2 className="card-title"><i className="fa-solid fa-user-check"></i> {skinType} Skin Compatibility</h2>
         <div style={{ marginBottom: "8px", fontSize: "0.8rem", color: "var(--text-sub)" }}>
-          Base texture compatibility for {skinType} skin: <strong style={{ color: getBarColor(result.skin_type_base_texture || result.skin_type_compatibility) }}>{result.skin_type_base_texture || result.skin_type_compatibility}%</strong>
-          {result.skin_type_base_texture && result.skin_type_base_texture !== result.skin_type_compatibility && (
+          Base texture compatibility for {skinType} skin: <strong style={{ color: getBarColor(baseCompat) }}>{baseCompat}%</strong>
+          {result.skin_type_base_texture && result.skin_type_base_texture !== compatScore && (
             <span style={{ marginLeft: "6px", color: "var(--text-sub)", fontSize: "0.75rem" }}>
-              → Final score adjusted to <strong>{result.skin_type_compatibility}%</strong> after ingredient-level risk checks (irritancy, comedogenicity, formulation penalties).
+              → Final score adjusted to <strong>{displayCompat}%</strong> after ingredient-level risk checks (irritancy, comedogenicity, formulation penalties).
             </span>
           )}
         </div>
         <div className="compat-score-row">
-          <span className="compat-pct" style={{ color: getBarColor(result.skin_type_compatibility) }}>{result.skin_type_compatibility}%</span>
-          <ProgressBar pct={result.skin_type_compatibility} label="compat" />
+          <span className="compat-pct" style={{ color: getBarColor(displayCompat) }}>{displayCompat}%</span>
+          <ProgressBar pct={displayCompat} label="compat" />
         </div>
         {result.skin_type_risk_level && (
           <div style={{ marginTop: "8px", marginBottom: "6px" }}>
@@ -397,7 +416,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             )}
           </div>
         )}
-        <SkinTypeDetails details={result.skin_type_details} score={result.skin_type_compatibility} betterSuited={result.better_suited} formNotes={result.skin_type_details?.formulation_notes} riskLevel={result.skin_type_risk_level} />
+        <SkinTypeDetails details={result.skin_type_details} score={compatScore} betterSuited={result.better_suited} formNotes={result.skin_type_details?.formulation_notes} riskLevel={result.skin_type_risk_level} />
       </div>
 
       {/* CARD 4A: ALTERNATIVES */}
