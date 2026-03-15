@@ -96,6 +96,65 @@ CONCERN_INCI_PREFIXES = {
     'Puffiness':          ['Acetyl Tetrapeptide', 'Centella Asiatica'],
 }
 
+# ─── Ingredient Normalization Pipeline ───────────────────────────────────────
+# Step 3: Common synonym aliases → canonical INCI name
+_INGREDIENT_ALIASES = {
+    # Vitamins
+    "vitamin e": "tocopherol", "vit e": "tocopherol",
+    "vitamin b3": "niacinamide", "vit b3": "niacinamide",
+    "vitamin b5": "panthenol", "pro-vitamin b5": "panthenol",
+    "provitamin b5": "panthenol", "pro vitamin b5": "panthenol",
+    "vitamin c": "ascorbic acid", "vit c": "ascorbic acid",
+    "vitamin a": "retinol", "vit a": "retinol",
+    "vitamin k": "phytonadione", "vitamin k1": "phytonadione",
+    # Common shorthand
+    "dl-alpha-tocopherol": "tocopherol",
+    "alpha-tocopherol": "tocopherol",
+    "l-ascorbic acid": "ascorbic acid",
+    "ha": "sodium hyaluronate",
+    "aha": "glycolic acid",
+    "bha": "salicylic acid",
+    "pha": "gluconolactone",
+    # Brand/marketing names
+    "hyaluronic acid": "sodium hyaluronate",
+    "retin-a": "tretinoin",
+    "retinaldehyde": "retinal",
+    "argireline": "acetyl hexapeptide-8",
+    "matrixyl": "palmitoyl pentapeptide-4",
+    "coenzyme q10": "ubiquinone",
+    "q10": "ubiquinone",
+    "ectoin": "ectoine",
+    "beta glucan": "beta-glucan",
+    "licorice": "glycyrrhiza glabra root extract",
+    "licorice extract": "glycyrrhiza glabra root extract",
+}
+
+# Step 4: Family normalization — derivatives map to parent INCI for lookup
+_INGREDIENT_FAMILY_MAP = {
+    # Hyaluronic acid family
+    "hydrolyzed hyaluronic acid": "sodium hyaluronate",
+    "sodium hyaluronate crosspolymer": "sodium hyaluronate",
+    "hyaluronic acid crosspolymer": "sodium hyaluronate",
+    # Retinoid family
+    "retinyl palmitate": "retinol",
+    "retinyl acetate": "retinol",
+    "retinyl propionate": "retinol",
+    # Ceramide family — map to NP as representative
+    "ceramide 1": "ceramide eop",
+    "ceramide 2": "ceramide np",
+    "ceramide 3": "ceramide np",
+    "ceramide 6 ii": "ceramide ap",
+    # Peptide shorthands
+    "palmitoyl pentapeptide": "palmitoyl pentapeptide-4",
+    "palmitoyl tripeptide": "palmitoyl tripeptide-1",
+    "palmitoyl tetrapeptide": "palmitoyl tetrapeptide-7",
+    # AHA family
+    "alpha hydroxy acid": "glycolic acid",
+    # Niacinamide forms
+    "nicotinamide": "niacinamide",
+    "nicotinic acid amide": "niacinamide",
+}
+
 
 def _parse_skin_concerns(raw):
     """Parse Skin_Concerns column: split by ";", strip whitespace, lowercase.
@@ -121,7 +180,10 @@ class DataLoader:
         self.concern_actives = {}
         self.concern_supporters = {}
         self.synergy_registry = {}  # concern -> list of synergy combos
+        self.synergy_partners_map = {}  # inci_lower -> set of partner inci_lower
         self.uv_sun_db = {}  # INCI_Name.lower() -> row dict for UV/Sun/Tanning data
+        self.surfactant_db = {}  # INCI_lower -> row dict (harshness, foam, irritation)
+        self.role_weight_table = {}  # role_lower -> float weight
         self.load_data()
 
     def load_data(self):
@@ -191,12 +253,13 @@ class DataLoader:
         self._build_concern_maps()
         self._load_synergy_registry()
         self._load_uv_sun_tanning_db()
+        self._load_surfactant_db()
+        self._load_role_weight_table()
 
     def _load_synergy_registry(self):
         """Load pair-based synergy data from ingredient_synergy_table.csv.
         Format: INCI_Name, Synergistic_Ingredients (semicolon-separated partners).
-        Builds a flat list of pair combos stored under '__all__' key,
-        returned for any concern since the table is not concern-specific.
+        Builds both a flat list for concern scoring AND a partners_map for impact_score.
         """
         try:
             syn_path = os.path.join(self.database_path, 'ingredient_synergy_table.csv')
@@ -214,18 +277,23 @@ class DataLoader:
                 partners = [p.strip().lower() for p in partners_raw.split(';') if p.strip()]
                 for ing2 in partners:
                     pair_key = tuple(sorted([ing1, ing2]))
-                    if pair_key in seen_pairs:
-                        continue
-                    seen_pairs.add(pair_key)
-                    all_synergies.append({
-                        'ingredients': [ing1, ing2],
-                        'bonus': 2,
-                        'type': 'synergy',
-                        'mechanism': f"{ing1.title()} + {ing2.title()} synergy",
-                    })
-            # Store under '__all__' — get_synergies returns same list for any concern
+                    if pair_key not in seen_pairs:
+                        seen_pairs.add(pair_key)
+                        all_synergies.append({
+                            'ingredients': [ing1, ing2],
+                            'bonus': 2,
+                            'type': 'synergy',
+                            'mechanism': f"{ing1.title()} + {ing2.title()} synergy",
+                        })
+                    # Build fast partners map for impact_score synergy check
+                    if ing1 not in self.synergy_partners_map:
+                        self.synergy_partners_map[ing1] = set()
+                    self.synergy_partners_map[ing1].add(ing2)
+                    if ing2 not in self.synergy_partners_map:
+                        self.synergy_partners_map[ing2] = set()
+                    self.synergy_partners_map[ing2].add(ing1)
             self.synergy_registry['__all__'] = all_synergies
-            logger.info(f"Loaded {len(all_synergies)} synergy pairs from ingredient_synergy_table.csv")
+            logger.info(f"Loaded {len(all_synergies)} synergy pairs, {len(self.synergy_partners_map)} mapped ingredients")
         except Exception as e:
             logger.error(f"Error loading synergy registry: {e}")
 
@@ -383,18 +451,122 @@ class DataLoader:
         return None
 
     def get_ingredient_data(self, ingredient_name):
+        """Multi-step normalization pipeline before DB lookup.
+        Step 1: Clean (lowercase, strip brackets/percentages)
+        Step 2: Direct lookup
+        Step 3: Alias mapping
+        Step 4: Family normalization
+        Step 5: Alias column lookup (already loaded into ingredient_lookup at init)
+        Step 6: Fuzzy match (RapidFuzz, threshold 85)
+        """
+        if not ingredient_name:
+            return None
+
+        # Step 1: Clean — lowercase, remove parens/%, collapse spaces
+        key = ingredient_name.strip().lower()
+        key = re.sub(r'\([^)]*\)', '', key)          # remove (Vitamin B3) style annotations
+        key = re.sub(r'\d+\.?\d*\s*%', '', key)      # remove 10%, 0.5%
+        key = re.sub(r'\s+', ' ', key).strip()
+
+        # Step 2: Direct lookup (covers exact INCI names and all aliases loaded at init)
+        if key in self.ingredient_lookup:
+            return self.ingredient_lookup[key]
+
+        # Step 3: Alias mapping (common marketing/vitamin names → INCI)
+        aliased = _INGREDIENT_ALIASES.get(key)
+        if aliased:
+            result = self.ingredient_lookup.get(aliased)
+            if result:
+                return result
+
+        # Step 4: Family normalization (derivatives → parent INCI)
+        familied = _INGREDIENT_FAMILY_MAP.get(key)
+        if familied:
+            result = self.ingredient_lookup.get(familied)
+            if result:
+                return result
+
+        # Step 5: Normalized form (strip punctuation for fuzzy-ready key)
+        normalized = self._normalize_ingredient(key)
+        if normalized in self.ingredient_lookup:
+            return self.ingredient_lookup[normalized]
+
+        # Try alias/family maps on normalized form too
+        aliased_norm = _INGREDIENT_ALIASES.get(normalized)
+        if aliased_norm and aliased_norm in self.ingredient_lookup:
+            return self.ingredient_lookup[aliased_norm]
+        familied_norm = _INGREDIENT_FAMILY_MAP.get(normalized)
+        if familied_norm and familied_norm in self.ingredient_lookup:
+            return self.ingredient_lookup[familied_norm]
+
+        # Step 6: Fuzzy match — last resort, 85% threshold
+        match = process.extractOne(
+            normalized,
+            list(self.ingredient_lookup.keys()),
+            scorer=fuzz.token_set_ratio,
+            score_cutoff=85
+        )
+        if match:
+            return self.ingredient_lookup[match[0]]
+
+        return None
+
+    def _load_surfactant_db(self):
+        """Load surfactant_database.csv → self.surfactant_db (inci_lower → row_dict)."""
+        try:
+            path = os.path.join(self.database_path, 'surfactant_database.csv')
+            if not os.path.exists(path):
+                logger.warning("surfactant_database.csv not found")
+                return
+            df = pd.read_csv(path)
+            df.columns = df.columns.str.strip()
+            for _, row in df.iterrows():
+                inci = str(row.get('INCI_Name', '')).strip()
+                if inci and inci != 'nan':
+                    entry = row.to_dict()
+                    for k, v in entry.items():
+                        if isinstance(v, float) and pd.isna(v):
+                            entry[k] = ''
+                    self.surfactant_db[inci.lower()] = entry
+            logger.info(f"Loaded {len(self.surfactant_db)} surfactants from surfactant_database.csv")
+        except Exception as e:
+            logger.error(f"Error loading surfactant DB: {e}")
+
+    def _load_role_weight_table(self):
+        """Load ingredient_role_weight_table.csv → self.role_weight_table (role_lower → float)."""
+        try:
+            path = os.path.join(self.database_path, 'ingredient_role_weight_table.csv')
+            if not os.path.exists(path):
+                logger.warning("ingredient_role_weight_table.csv not found")
+                return
+            df = pd.read_csv(path)
+            df.columns = df.columns.str.strip()
+            for _, row in df.iterrows():
+                role = str(row.get('Role', '')).strip().lower()
+                if role and role != 'nan':
+                    try:
+                        self.role_weight_table[role] = float(row.get('Role_Weight', 3.0))
+                    except (ValueError, TypeError):
+                        pass
+            logger.info(f"Loaded {len(self.role_weight_table)} role weights from ingredient_role_weight_table.csv")
+        except Exception as e:
+            logger.error(f"Error loading role weight table: {e}")
+
+    def get_surfactant_data(self, ingredient_name):
+        """Look up surfactant data for an ingredient."""
         if not ingredient_name:
             return None
         key = ingredient_name.strip().lower()
-        if key in self.ingredient_lookup:
-            return self.ingredient_lookup[key]
+        if key in self.surfactant_db:
+            return self.surfactant_db[key]
         normalized = self._normalize_ingredient(ingredient_name)
-        if normalized in self.ingredient_lookup:
-            return self.ingredient_lookup[normalized]
-        match = process.extractOne(normalized, list(self.ingredient_lookup.keys()), scorer=fuzz.token_set_ratio, score_cutoff=85)
-        if match:
-            return self.ingredient_lookup[match[0]]
-        return None
+        return self.surfactant_db.get(normalized)
+
+    def get_synergy_partners(self, ingredient_name):
+        """Return set of synergistic partner names (lowercase) for an ingredient."""
+        if not ingredient_name:
+            return set()
+        return self.synergy_partners_map.get(ingredient_name.strip().lower(), set())
 
     def is_loaded(self):
         return len(self.ingredient_lookup) > 0

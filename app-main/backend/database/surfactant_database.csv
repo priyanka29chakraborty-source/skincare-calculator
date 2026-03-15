@@ -1,0 +1,68 @@
+INCI_Name,Surfactant_Type,Harshness_Score,Foam_Score,Irritation_Risk
+Sodium Lauryl Sulfate,Anionic,9,10,High
+Sodium Laureth Sulfate,Anionic,7,9,Medium
+Ammonium Lauryl Sulfate,Anionic,9,10,High
+Ammonium Laureth Sulfate,Anionic,7,9,Medium
+Sodium Myreth Sulfate,Anionic,7,9,Medium
+Sodium Cocoyl Isethionate,Anionic,3,6,Low
+Sodium Lauroyl Sarcosinate,Anionic,4,7,Low
+Sodium Lauroyl Methyl Isethionate,Anionic,3,6,Low
+Sodium Methyl Cocoyl Taurate,Anionic,3,6,Low
+Sodium Cocoyl Glutamate,Anionic,3,5,Low
+Sodium Lauroyl Glutamate,Anionic,3,5,Low
+Disodium Laureth Sulfosuccinate,Anionic,4,6,Low
+Sodium Lauryl Sulfoacetate,Anionic,5,7,Medium
+Sodium Stearoyl Glutamate,Anionic,3,5,Low
+Sodium Lauroyl Oat Amino Acids,Anionic,3,5,Low
+Cocamidopropyl Betaine,Amphoteric,5,7,Medium
+Coco Betaine,Amphoteric,5,7,Medium
+Lauramidopropyl Betaine,Amphoteric,5,7,Medium
+Sodium Cocoamphoacetate,Amphoteric,3,5,Low
+Disodium Cocoamphodiacetate,Amphoteric,3,5,Low
+Sodium Lauroamphoacetate,Amphoteric,3,5,Low
+Sodium Lauroamphodiacetate,Amphoteric,3,5,Low
+Decyl Glucoside,Nonionic,3,5,Low
+Lauryl Glucoside,Nonionic,3,5,Low
+Coco Glucoside,Nonionic,3,5,Low
+Caprylyl/Capryl Glucoside,Nonionic,3,5,Low
+Polysorbate 20,Nonionic,2,2,Low
+Polysorbate 80,Nonionic,2,2,Low
+PEG-7 Glyceryl Cocoate,Nonionic,2,3,Low
+PEG-40 Hydrogenated Castor Oil,Nonionic,2,3,Low
+PEG-80 Sorbitan Laurate,Nonionic,2,3,Low
+PEG-120 Methyl Glucose Dioleate,Nonionic,2,3,Low
+Behentrimonium Chloride,Cationic,3,1,Low
+Cetrimonium Chloride,Cationic,4,1,Medium
+Stearalkonium Chloride,Cationic,4,1,Medium
+Behentrimonium Methosulfate,Cationic,3,1,Low
+Distearoylethyl Dimonium Chloride,Cationic,3,1,Low
+Potassium Cocoyl Glycinate,Anionic,3,6,Low
+Potassium Cocoate,Anionic,6,8,Medium
+Sodium Cocoate,Anionic,6,8,Medium
+Potassium Oleate,Anionic,6,8,Medium
+Sodium Oleate,Anionic,6,8,Medium
+Sodium Palmate,Anionic,7,8,Medium
+Sodium Palm Kernelate,Anionic,7,8,Medium
+Sodium Tallowate,Anionic,7,8,Medium
+Sodium Cocoyl Apple Amino Acids,Anionic,3,5,Low
+Cocamidopropyl Hydroxysultaine,Amphoteric,3,7,Low
+Lauryl Hydroxysultaine,Amphoteric,3,7,Low
+Sodium Cocoyl Glycinate,Anionic,3,7,Low
+Sodium Lauroyl Methyl Taurate,Anionic,3,6,Low
+Sodium Myristoyl Glutamate,Anionic,3,5,Low
+Potassium Lauroyl Glutamate,Anionic,3,5,Low
+Sodium Cocoyl Alaninate,Anionic,3,6,Low
+Sucrose Cocoate,Nonionic,2,2,Low
+Sucrose Laurate,Nonionic,2,2,Low
+Sorbitan Oleate,Nonionic,2,1,Low
+Glyceryl Laurate,Nonionic,2,1,Low
+Methyl Gluceth-10,Nonionic,1,0,Low
+Methyl Gluceth-20,Nonionic,1,0,Low
+Sophorolipids,Biosurfactant,2,3,Low
+Rhamnolipids,Biosurfactant,2,3,Low
+Sodium Surfactin,Biosurfactant,2,2,Low
+Sodium C14-16 Olefin Sulfonate,Anionic,8,9,High
+Sodium Xylene Sulfonate,Hydrotrope,4,1,Medium
+Quillaja Saponaria Extract,Natural Saponin,4,5,Medium
+Sapindus Mukorossi Fruit Extract,Natural Saponin,4,5,Medium
+Yucca Schidigera Stem Extract,Natural Saponin,4,4,Medium

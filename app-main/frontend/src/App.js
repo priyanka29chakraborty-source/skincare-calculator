@@ -24,6 +24,7 @@ function App() {
   const [fetchLoading, setFetchLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [fetchMsg, setFetchMsg] = useState("");
+  const [fetchStatus, setFetchStatus] = useState(""); // "success" | "partial" | "failed"
   const [alternatives, setAlternatives] = useState(null);
   const [altLoading, setAltLoading] = useState(false);
   const [bestPrice, setBestPrice] = useState(null);
@@ -124,7 +125,7 @@ function App() {
 
   const handleFetch = useCallback(async () => {
     if (!fetchInput.trim()) return;
-    setFetchLoading(true); setFetchError(""); setFetchMsg("");
+    setFetchLoading(true); setFetchError(""); setFetchMsg(""); setFetchStatus("");
     const isBarcode = /^\d{8,14}$/.test(fetchInput.trim());
     const isUrl = fetchInput.trim().startsWith("http");
     if (!isBarcode && !isUrl) { setFetchError("Enter a valid barcode or product URL"); setFetchLoading(false); return; }
@@ -168,11 +169,18 @@ function App() {
       if (data.category) setCategory(data.category);
       if (data.active_concentrations) setActiveConcentrations(data.active_concentrations);
       if (data.scrape_failed) {
+        setFetchStatus("failed");
         setFetchError("⚠️ Could not fetch product details from this URL. Please fill in the fields manually.");
-      } else if (data.message) setFetchMsg(data.message);
-      else if (data.price_note) setFetchMsg(data.price_note);
-      else if (data.partial) setFetchMsg("Some fields not found — please check and fill in manually.");
-      else if (!data.partial && data.ingredients) setFetchMsg("Product details fetched successfully!");
+      } else if (data.message || data.partial) {
+        setFetchStatus("partial");
+        setFetchMsg(data.message || "Some fields could not be fetched. Please fill in the missing fields manually.");
+      } else if (data.price_note && !data.partial) {
+        setFetchStatus("partial");
+        setFetchMsg(data.price_note);
+      } else if (!data.partial && data.ingredients) {
+        setFetchStatus("success");
+        setFetchMsg("Product details fetched successfully!");
+      }
     } catch (e) { setFetchError(e.response?.data?.error || "Failed to fetch. Please fill in manually."); }
     finally { setFetchLoading(false); }
   }, [fetchInput]);
@@ -180,7 +188,7 @@ function App() {
   const handleClear = () => {
     setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml"); setCategory("Serum");
     setSkinType(""); setConcerns([]); setCountry("India"); setProductName(""); setBrand("");
-    setResult(null); setError(""); setFetchInput(""); setFetchError(""); setFetchMsg("");
+    setResult(null); setError(""); setFetchInput(""); setFetchError(""); setFetchMsg(""); setFetchStatus("");
     setAlternatives(null); setBestPrice(null); setActiveConcentrations({});
   };
 
@@ -197,7 +205,7 @@ function App() {
       <main className="sc-main">
         <InputForm
           fetchInput={fetchInput} setFetchInput={setFetchInput}
-          fetchLoading={fetchLoading} fetchMsg={fetchMsg} fetchError={fetchError} handleFetch={handleFetch}
+          fetchLoading={fetchLoading} fetchMsg={fetchMsg} fetchStatus={fetchStatus} fetchError={fetchError} handleFetch={handleFetch}
           productName={productName} setProductName={setProductName}
           brand={brand} setBrand={setBrand}
           price={price} setPrice={setPrice}

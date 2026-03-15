@@ -22,13 +22,24 @@ BROWSER_HEADERS = {
 }
 
 CATEGORY_KEYWORDS = {
-    'serum': 'Serum', 'moisturizer': 'Moisturizer', 'moisturiser': 'Moisturizer',
-    'cleanser': 'Cleanser', 'face wash': 'Cleanser', 'toner': 'Toner',
-    'sunscreen': 'Sunscreen', 'spf': 'Sunscreen', 'eye cream': 'Eye Cream',
-    'mask': 'Mask', 'facial oil': 'Facial Oil', 'treatment': 'Treatment',
-    'exfoliat': 'Treatment', 'peel': 'Treatment', 'cream': 'Moisturizer',
-    'lotion': 'Moisturizer', 'gel': 'Moisturizer', 'mist': 'Toner',
-    'essence': 'Toner', 'ampoule': 'Serum',
+    # UV / sunscreen — check first (these often also say "cream")
+    'sunscreen': 'Sunscreen', 'spf': 'Sunscreen', 'sun protection': 'Sunscreen',
+    # Eye
+    'eye cream': 'Eye Cream', 'eye serum': 'Eye Cream',
+    # Oils — check before cream/gel/lotion to avoid "face oil" → Moisturizer
+    'facial oil': 'Facial Oil', 'face oil': 'Facial Oil', 'face serum oil': 'Facial Oil',
+    'hair oil': 'Facial Oil',   # unlikely but prevents wrong match
+    'dry oil': 'Facial Oil',
+    # Standard
+    'serum': 'Serum', 'ampoule': 'Serum', 'concentrate': 'Serum',
+    'moisturizer': 'Moisturizer', 'moisturiser': 'Moisturizer',
+    'cream': 'Moisturizer', 'lotion': 'Moisturizer',
+    'gel moisturizer': 'Moisturizer', 'gel cream': 'Moisturizer',
+    'cleanser': 'Cleanser', 'face wash': 'Cleanser', 'foaming wash': 'Cleanser',
+    'toner': 'Toner', 'mist': 'Toner', 'essence': 'Toner',
+    'mask': 'Mask', 'treatment': 'Treatment',
+    'exfoliat': 'Treatment', 'peel': 'Treatment',
+    'gel': 'Moisturizer',
 }
 
 TLD_COUNTRY_MAP = {
@@ -77,6 +88,7 @@ KNOWN_SHOPIFY_DOMAINS = [
     'thedermacompany.com', 'fixderma.com', 'purplle.com', 'juicychemistry.com',
     'wowskinscience.com', 'forestessentialsindia.com', 'kamaayurveda.com',
     'cosiq.in', 'reequil.com', 'minimalistskincare.com', 'consciouschemist.com',
+    '82e.com',
     # International Shopify
     'cosrx.com', 'paulaschoice.com', 'adorebeauty.com.au',
 ]
@@ -110,6 +122,7 @@ SITE_ROUTING = {
     'kamaayurveda.com':   ['shopify', 'firecrawl'],
     'cosiq.in':           ['shopify', 'firecrawl'],
     'reequil.com':        ['shopify', 'firecrawl'],
+    '82e.com':            ['shopify', 'cloud', 'firecrawl'],
     # International — Shopify
     'cosrx.com':          ['shopify', 'firecrawl'],
     'paulaschoice.com':   ['shopify', 'firecrawl'],
@@ -206,9 +219,13 @@ def _detect_category(text):
     if not text:
         return None
     text_lower = text.lower()
+    # Check multi-word keywords first (dict is insertion-ordered, multi-word keys come first above)
     for kw, cat in CATEGORY_KEYWORDS.items():
         if kw in text_lower:
             return cat
+    # Bare "oil" at word boundary — catch "Bakuchiol Slip Glowing Face Oil" etc.
+    if re.search(r'\boil\b', text_lower):
+        return 'Facial Oil'
     return None
 
 
@@ -234,13 +251,45 @@ def _clean_product_name(name):
 def _extract_ingredients_from_body_html(body_html):
     """Extract INCI list from Shopify body_html field.
     Handles aqueous AND non-aqueous formulas (e.g. PDRN serums, oils, anhydrous products).
+    Also handles accordion/tab layouts used by some Shopify themes (82e.com, etc.)
     """
     if not body_html:
         return None
     soup = BeautifulSoup(body_html, 'html.parser')
     plain = soup.get_text(separator=' ')
 
-    # Strategy 1: After "Ingredients:" / "INCI:" label — any INCI content
+    # Strategy 0: Accordion/tab blocks (82e.com and similar Shopify themes store
+    # ingredients inside hidden divs with data-tab, data-content, or tab__content class)
+    _TAB_ATTRS = ['data-tab', 'data-content', 'data-accordion-content', 'data-tab-content']
+    for attr in _TAB_ATTRS:
+        for block in soup.find_all(['div', 'section', 'li', 'article'], attrs={attr: True}):
+            block_text = block.get_text(separator=' ', strip=True)
+            if not re.search(r'\bingredients?\b|\binci\b', block_text, re.I):
+                continue
+            m = re.search(
+                r'(?:Ingredients?|INCI|Full\s+Ingredients?(?:\s*List)?)\s*[:\-]?\s*'
+                r'([A-Za-z][A-Za-z0-9\s,\(\)\-\.\/\%]{40,2000})',
+                block_text, re.IGNORECASE
+            )
+            if m and m.group(1).count(',') >= 3:
+                return m.group(1).strip()
+            if block_text.count(',') >= 5 and len(block_text) > 80:
+                return block_text
+    # Also check class-based tab containers
+    for block in soup.find_all(['div', 'section'], class_=re.compile(
+            r'tab.{0,20}content|accordion.{0,20}body|product.{0,20}tab|collapsible.{0,20}content', re.I)):
+        block_text = block.get_text(separator=' ', strip=True)
+        if not re.search(r'\bingredients?\b|\binci\b', block_text, re.I):
+            continue
+        m = re.search(
+            r'(?:Ingredients?|INCI|Full\s+Ingredients?(?:\s*List)?)\s*[:\-]?\s*'
+            r'([A-Za-z][A-Za-z0-9\s,\(\)\-\.\/\%]{40,2000})',
+            block_text, re.IGNORECASE
+        )
+        if m and m.group(1).count(',') >= 3:
+            return m.group(1).strip()
+
+    # Strategy 1: After "Ingredients:" / "INCI:" label -- any INCI content
     m = re.search(
         r'(?:all\s+)?(?:Ingredients?|INCI|Full\s+Ingredients?(?:\s*List)?)\s*[:\-]\s*'
         r'([A-Z][A-Za-z0-9\s,\(\)\-\.\/%]{40,2000})',
@@ -248,7 +297,6 @@ def _extract_ingredients_from_body_html(body_html):
     )
     if m:
         candidate = m.group(1).strip()
-        # Must look like an INCI list: has commas, not all marketing text
         if candidate.count(',') >= 3:
             return candidate
 
@@ -260,7 +308,7 @@ def _extract_ingredients_from_body_html(body_html):
     if m:
         return m.group(1).strip()
 
-    # Strategy 3: Non-aqueous INCI — common anhydrous first ingredients
+    # Strategy 3: Non-aqueous INCI -- common anhydrous first ingredients
     _ANHYDROUS_FIRST = (
         'pentylene glycol', 'glycerin', 'propanediol', 'butylene glycol',
         'caprylic', 'dimethicone', 'cyclopentasiloxane', 'squalane',
@@ -275,8 +323,6 @@ def _extract_ingredients_from_body_html(body_html):
             return m.group(1).strip()
 
     return None
-
-
 def _parse_size(text, product_name=None):
     """Extract size (value + unit) from text. Returns (float, str) or (None, 'ml')."""
     search_text = (product_name or '') + ' ' + (text or '')
@@ -418,16 +464,29 @@ def _fetch_shopify_json(url):
         logger.info(f"Shopify JSON: name={bool(name)}, brand={bool(brand)}, price={price}, "
                      f"size={size_ml}, ingredients={bool(ingredients)}")
 
+        # Extract concentrations from product name and ingredients
+        active_concentrations = {}
+        try:
+            from scoring import _parse_concentrations_from_name, extract_concentrations_from_inci
+            if name:
+                active_concentrations.update(_parse_concentrations_from_name(name))
+            if ingredients:
+                active_concentrations.update(extract_concentrations_from_inci(ingredients))
+        except Exception:
+            pass
+
         return {
             'product_name': name or None,
             'brand': brand or None,
             'price': price,
+            'price_confidence': 'high',
             'size_ml': size_ml,
             'size_unit': size_unit,
             'ingredients': ingredients,
             'category': category,
             'country': country,
             'currency': currency,
+            'active_concentrations': active_concentrations,
             'source': 'shopify_json',
         }
     except Exception as e:

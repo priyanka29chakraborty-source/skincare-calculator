@@ -1,7 +1,7 @@
 import { CONCERNS_LIST, SKIN_TYPES, CATEGORIES, COUNTRIES, SIZE_UNITS, CURRENCY_MAP } from "../constants";
 
 export default function InputForm({
-  fetchInput, setFetchInput, fetchLoading, fetchMsg, fetchError, handleFetch,
+  fetchInput, setFetchInput, fetchLoading, fetchMsg, fetchStatus, fetchError, handleFetch,
   productName, setProductName, brand, setBrand, price, setPrice,
   size, setSize, sizeUnit, setSizeUnit, category, setCategory, country, setCountry,
   ingredients, setIngredients, skinType, setSkinType, concerns, toggleConcern,
@@ -21,8 +21,26 @@ export default function InputForm({
             {fetchLoading ? <><i className="fa-solid fa-spinner fa-spin"></i> Fetching...</> : <><i className="fa-solid fa-download"></i> Fetch Details</>}
           </button>
         </div>
-        {fetchMsg && <div className="fetch-msg" data-testid="fetch-message">{fetchMsg}</div>}
-        {fetchError && <div className="fetch-error-msg" data-testid="fetch-error"><i className="fa-solid fa-triangle-exclamation"></i> {fetchError}</div>}
+        {fetchStatus === "success" && fetchMsg && (
+          <div style={{ marginTop: "6px", padding: "7px 12px", borderRadius: "6px", background: "#E8F5E9", border: "1px solid #66BB6A", fontSize: "0.78rem", color: "#1B5E20", display: "flex", alignItems: "center", gap: "7px" }}>
+            <i className="fa-solid fa-circle-check" style={{ flexShrink: 0 }}></i>
+            <span>{fetchMsg}</span>
+          </div>
+        )}
+        {fetchStatus === "partial" && fetchMsg && (
+          <div style={{ marginTop: "6px", padding: "7px 12px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FFD54F", fontSize: "0.78rem", color: "#7A5C00", display: "flex", alignItems: "center", gap: "7px" }}>
+            <i className="fa-solid fa-triangle-exclamation" style={{ flexShrink: 0 }}></i>
+            <span>{fetchMsg}</span>
+          </div>
+        )}
+        {fetchStatus === "failed" && fetchError && (
+          <div style={{ marginTop: "6px", padding: "7px 12px", borderRadius: "6px", background: "#FFEBEE", border: "1px solid #EF9A9A", fontSize: "0.78rem", color: "#B71C1C", display: "flex", alignItems: "center", gap: "7px" }}>
+            <i className="fa-solid fa-circle-xmark" style={{ flexShrink: 0 }}></i>
+            <span>{fetchError}</span>
+          </div>
+        )}
+        {!fetchStatus && fetchMsg && <div className="fetch-msg" data-testid="fetch-message">{fetchMsg}</div>}
+        {!fetchStatus && fetchError && <div className="fetch-error-msg" data-testid="fetch-error"><i className="fa-solid fa-triangle-exclamation"></i> {fetchError}</div>}
         <div className="or-divider">or enter manually</div>
         <div className="form-grid">
           <div className="field-group">
@@ -65,23 +83,6 @@ export default function InputForm({
             <label className="field-label">Ingredients (INCI List)</label>
             <textarea className="field-textarea" data-testid="ingredients-input" value={ingredients} onChange={e => setIngredients(e.target.value)}
               placeholder="Aqua, Niacinamide, Pentylene Glycol, Zinc PCA, Sodium Hyaluronate..." />
-            {fetchMsg && ingredients && (
-              <div style={{
-                marginTop: "6px",
-                padding: "7px 12px",
-                borderRadius: "6px",
-                background: "#FFF8E1",
-                border: "1px solid #FFD54F",
-                fontSize: "0.78rem",
-                color: "#7A5C00",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "7px",
-              }}>
-                <i className="fa-solid fa-triangle-exclamation" style={{ marginTop: "2px", flexShrink: 0 }}></i>
-                <span>Some websites do not show the full INCI. Please cross-check this list with the product packaging or label photo to ensure all ingredients are present.</span>
-              </div>
-            )}
           </div>
         </div>
       </div>

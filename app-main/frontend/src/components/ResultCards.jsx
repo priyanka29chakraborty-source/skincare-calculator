@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { getBarColor } from "../constants";
 import { ScoreCircle, TierBadge, BreakdownRow, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
 import AlternativesCard from "./AlternativesCard";
@@ -81,6 +81,160 @@ function IngredientBreakdownTable({ actives }) {
       <p style={{ fontSize: "0.72rem", color: "var(--text-sub)", marginTop: "8px", fontStyle: "italic" }}>
         ℹ️ <span style={{ color: '#267C36', fontWeight: 600 }}>✓ Green % = confirmed from product page or INCI annotation.</span> All other estimates are based on INCI position and may not reflect actual formulation.
       </p>
+    </div>
+  );
+}
+
+
+
+// ── 1% Line Visualiser ──────────────────────────────────────────────────────
+function OnePercentVisualiser({ marker }) {
+  const [open, setOpen] = React.useState(false);
+  if (!marker) return null;
+  const above = marker.above_marker || [];
+  const below = marker.below_marker || [];
+  return (
+    <div style={{ marginTop: '14px', borderRadius: '10px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', background: 'var(--bg-deep)', border: 'none', padding: '9px 14px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)' }}>
+        <span><i className="fa-solid fa-layer-group" style={{ marginRight: '6px', color: '#5B4FBE' }}></i>
+          INCI 1% Threshold Visualiser
+        </span>
+        <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'} fa-xs`} style={{ color: 'var(--text-sub)' }}></i>
+      </button>
+      {open && (
+        <div style={{ padding: '12px 14px', fontSize: '0.76rem' }}>
+          <div style={{ marginBottom: '8px', color: 'var(--text-sub)', lineHeight: '1.5' }}>
+            EU/US law requires ingredients above 1% to be listed from highest to lowest.
+            Ingredients below the threshold line can appear in any order — exact % unknown.
+          </div>
+          {above.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontWeight: 700, color: '#267C36', marginBottom: '5px', fontSize: '0.72rem',
+                textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                ✅ Above 1% — descending order confirmed
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {above.map((ing, i) => (
+                  <span key={i} style={{ background: '#f0faf2', border: '1px solid #a8dab5', borderRadius: '6px',
+                    padding: '3px 8px', color: '#1a5c2a', fontSize: '0.72rem' }}>{ing}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0',
+            fontSize: '0.7rem', color: '#5B4FBE', fontWeight: 700 }}>
+            <div style={{ flex: 1, height: '1px', background: '#5B4FBE', opacity: 0.4 }}></div>
+            <span>≈1% line · {marker.ingredient}</span>
+            <div style={{ flex: 1, height: '1px', background: '#5B4FBE', opacity: 0.4 }}></div>
+          </div>
+          {below.length > 0 && (
+            <div>
+              <div style={{ fontWeight: 700, color: '#8B7355', marginBottom: '5px', fontSize: '0.72rem',
+                textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                ⚠ Below 1% — any order, concentration unknown
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {below.map((ing, i) => (
+                  <span key={i} style={{ background: '#faf8f3', border: '1px solid var(--border)', borderRadius: '6px',
+                    padding: '3px 8px', color: 'var(--text-sub)', fontSize: '0.72rem' }}>{ing}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── pH Analysis Card ────────────────────────────────────────────────────────
+function PhAnalysisSection({ ph }) {
+  if (!ph || !ph.ph_range) return null;
+  const hasWarnings = ph.warnings && ph.warnings.length > 0;
+  return (
+    <div style={{ marginTop: '14px', borderRadius: '10px',
+      background: hasWarnings ? '#fffaf0' : '#f7fbff',
+      border: `1px solid ${hasWarnings ? '#fde8b0' : '#c8e0f4'}`, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+        <i className="fa-solid fa-flask-vial" style={{ color: hasWarnings ? '#C9A96E' : '#2D7FD3', fontSize: '0.9rem' }}></i>
+        <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-main)' }}>
+          Formula pH Inference
+        </span>
+        <span style={{ fontSize: '0.68rem', background: 'var(--border)', padding: '2px 7px',
+          borderRadius: '10px', color: 'var(--text-sub)' }}>
+          {ph.confidence === 'medium' ? 'Medium confidence' : 'Estimate only'}
+        </span>
+        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '0.8rem',
+          color: hasWarnings ? '#C9A96E' : '#2D7FD3' }}>
+          pH {ph.ph_range[0]}–{ph.ph_range[1]}
+        </span>
+      </div>
+      {ph.notes && ph.notes.map((n, i) => (
+        <div key={i} style={{ fontSize: '0.75rem', color: 'var(--text-sub)', marginBottom: '4px',
+          paddingLeft: '4px' }}>{n}</div>
+      ))}
+      {hasWarnings && ph.warnings.map((w, i) => (
+        <div key={i} style={{ fontSize: '0.75rem', color: '#856404', background: '#fff3cd',
+          border: '1px solid #fde8b0', borderRadius: '6px', padding: '6px 10px', marginTop: '6px' }}>
+          ⚠ {w}
+        </div>
+      ))}
+      <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', marginTop: '8px', fontStyle: 'italic' }}>
+        pH is inferred from buffering/adjusting ingredients in the INCI — brands rarely disclose actual pH.
+        This estimate is directional, not a lab measurement.
+      </div>
+    </div>
+  );
+}
+
+// ── Ingredient Conflicts Section ────────────────────────────────────────────
+function ConflictsSection({ conflicts }) {
+  if (!conflicts || conflicts.length === 0) return null;
+  const severityStyle = {
+    high:     { bg: '#fff0f0', border: '#f5c6cb', text: '#721C24', icon: '🚨' },
+    moderate: { bg: '#fffaf0', border: '#fde8b0', text: '#856404', icon: '⚠️' },
+    low:      { bg: '#f0f8ff', border: '#bee5eb', text: '#0c5460', icon: 'ℹ️' },
+  };
+  return (
+    <div style={{ marginTop: '14px' }}>
+      <div style={{ fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-main)',
+        display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <i className="fa-solid fa-triangle-exclamation" style={{ color: '#C9A96E' }}></i>
+        In-Formula Interactions
+      </div>
+      {conflicts.map((c, i) => {
+        const s = severityStyle[c.severity] || severityStyle.low;
+        return (
+          <div key={i} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '8px',
+            padding: '9px 12px', marginBottom: '6px', fontSize: '0.76rem', color: s.text, lineHeight: '1.5' }}>
+            {s.icon} {c.message}
+          </div>
+        );
+      })}
+      <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', fontStyle: 'italic', marginTop: '4px' }}>
+        These interactions are within a single product formula. For routine layering conflicts, check with a dermatologist.
+      </div>
+    </div>
+  );
+}
+
+// ── Delivery Systems Badge ───────────────────────────────────────────────────
+function DeliveryBadge({ systems }) {
+  if (!systems || systems.length === 0) return null;
+  return (
+    <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+      <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 600 }}>Advanced delivery:</span>
+      {systems.map((d, i) => (
+        <span key={i} style={{ fontSize: '0.72rem', background: '#f0ecff', border: '1px solid #d0c8f5',
+          borderRadius: '8px', padding: '3px 9px', color: '#5B4FBE', fontWeight: 600 }}
+          title={d.ingredient}>
+          ⚡ {d.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -300,12 +454,28 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
             {result.price_analysis?.value_tier && result.price_analysis.value_tier !== 'fair' && (
               <div style={{ color: valueChip.color, fontSize: "0.75rem", fontWeight: 600, marginBottom: "4px" }}>
-                {result.price_analysis.value_tier === 'overpriced' ? 'But Overpriced vs Category Avg' :
-                 result.price_analysis.value_tier === 'slightly_overpriced' ? 'But Slightly Overpriced' :
-                 result.price_analysis.value_tier === 'underpriced' ? 'Good Value for Money' : null}
+                {result.price_analysis.value_tier === 'overpriced'
+                  ? `Priced ${result.price_analysis.vs_average} above the category average`
+                  : result.price_analysis.value_tier === 'slightly_overpriced'
+                  ? `Slightly above category average (${result.price_analysis.vs_average})`
+                  : result.price_analysis.value_tier === 'underpriced'
+                  ? `Priced below category average — good value`
+                  : null}
               </div>
             )}
             <p className="score-title-text">{result.score_title}</p>
+            {/* Change 7: honest confidence badge */}
+            {result.score_confidence && (
+              <div style={{ fontSize: '0.68rem', marginTop: '6px', padding: '4px 9px', borderRadius: '8px',
+                background: result.score_confidence_level === 'medium' ? '#f0faf2' : '#faf8f3',
+                border: `1px solid ${result.score_confidence_level === 'medium' ? '#a8dab5' : 'var(--border)'}`,
+                color: result.score_confidence_level === 'medium' ? '#1a5c2a' : '#7A7168',
+                display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
+                <i className={`fa-solid ${result.score_confidence_level === 'medium' ? 'fa-circle-check' : 'fa-circle-info'} fa-xs`}
+                  style={{ marginTop: '2px', flexShrink: 0 }}></i>
+                <span>{result.score_confidence}</span>
+              </div>
+            )}
             {result.worth_multipliers_applied?.length > 0 && (
               <p className="multipliers">Bonus: {result.worth_multipliers_applied.join(", ")}</p>
             )}
@@ -350,6 +520,18 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           </div>
         )}
 
+        {/* Change 6: Delivery systems badge */}
+        <DeliveryBadge systems={result.delivery_systems} />
+
+        {/* Change 1: 1% Line Visualiser */}
+        <OnePercentVisualiser marker={result.one_percent_marker} />
+
+        {/* Change 3: Ingredient conflicts */}
+        <ConflictsSection conflicts={result.ingredient_conflicts} />
+
+        {/* Change 4: pH inference */}
+        <PhAnalysisSection ph={result.ph_analysis} />
+
         {/* Active Classes Buckets */}
 
       </div>
@@ -373,14 +555,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       {/* CARD 3: SKIN TYPE COMPAT */}
       <div className="sc-card result-card card-3" data-testid="card-skin-type" style={{ "--anim-delay": "0.3s" }}>
         <h2 className="card-title"><i className="fa-solid fa-user-check"></i> {skinType} Skin Compatibility</h2>
-        <div style={{ marginBottom: "8px", fontSize: "0.8rem", color: "var(--text-sub)" }}>
-          Base texture compatibility for {skinType} skin: <strong style={{ color: getBarColor(result.skin_type_base_texture || result.skin_type_compatibility) }}>{result.skin_type_base_texture || result.skin_type_compatibility}%</strong>
-          {result.skin_type_base_texture && result.skin_type_base_texture !== result.skin_type_compatibility && (
-            <span style={{ marginLeft: "6px", color: "var(--text-sub)", fontSize: "0.75rem" }}>
-              → Final score adjusted to <strong>{result.skin_type_compatibility}%</strong> after ingredient-level risk checks (irritancy, comedogenicity, formulation penalties).
-            </span>
-          )}
-        </div>
+
         <div className="compat-score-row">
           <span className="compat-pct" style={{ color: getBarColor(result.skin_type_compatibility) }}>{result.skin_type_compatibility}%</span>
           <ProgressBar pct={result.skin_type_compatibility} label="compat" />
@@ -408,7 +583,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading} currency={currency} fetchInput={fetchInput} />
 
       <div className="disclaimer" data-testid="disclaimer">
-        This tool works best with products that clearly disclose their ingredient list and active concentrations. Educational information only, not medical advice. Consult a dermatologist for personalized recommendations.
+        <strong>How to read this analysis:</strong> Scores are estimates based on INCI ingredient position and clinical evidence data — not lab measurements. Ingredient concentrations are inferred from list order (EU/US law requires &gt;1% ingredients in descending order). Confirmed % values (shown in green) come from the product page or INCI annotations only. pH inference is directional, not a lab test. Ingredient conflicts shown are within the single formula — always patch test new products. This tool is for educational purposes only and is not medical or dermatological advice. Consult a dermatologist for personalised skin concerns.
       </div>
     </>
   );

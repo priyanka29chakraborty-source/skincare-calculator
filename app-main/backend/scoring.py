@@ -393,6 +393,204 @@ MARKETING_BUZZWORDS = {
 }
 
 
+# ─── 1% Marker ────────────────────────────────────────────────────────────────
+
+def _find_one_percent_marker(ingredient_list):
+    """Find the first known ≤1% threshold ingredient in the INCI list.
+    EU/US law: ingredients above 1% must be listed highest to lowest.
+    Everything before this marker is confirmed >1%. Everything after may be <1%.
+    Returns (index, ingredient_name) or (None, None).
+    """
+    from config import CONCENTRATION_THRESHOLDS
+    for i, ing in enumerate(ingredient_list):
+        for marker in CONCENTRATION_THRESHOLDS:
+            if marker.lower() in ing.lower():
+                return i, ing
+    return None, None
+
+
+# ─── Ingredient Conflicts ─────────────────────────────────────────────────────
+
+_INGREDIENT_CONFLICTS = [
+    {
+        'triggers': ['retinol', 'glycolic acid'],
+        'severity': 'moderate',
+        'message': 'Retinol + Glycolic Acid in one formula can cause over-exfoliation. Better used on alternate nights.',
+    },
+    {
+        'triggers': ['retinol', 'lactic acid'],
+        'severity': 'moderate',
+        'message': 'Retinol + Lactic Acid together increases irritation risk. Alternate nights recommended.',
+    },
+    {
+        'triggers': ['retinol', 'salicylic acid'],
+        'severity': 'moderate',
+        'message': 'Retinol + BHA: increased irritation risk, especially for sensitive skin. Fine for oily/resilient skin.',
+    },
+    {
+        'triggers': ['retinol', 'benzoyl peroxide'],
+        'severity': 'high',
+        'message': 'Benzoyl Peroxide oxidises Retinol and destroys its effectiveness. Avoid using together.',
+    },
+    {
+        'triggers': ['retinal', 'benzoyl peroxide'],
+        'severity': 'high',
+        'message': 'Benzoyl Peroxide oxidises Retinal/Retinaldehyde. These conflict in the same formula.',
+    },
+    {
+        'triggers': ['copper tripeptide', 'ascorbic acid'],
+        'severity': 'high',
+        'message': 'Copper peptides + Vitamin C react and reduce the effectiveness of both. Use in separate routines.',
+    },
+    {
+        'triggers': ['copper tripeptide', 'glycolic acid'],
+        'severity': 'high',
+        'message': 'Copper peptides degrade in acidic pH. Avoid layering directly with AHAs.',
+    },
+    {
+        'triggers': ['niacinamide', 'ascorbic acid'],
+        'severity': 'low',
+        'message': 'Old concern about Niacinamide + Vitamin C causing flushing. Modern research shows stable formulations handle this fine.',
+    },
+]
+
+def detect_ingredient_conflicts(ingredient_list):
+    """Check for known problematic ingredient pairings within a single product formula."""
+    ing_str = ' '.join(i.strip().lower() for i in ingredient_list)
+    found = []
+    for conflict in _INGREDIENT_CONFLICTS:
+        if all(trigger in ing_str for trigger in conflict['triggers']):
+            found.append({
+                'severity': conflict['severity'],
+                'message': conflict['message'],
+                'triggers': conflict['triggers'],
+            })
+    return found
+
+
+# ─── pH Inference ─────────────────────────────────────────────────────────────
+
+_PH_LOWERING = {
+    'citric acid': (3.5, 5.5),
+    'lactic acid': (3.5, 5.0),
+    'glycolic acid': (3.0, 4.5),
+    'ascorbic acid': (2.5, 3.5),
+    'salicylic acid': (3.0, 4.0),
+    'malic acid': (3.5, 5.5),
+    'tartaric acid': (3.5, 5.5),
+    'mandelic acid': (3.5, 5.0),
+    'phosphoric acid': (2.5, 4.0),
+    'gluconolactone': (3.5, 5.0),
+}
+_PH_RAISING = {
+    'sodium hydroxide': (7.0, 10.0),
+    'potassium hydroxide': (8.0, 12.0),
+    'triethanolamine': (7.0, 9.0),
+    'aminomethyl propanol': (7.0, 9.0),
+    'arginine': (6.5, 8.0),
+}
+_PH_BUFFERING = {
+    'sodium citrate': (4.5, 6.5),
+    'sodium phosphate': (6.0, 8.0),
+    'disodium phosphate': (6.5, 8.0),
+    'sodium acetate': (4.5, 6.0),
+    'sodium bicarbonate': (7.0, 8.5),
+}
+_PH_SENSITIVE_ACTIVES = {
+    'ascorbic acid': (2.0, 3.5, 'Vitamin C needs pH below 3.5 to penetrate and be effective'),
+    'glycolic acid': (3.0, 4.5, 'Glycolic acid exfoliates best at pH 3–4.5'),
+    'salicylic acid': (3.0, 4.5, 'BHA works best at pH 3–4.5'),
+    'lactic acid': (3.0, 4.5, 'Lactic acid is most effective at pH 3–4.5'),
+    'mandelic acid': (3.0, 4.5, 'Mandelic acid needs pH 3–4.5 for exfoliation'),
+    'retinol': (4.5, 7.0, 'Retinol is stable at near-neutral pH — acidic conditions can degrade it'),
+}
+
+def infer_ph_and_check(ingredient_list):
+    """Infer formula pH range from buffering/adjusting ingredients.
+    Only returns data when pH signals are present — no section shown for plain moisturisers.
+    """
+    ing_str = ' '.join(i.strip().lower() for i in ingredient_list)
+    has_acid   = {k: v for k, v in _PH_LOWERING.items()  if k in ing_str}
+    has_base   = {k: v for k, v in _PH_RAISING.items()   if k in ing_str}
+    has_buffer = {k: v for k, v in _PH_BUFFERING.items() if k in ing_str}
+
+    if not has_acid and not has_base and not has_buffer:
+        return {}
+
+    notes    = []
+    warnings = []
+    ph_range = None
+    confidence = None
+
+    if has_acid and has_base:
+        lowest   = min(v[0] for v in has_acid.values())
+        ph_range = (round(lowest, 1), round(lowest + 1.5, 1))
+        confidence = 'medium'
+        acid_names = ', '.join(k.title() for k in has_acid)
+        notes.append(f"Formula contains {acid_names} + pH adjuster — likely pH {ph_range[0]}–{ph_range[1]}")
+    elif has_acid:
+        lowest   = min(v[0] for v in has_acid.values())
+        highest  = max(v[1] for v in has_acid.values())
+        ph_range = (round(lowest, 1), round(highest, 1))
+        confidence = 'low'
+        acid_names = ', '.join(k.title() for k in has_acid)
+        notes.append(f"Acidic ingredients detected ({acid_names}) — formula likely pH {ph_range[0]}–{ph_range[1]}")
+    elif has_buffer:
+        lowest   = min(v[0] for v in has_buffer.values())
+        highest  = max(v[1] for v in has_buffer.values())
+        ph_range = (round(lowest, 1), round(highest, 1))
+        confidence = 'medium'
+        buffer_names = ', '.join(k.title() for k in has_buffer)
+        notes.append(f"Buffering system detected ({buffer_names}) — formula likely pH {ph_range[0]}–{ph_range[1]}")
+    elif has_base:
+        ph_range = (7.0, 9.0)
+        confidence = 'low'
+        base_names = ', '.join(k.title() for k in has_base)
+        notes.append(f"Alkaline adjuster detected ({base_names}) — formula likely pH 7+")
+
+    if ph_range:
+        for active, (eff_min, eff_max, reason) in _PH_SENSITIVE_ACTIVES.items():
+            if active in ing_str:
+                if ph_range[0] > eff_max:
+                    warnings.append(f"{active.title()} present but formula pH appears too high for efficacy. {reason}.")
+                elif ph_range[1] < eff_min:
+                    warnings.append(f"{active.title()} present but formula pH may be too low. {reason}.")
+                else:
+                    notes.append(f"{active.title()} — inferred pH is within its effective range")
+
+    return {
+        'ph_range': ph_range,
+        'confidence': confidence,
+        'notes': notes[:4],
+        'warnings': warnings[:3],
+    }
+
+
+# ─── Delivery Systems ─────────────────────────────────────────────────────────
+
+_DELIVERY_KEYWORDS = {
+    'liposom':       'Liposomal delivery',
+    'encapsulat':    'Encapsulated',
+    'nanocapsul':    'Nanocapsule technology',
+    'microsphere':   'Microsphere',
+    'cyclodextrin':  'Cyclodextrin complex',
+    'nano':          'Nano-particle',
+    'phytosome':     'Phytosome complex',
+}
+
+def detect_delivery_systems(ingredient_list):
+    """Return list of delivery system findings in the formula."""
+    found = []
+    seen  = set()
+    for ing in ingredient_list:
+        il = ing.strip().lower()
+        for kw, label in _DELIVERY_KEYWORDS.items():
+            if kw in il and label not in seen:
+                found.append({'ingredient': ing, 'label': label})
+                seen.add(label)
+    return found
+
+
 def detect_red_flags(ingredient_list, concentrations, category):
     """Detect Worth Red Flags per blueprint spec."""
     flags = []
@@ -436,6 +634,18 @@ def detect_red_flags(ingredient_list, concentrations, category):
                     flags.append(f"Marketing inflation: '{ing}' listed below preservative threshold - concentration likely too low for claimed benefits")
                     penalty -= 3
                     break
+
+    # 4. Formaldehyde-releasing preservatives
+    _FORMALDEHYDE_RELEASERS = {
+        'dmdm hydantoin', 'imidazolidinyl urea', 'diazolidinyl urea',
+        'quaternium-15', '2-bromo-2-nitropropane-1,3-diol', 'bronopol',
+        'sodium hydroxymethylglycinate',
+    }
+    for ing in ingredient_list:
+        if ing.strip().lower() in _FORMALDEHYDE_RELEASERS:
+            flags.append(f"{ing} is a formaldehyde-releasing preservative — may cause sensitisation in reactive skin types")
+            penalty -= 3
+            break  # flag once is enough
 
     return flags, penalty
 
@@ -494,497 +704,606 @@ def detect_formulation_notes(ingredient_list):
     return list(dict.fromkeys(notes))[:8]
 
 
+def _get_evidence_weight(evidence_strength):
+    """Map Evidence_Strength string to numeric weight per spec."""
+    ev = str(evidence_strength).strip().lower() if evidence_strength else ''
+    if 'strong' in ev:    return 8
+    if 'moderate' in ev:  return 6
+    if 'limited' in ev:   return 3
+    return 3  # default
+
+def _get_role_weight(ingredient_data):
+    """Get role weight from DB row, falling back to role_weight_table, then defaults."""
+    # 1. Role_Weight column in ingredient_database
+    rw_raw = ingredient_data.get('Role_Weight', '')
+    try:
+        rw = float(str(rw_raw).strip())
+        if not math.isnan(rw) and rw > 0:
+            return rw
+    except (ValueError, TypeError):
+        pass
+
+    # 2. role_weight_table by Ingredient_Class / Functional_Category
+    ing_class = str(ingredient_data.get('Ingredient_Class', '')).strip().lower()
+    func_cat  = str(ingredient_data.get('Functional_Category', '')).strip().lower()
+    table = data_loader.role_weight_table   # loaded from ingredient_role_weight_table.csv
+
+    for key in [ing_class, func_cat]:
+        if key in table:
+            return table[key]
+        for role in table:
+            if role in key:
+                return table[role]
+
+    # 3. Hardcoded defaults from spec
+    DEFAULTS = {
+        'active': 10, 'barrier': 8, 'humectant': 7, 'emollient': 6,
+        'occlusive': 6, 'antioxidant': 5, 'surfactant': 5,
+        'emulsifier': 3, 'preservative': 2, 'fragrance': 1, 'filler': 1,
+    }
+    for k, v in DEFAULTS.items():
+        if k in ing_class or k in func_cat:
+            return v
+    return 3  # safe default
+
+
+def _calc_impact_score(ingredient_name, position, ingredient_list, known_concentrations=None):
+    """
+    impact_score = estimated_concentration * evidence_weight * role_weight * synergy_mult
+
+    Concentration: 15 * exp(-0.20 * position), clamped [0.1, 20]
+    Water at pos 0 always = 60 (constant solvent, not counted in active scoring)
+    Synergy: *1.10 if any partner present in ingredient_list (max 1.15)
+    """
+    data = data_loader.get_ingredient_data(ingredient_name)
+    if not data:
+        return 0.0, None
+
+    # Concentration
+    known = known_concentrations or {}
+    ing_lower = ingredient_name.strip().lower()
+    if ing_lower in known:
+        conc = float(known[ing_lower])
+    else:
+        conc = max(0.1, min(20.0, 15.0 * math.exp(-0.20 * position)))
+
+    ev_weight   = _get_evidence_weight(data.get('Evidence_Strength', ''))
+    role_weight = _get_role_weight(data)
+
+    # Synergy multiplier from synergy_partners_map
+    product_inci_lower = {i.strip().lower() for i in ingredient_list}
+    partners = data_loader.get_synergy_partners(ing_lower)
+    synergy_mult = 1.10 if partners & product_inci_lower - {ing_lower} else 1.0
+    synergy_mult = min(1.15, synergy_mult)
+
+    score = conc * ev_weight * role_weight * synergy_mult
+    return score, data
+
+
+def _impact_confidence(position):
+    if position <= 5:  return 'high'
+    if position <= 10: return 'medium'
+    return 'low'
+
+
+def _cleanser_score(ingredient_list, price, size_ml, country, known_concentrations=None):
+    """
+    Cleanser scoring per spec:
+      Surfactant safety   40
+      Irritation risk     25
+      Supporting ings     10
+      pH friendliness     10
+      Price fairness      15
+    """
+    surf_scores = []
+    irritation_penalty = 0
+    has_ph_adjuster = False
+    supporting_count = 0
+    ing_lower_list = [i.strip().lower() for i in ingredient_list]
+
+    _PH_FRIENDLY = {'citric acid','lactic acid','sodium citrate','sodium pca','glucono-delta-lactone'}
+    _SUPPORTING   = {'glycerin','panthenol','allantoin','sodium pca','betaine','aloe vera','centella asiatica',
+                     'ceramide','niacinamide','bisabolol','chamomile','hyaluronic','sodium hyaluronate'}
+
+    for i, ing in enumerate(ingredient_list):
+        surf_data = data_loader.get_surfactant_data(ing)
+        if surf_data:
+            try:
+                h = float(surf_data.get('Harshness_Score', 5))
+                safety = 10 - h   # harshness 9 → safety 1; harshness 1 → safety 9
+                surf_scores.append(safety)
+                irr = str(surf_data.get('Irritation_Risk','')).lower()
+                if irr == 'high':   irritation_penalty += 15
+                elif irr == 'medium': irritation_penalty += 7
+            except (ValueError, TypeError):
+                pass
+        ing_l = ing.strip().lower()
+        if any(ph in ing_l for ph in _PH_FRIENDLY):
+            has_ph_adjuster = True
+        if any(sup in ing_l for sup in _SUPPORTING):
+            supporting_count += 1
+
+    # Surfactant safety (40)
+    if surf_scores:
+        avg_safety  = sum(surf_scores) / len(surf_scores)
+        surf_component = min(40, (avg_safety / 10) * 40)
+    else:
+        surf_component = 20  # no surfactants detected = neutral
+
+    # Irritation risk (25) — start at 25, deduct penalties
+    irr_component = max(0, 25 - irritation_penalty)
+
+    # Supporting ings (10)
+    sup_component = min(10, supporting_count * 2)
+
+    # pH friendliness (10)
+    ph_component  = 10 if has_ph_adjuster else 5
+
+    # Price fairness (15)
+    price_pts = _price_pts(price, size_ml, 'Cleanser', country)
+    price_component = int(price_pts / 10 * 15)
+
+    raw = surf_component + irr_component + sup_component + ph_component + price_component
+    return min(100, max(0, raw))
+
+
+def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrations=None):
+    """
+    Facial Oil scoring:
+      Oil quality    35
+      Antioxidants   20
+      Actives        15
+      Irritation     10
+      Price fairness 20
+    """
+    _DRY_OILS   = {'squalane','jojoba','rosehip','marula','sea buckthorn','bakuchiol',
+                   'argan','hemp seed','pomegranate seed','sea buckthorn'}
+    _HEAVY_OILS = {'coconut oil','cocos nucifera','mineral oil','petrolatum','shea','castor',
+                   'isopropyl myristate','lanolin'}
+    _ANTIOXIDANTS = {'tocopherol','ascorbic acid','vitamin c','ferulic acid','resveratrol',
+                     'green tea','coenzyme q10','ubiquinone','astaxanthin'}
+
+    ing_lower_list = [i.strip().lower() for i in ingredient_list]
+    ing_str = ' '.join(ing_lower_list)
+
+    # Oil quality (35)
+    dry_count   = sum(1 for kw in _DRY_OILS   if kw in ing_str)
+    heavy_count = sum(1 for kw in _HEAVY_OILS if kw in ing_str)
+    oil_quality = min(35, dry_count * 8) - (heavy_count * 5)
+    oil_quality = max(0, oil_quality)
+    if dry_count == 0 and heavy_count == 0:
+        oil_quality = 15  # no identifiable oils = neutral
+
+    # Antioxidants (20)
+    aox_count  = sum(1 for kw in _ANTIOXIDANTS if kw in ing_str)
+    aox_pts    = min(20, aox_count * 7)
+
+    # Actives (15) — use impact scores
+    active_pts = 0
+    for i, ing in enumerate(ingredient_list[:15]):
+        score, data = _calc_impact_score(ing, i, ingredient_list, known_concentrations)
+        if data and str(data.get('Ingredient_Class','')).lower() == 'active':
+            active_pts += score
+    active_pts = min(15, active_pts / 5)  # normalise: typical active ~50-80 impact → 10-15 pts
+
+    # Irritation (10) — deduct for fragrance/essential oils in top 10
+    irr_pts = 10
+    for ing in ingredient_list[:10]:
+        il = ing.strip().lower()
+        if 'fragrance' in il or 'parfum' in il or 'essential oil' in il:
+            irr_pts -= 4
+    irr_pts = max(0, irr_pts)
+
+    # Price fairness (20)
+    price_pts = _price_pts(price, size_ml, 'Facial Oil', country)
+    price_component = int(price_pts / 10 * 20)
+
+    raw = oil_quality + aox_pts + active_pts + irr_pts + price_component
+    return min(100, max(0, raw))
+
+
+def _price_pts(price, size_ml, category, country):
+    """Return price score 0-10 using category average comparison."""
+    if not price or not size_ml or size_ml <= 0:
+        return 5
+    from config import CATEGORY_AVERAGES, CATEGORY_AVERAGES_DEFAULT
+    country_avgs = CATEGORY_AVERAGES.get(country)
+    if not country_avgs:
+        return 5
+    cat_key = category.strip().lower()
+    avg_price = country_avgs.get(cat_key, {}).get('avg_price_per_ml', 1.0)
+    if not avg_price:
+        return 5
+    ratio = (price / size_ml) / avg_price
+    if ratio <= 1.0:   return 10
+    if ratio <= 1.5:   return 8
+    if ratio <= 2.0:   return 6
+    if ratio <= 3.0:   return 4
+    return 2
+
+
 def calculate_main_worth_score(ingredient_list, price, size_ml, category, country='India', known_concentrations=None):
+    """
+    Category-specific scoring engine.
+
+    Worth score = 0.75 * formula_quality + 0.25 * price_fairness  (normalised to 100)
+
+    Category weights (per spec):
+      Serum:      active_potency 40, evidence 20, formula_balance 15, irritation 10, price 15
+      Moisturizer: barrier 35, humectant 25, active_support 15, texture 10, price 15
+      Cleanser:   surfactant_safety 40, irritation 25, supporting 10, pH 10, price 15
+      Toner:      humectants 30, soothing 25, actives 20, irritation 10, price 15
+      Facial Oil: oil_quality 35, antioxidants 20, actives 15, irritation 10, price 20
+      Sunscreen:  handled by UV scoring engine (existing)
+    """
     score_breakdown = {
-        'active_value': 0,
-        'formula_quality': 0,
-        'claim_accuracy': 15,
-        'safety': 10,
-        'price_rationality': 0
+        'active_value': 0, 'formula_quality': 0, 'claim_accuracy': 15,
+        'safety': 10, 'price_rationality': 0
     }
     component_details = {'A': [], 'B': [], 'C': [], 'D': [], 'E': []}
     concentrations = estimate_concentration(ingredient_list, known_concentrations=known_concentrations)
     identified_actives = []
     multipliers_applied = []
-
-    # --- Component A: Active Ingredient Value (Max 45) ---
-    # Diminishing returns: smooth decay 1/(1 + 0.5*i) so 2nd active worth 67%, 3rd 50%, etc.
-    # Calibrated: 2 strong actives ≈ 40/45
-    ACTIVE_NORM_FACTOR = 25
-
-    active_contributions = []
-    for ing_name in ingredient_list:
-        data = data_loader.get_ingredient_data(ing_name)
-        if data and str(data.get('Ingredient_Class', '')).lower() == 'active':
-            try:
-                esw_raw = data.get('Effect_Strength_Weight', '')
-                if esw_raw == '' or str(esw_raw).strip() in ('', 'nan', '0'):
-                    # Category-based ESW default for blank/unscored ingredients
-                    func_cat = str(data.get('Functional_Category', '')).lower()
-                    if 'humectant' in func_cat:
-                        weight = 1.0
-                    elif any(c in func_cat for c in ['emulsifier', 'thickener', 'solvent', 'preservative']):
-                        weight = 0.5
-                    else:
-                        weight = 0.5  # conservative default for actives without scored weight
-                else:
-                    weight = float(esw_raw)
-                if math.isnan(weight):
-                    weight = 0.5
-            except (ValueError, TypeError):
-                weight = 0.5
-
-            conc = concentrations.get(ing_name, 0.3)
-            conc_factor = get_concentration_factor(conc, data)
-            eq_factor = get_evidence_factor(data)
-            raw_strength = weight * conc_factor * eq_factor
-
-            conc_label = (
-                "likely at optimal functional level" if conc_factor >= 1.0 else
-                "likely within functional range" if conc_factor >= 0.7 else
-                "concentration range unknown" if conc_factor >= 0.5 else
-                "may be below typical functional range"
-            )
-            ev_label = get_evidence_label(eq_factor)
-
-            active_contributions.append({
-                'name': ing_name, 'strength': raw_strength,
-                'conc_factor': conc_factor, 'eq_factor': eq_factor, 'weight': weight,
-                'conc_label': conc_label, 'ev_label': ev_label,
-                'position': ingredient_list.index(ing_name)
-            })
-            # Check if this ingredient's concentration is from a known source
-            # (scraped from product page, inline INCI %, or product name)
-            _ing_lower = ing_name.lower()
-            _kc = known_concentrations or {}
-            _conc_is_known = _ing_lower in _kc
-            identified_actives.append({
-                'name': ing_name,
-                'position': ingredient_list.index(ing_name) + 1,
-                'evidence': ev_label,
-                'concentration': conc_label,
-                'concentration_pct': round(conc, 2) if _conc_is_known else None,
-                'concentration_known': _conc_is_known,
-                'score_contribution': round(eq_factor * conc_factor * weight, 2),
-                'primary_benefits': (lambda d: (
-                    # Try Primary_Benefits first
-                    (lambda v: str(v).strip() if v and str(v).lower() not in ('nan', 'none', '') else None)(d.get('Primary_Benefits', ''))
-                    # Fall back to Functional_Category
-                    or (lambda v: str(v).strip() if v and str(v).lower() not in ('nan', 'none', '') else None)(d.get('Functional_Category', ''))
-                    # Final fallback: first Skin_Concern from the semicolon list
-                    or (lambda v: str(v).split(';')[0].strip() if v and str(v).lower() not in ('nan', 'none', '') else None)(d.get('Skin_Concerns', ''))
-                ))(data),
-                'targets': [t.strip() for t in str(data.get('Skin_Concerns', '') or '').split(';') if t.strip() and t.strip() not in ('', ' ')][:3],
-                'functional_category': (lambda v: None if (not v or str(v).lower() in ('nan','none','')) else str(v).strip())(data.get('Functional_Category', '')),
-            })
-
-    active_contributions.sort(key=lambda x: x['strength'], reverse=True)
-    weighted_sum = 0
-    actives_found = []
-    for i, ac in enumerate(active_contributions):
-        # Smooth log-based diminishing returns: 1st=1.0, 2nd=0.67, 3rd=0.50, 4th=0.40...
-        mult = max(0.15, 1.0 / (1 + 0.5 * i))
-        weighted_sum += ac['strength'] * mult
-        actives_found.append(ac['name'])
-
-    active_score = min(45, weighted_sum * ACTIVE_NORM_FACTOR)
-    score_breakdown['active_value'] = round(active_score, 1)
-
-    clinical_count = sum(1 for a in active_contributions if a['eq_factor'] >= 0.7)
-    component_details['A'].append(f"{len(actives_found)} active ingredient{'s' if len(actives_found) != 1 else ''} with clinical backing" if clinical_count > 0 else "No clinically-backed actives found")
-    for ac in active_contributions[:3]:
-        component_details['A'].append(f"{ac['name']} ({ac['ev_label']})")
-
-    # --- Component B: Functional Formula Quality (Max 20) ---
-    formula_score = 10.0
-    has_humectant = False
-    has_emollient = False
-    has_occlusive = False
-    has_preservative = False
-    has_delivery_system = False
-    functional_count = 0
-
-    FUNCTIONAL_CLASSES = {'functional', 'humectant', 'emollient', 'preservative',
-                          'functional support', 'antioxidant support', 'occlusive',
-                          'sensory modifier', 'surfactant', 'solvent'}
-
-    for i, ing_name in enumerate(ingredient_list):
-        data = data_loader.get_ingredient_data(ing_name)
-        ing_lower = ing_name.lower()
-
-        if data:
-            func_cat = str(data.get('Functional_Category', '')).lower()
-            ing_class = str(data.get('Ingredient_Class', '')).lower().strip()
-
-            if ing_class in FUNCTIONAL_CLASSES:
-                functional_count += 1
-
-            if 'humectant' in func_cat or ing_class == 'humectant':
-                has_humectant = True
-            if 'emollient' in func_cat or ing_class == 'emollient':
-                has_emollient = True
-            if 'occlusive' in func_cat or ing_class == 'occlusive':
-                has_occlusive = True
-            if 'preservative' in func_cat or 'antimicrobial' in func_cat or ing_class == 'preservative':
-                has_preservative = True
-
-        if any(kw in ing_lower for kw in ['liposom', 'encapsulat', 'nano', 'cyclodextrin']):
-            has_delivery_system = True
-
-        if i < 5 and ('alcohol denat' in ing_lower or 'sd alcohol' in ing_lower):
-            cat_lower = category.lower()
-            if cat_lower in ['moisturizer', 'treatment', 'eye cream']:
-                formula_score -= 3
-                component_details['B'].append(f"Denatured alcohol in top 5 for {category} (-3)")
-
-        if 'essential oil' in ing_lower and category.lower() in ['treatment', 'serum']:
-            formula_score -= 4
-            component_details['B'].append("Essential oils in treatment product (-4)")
-
-        if ('fragrance' in ing_lower or 'parfum' in ing_lower) and category.lower() in ['sensitive', 'treatment']:
-            formula_score -= 2
-
-    # Functional ingredient bonus (capped at +5)
-    formula_score += min(5, functional_count * 0.5)
-
-    if has_humectant and has_emollient:
-        formula_score += 3
-    if has_humectant and has_emollient and has_occlusive:
-        formula_score += 2
-
-    # Broader preservative check - includes both synthetic and natural preservation systems
-    _BROAD_PRESERVATIVES = [
-        'phenoxyethanol', 'ethylhexylglycerin', 'sodium benzoate', 'potassium sorbate',
-        'caprylyl glycol', 'benzyl alcohol', 'dehydroacetic acid', 'chlorphenesin',
-        'sodium hydroxymethylglycinate', 'methylisothiazolinone', 'chloromethylisothiazolinone',
-        'iodopropynyl', 'dmdm hydantoin', 'imidazolidinyl urea', 'diazolidinyl urea',
-        'ferment', 'lactobacillus', 'leuconostoc',  # natural/ferment-based preservation
-    ]
-    if not has_preservative:
-        has_preservative = any(p in ' '.join(ingredient_list).lower() for p in _BROAD_PRESERVATIVES)
-    if not has_preservative and len(ingredient_list) > 5:
-        formula_score -= 4  # reduced penalty from -8 to -4
-        component_details['B'].append("No standard preservative detected (-4)")
-
-    if has_delivery_system:
-        formula_score += 3
-        component_details['B'].append("Advanced delivery systems present (+3)")
-
-    # Category-specific formula expectations (Item 7)
     cat_lower = category.strip().lower()
-    if cat_lower in ('serum', 'treatment', 'essence'):
-        if not actives_found:
-            formula_score -= 3
-            component_details['B'].append("Serum with no identified actives (-3)")
-        elif len(actives_found) >= 3:
-            formula_score += 2
-            component_details['B'].append(f"Rich active profile for a {category} (+2)")
-    elif cat_lower in ('moisturizer', 'cream', 'lotion'):
-        if has_humectant and has_emollient and has_occlusive:
-            formula_score += 3
-            component_details['B'].append("Complete moisturization stack (+3)")
-    elif cat_lower == 'sunscreen':
-        has_antioxidant_boost = any(
-            any(kw in i.lower() for kw in ('tocopherol', 'ascorbic acid', 'ferulic acid'))
-            for i in ingredient_list
-        )
-        if has_antioxidant_boost:
-            formula_score += 2
-            component_details['B'].append("Antioxidant UV boosters present (+2)")
-    elif cat_lower in ('toner', 'mist', 'essence'):
-        formula_score += 1  # Lighter category — less infrastructure expected
-    elif cat_lower == 'cleanser':
-        has_conditioning = any(
-            any(kw in i.lower() for kw in ('panthenol', 'aloe', 'glycerin', 'ceramide'))
-            for i in ingredient_list
-        )
-        if has_conditioning:
-            formula_score += 2
-            component_details['B'].append("Skin-conditioning agents in cleanser (+2)")
 
-    formula_score = round(min(20, max(0, formula_score)), 1)
-    score_breakdown['formula_quality'] = formula_score
-
-    if not component_details['B']:
-        if formula_score >= 15:
-            component_details['B'].append("Well-balanced humectant-emollient base")
-        elif formula_score >= 10:
-            component_details['B'].append("Standard formulation with adequate support")
-        else:
-            component_details['B'].append("Basic formulation, limited functional support")
-    if has_preservative:
-        component_details['B'].append("Preservative system present")
-
-    # --- Component C: Claim-Reality Accuracy (Max 15) ---
-    claim_score = 15
-    claim_details = []
-    for ing_name in ingredient_list:
-        data = data_loader.get_ingredient_data(ing_name)
-        if data and 'Overclaim risk' in str(data.get('Red_Flag_Tags', '')):
-            claim_score -= 3
-            claim_details.append(f"{ing_name} has overclaim risk")
-
-    for ac in active_contributions:
-        if ac['conc_factor'] == 0.0:
-            claim_score -= 2
-            claim_details.append(f"{ac['name']} below effective concentration")
-
-    claim_score = max(0, claim_score)
-    score_breakdown['claim_accuracy'] = claim_score
-
-    if claim_score >= 13:
-        component_details['C'].append("Claims well-supported by ingredient composition")
-    elif claim_score >= 7:
-        component_details['C'].append("Some claims partially supported")
-    else:
-        component_details['C'].append("Significant gap between claims and formulation")
-    for d in claim_details[:2]:
-        component_details['C'].append(d)
-
-    # --- Component D: Safety & Suitability (Max 10) ---
-    safety_score = 10.0
-    safety_details = []
-
-    # Track deductions per risk class so no single class can wipe out the entire score.
-    # This preserves distinction between "one mild flag" and "many serious flags".
-    _fragrance_deducted = 0.0
-    _alcohol_deducted = 0.0
-    _allergen_deducted = 0.0
-    _irritation_deducted = 0.0
-    _pregnancy_deducted = 0.0
-
-    for i, ing_name in enumerate(ingredient_list):
-        ing_lower = ing_name.lower()
-        data = data_loader.get_ingredient_data(ing_name)
-
-        if 'fragrance' in ing_lower or 'parfum' in ing_lower:
-            if i < 10 and _fragrance_deducted < 4.0:
-                deduct = min(4.0, 4.0 - _fragrance_deducted)
-                safety_score -= deduct
-                _fragrance_deducted += deduct
-                safety_details.append(f"Contains fragrance ({ing_name})")
-        if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower:
-            if i < 10 and _alcohol_deducted < 3.0:
-                deduct = min(3.0, 3.0 - _alcohol_deducted)
-                safety_score -= deduct
-                _alcohol_deducted += deduct
-                safety_details.append(f"Contains denatured alcohol ({ing_name})")
-        if 'essential oil' in ing_lower or 'limonene' in ing_lower or 'linalool' in ing_lower:
-            if _allergen_deducted < 4.0:
-                deduct = min(2.0, 4.0 - _allergen_deducted)
-                safety_score -= deduct
-                _allergen_deducted += deduct
-                safety_details.append(f"Contains potential allergen ({ing_name})")
-
+    # ── IMPACT SCORE for every ingredient ─────────────────────────────────────
+    all_impact = []
+    for i, ing in enumerate(ingredient_list):
+        score, data = _calc_impact_score(ing, i, ingredient_list, known_concentrations)
         if data:
-            irritation = str(data.get('Irritation_Risk', 'Low')).lower()
-            if irritation == 'high' and _irritation_deducted < 3.0:
-                deduct = min(3.0, 3.0 - _irritation_deducted)
-                safety_score -= deduct
-                _irritation_deducted += deduct
-                safety_details.append(f"{ing_name} has high irritation risk")
-            elif irritation == 'medium':
+            all_impact.append((ing, i, score, data))
+
+    # ── IDENTIFIED ACTIVES (for display) ──────────────────────────────────────
+    _helpful_seen = set()
+    for ing, pos, imp_score, data in all_impact:
+        if str(data.get('Ingredient_Class', '')).lower() not in ('active','peptide','retinoid',
+                                                                   'brightening active'):
+            continue
+        ing_lower = ing.strip().lower()
+        if ing_lower in _helpful_seen:
+            continue
+        _helpful_seen.add(ing_lower)
+
+        conc = concentrations.get(ing, 0.3)
+        conc_factor = get_concentration_factor(conc, data)
+        ev_label  = get_evidence_label(get_evidence_factor(data))
+        eq_factor = get_evidence_factor(data)
+
+        conc_label = (
+            "likely at optimal functional level"    if conc_factor >= 1.0 else
+            "likely within functional range"        if conc_factor >= 0.7 else
+            "concentration range unknown"           if conc_factor >= 0.5 else
+            "may be below typical functional range"
+        )
+
+        _kc = known_concentrations or {}
+        _conc_is_known = ing_lower in _kc
+
+        identified_actives.append({
+            'name': ing,
+            'position': pos + 1,
+            'evidence': ev_label,
+            'concentration': conc_label,
+            'concentration_pct': round(conc, 2) if _conc_is_known else None,
+            'concentration_known': _conc_is_known,
+            'score_contribution': round(imp_score / 100, 2),
+            'primary_benefits': (
+                (lambda v: str(v).strip() if v and str(v).lower() not in ('nan','none','') else None)
+                (data.get('Primary_Benefits',''))
+                or (lambda v: str(v).strip() if v and str(v).lower() not in ('nan','none','') else None)
+                (data.get('Functional_Category',''))
+                or (lambda v: str(v).split(';')[0].strip() if v and str(v).lower() not in ('nan','none','') else None)
+                (data.get('Skin_Concerns',''))
+            ),
+            'targets': [t.strip() for t in str(data.get('Skin_Concerns','') or '').split(';')
+                        if t.strip() and t.strip() not in ('','nan')][:3],
+            'functional_category': (None if not data.get('Functional_Category') or
+                                    str(data.get('Functional_Category','')).lower() in ('nan','none','')
+                                    else str(data['Functional_Category']).strip()),
+        })
+
+    # ── CATEGORY-SPECIFIC FORMULA QUALITY ─────────────────────────────────────
+    ing_str = ' '.join(i.strip().lower() for i in ingredient_list)
+
+    if cat_lower in ('serum', 'treatment', 'essence', 'ampoule'):
+        # Active potency 40, evidence 20, formula balance 15, irritation 10
+        active_impact_sum = sum(s for _, _, s, d in all_impact
+                                if str(d.get('Ingredient_Class','')).lower() in
+                                ('active','peptide','retinoid','brightening active'))
+        active_potency = min(40, active_impact_sum / 50)
+
+        ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength','')) for _, _, _, d in all_impact
+                     if str(d.get('Ingredient_Class','')).lower() == 'active')
+        active_count_for_ev = max(1, sum(1 for _, _, _, d in all_impact
+                                         if str(d.get('Ingredient_Class','')).lower() == 'active'))
+        evidence_score = min(20, (ev_sum / active_count_for_ev / 8) * 20)
+
+        has_humectant = any('humectant' in str(d.get('Functional_Category','')).lower() or
+                            str(d.get('Ingredient_Class','')).lower() == 'humectant'
+                            for _, _, _, d in all_impact)
+        has_preservative = any('preserv' in str(d.get('Functional_Category','')).lower() or
+                                str(d.get('Ingredient_Class','')).lower() == 'preservative'
+                                for _, _, _, d in all_impact)
+        balance_score = 7
+        if has_humectant:   balance_score += 4
+        if has_preservative: balance_score += 4
+        balance_score = min(15, balance_score)
+
+        irr_penalty = sum(3 for ing in ingredient_list[:10]
+                          if any(k in ing.lower() for k in ('fragrance','parfum','essential oil',
+                                                             'alcohol denat','sd alcohol')))
+        irr_score = max(0, 10 - irr_penalty)
+
+        formula_quality = active_potency + evidence_score + balance_score + irr_score
+        component_details['A'].append(f"Active potency: {active_potency:.1f}/40")
+        component_details['A'].append(f"Evidence strength: {evidence_score:.1f}/20")
+        component_details['B'].append(f"Formula balance: {balance_score}/15, Irritation: {irr_score}/10")
+
+    elif cat_lower in ('moisturizer', 'cream', 'lotion', 'gel'):
+        # Barrier 35, humectants 25, active support 15, texture 10, price handled separately
+        _BARRIER   = {'ceramide','cholesterol','fatty acid','phytosphingosine','sphingosine',
+                      'stearic acid','palmitic acid','linoleic','linolenic','squalane',
+                      'shea butter','lanolin','petrolatum'}
+        _HUMECTANTS = {'glycerin','sodium hyaluronate','hyaluronic','panthenol','propanediol',
+                       'butylene glycol','sorbitol','urea','sodium pca','beta-glucan',
+                       'polyglutamic','tremella'}
+        _OCCLUSIVES = {'petrolatum','dimethicone','beeswax','lanolin','zinc oxide','shea',
+                       'mineral oil','vaseline'}
+
+        barrier_count   = sum(1 for kw in _BARRIER   if kw in ing_str)
+        humectant_count = sum(1 for kw in _HUMECTANTS if kw in ing_str)
+        occlusive_count = sum(1 for kw in _OCCLUSIVES if kw in ing_str)
+
+        barrier_pts   = min(35, barrier_count * 8 + occlusive_count * 4)
+        humectant_pts = min(25, humectant_count * 6)
+
+        active_impact = sum(s for _, _, s, d in all_impact
+                            if str(d.get('Ingredient_Class','')).lower() == 'active')
+        active_pts = min(15, active_impact / 80)
+
+        # Texture (10): penalise high-alcohol or fragrance, reward lightweight silicone
+        texture_pts = 8
+        for ing in ingredient_list[:5]:
+            il = ing.strip().lower()
+            if 'alcohol denat' in il or 'sd alcohol' in il:
+                texture_pts -= 4
+            if 'dimethicone' in il or 'cyclopentasiloxane' in il:
+                texture_pts = min(10, texture_pts + 2)
+        texture_pts = max(0, texture_pts)
+
+        formula_quality = barrier_pts + humectant_pts + active_pts + texture_pts
+        component_details['A'].append(f"Barrier support: {barrier_pts:.1f}/35, Humectants: {humectant_pts:.1f}/25")
+        component_details['B'].append(f"Active support: {active_pts:.1f}/15, Texture: {texture_pts}/10")
+
+    elif cat_lower == 'cleanser':
+        # Use dedicated cleanser scorer (returns 0-100 directly)
+        formula_quality = _cleanser_score(ingredient_list, price, size_ml, country, known_concentrations)
+        component_details['A'].append("Cleanser scored on surfactant safety + irritation + support")
+        # Cleanser score already includes price — skip separate price component
+        price_score = _price_pts(price, size_ml, category, country)
+        score_breakdown['price_rationality'] = float(price_score)
+        score_breakdown['active_value'] = round(min(45, formula_quality * 0.45), 1)
+        score_breakdown['formula_quality'] = round(min(20, formula_quality * 0.20), 1)
+        score_breakdown['safety'] = round(min(10, formula_quality * 0.10), 1)
+        score_breakdown['claim_accuracy'] = 15
+        total_score = min(100, max(0, formula_quality))
+        avg_price = _get_avg_price(price, size_ml, category, country)
+        ratio = round((price / size_ml) / avg_price, 2) if (size_ml > 0 and avg_price > 0 and price > 0) else 1.0
+        value_tier = _ratio_to_tier(ratio)
+        return _build_result(total_score, score_breakdown, component_details, identified_actives,
+                             all_impact, ingredient_list, price, size_ml, category, country,
+                             ratio, value_tier, multipliers_applied, concentrations, known_concentrations)
+
+    elif cat_lower in ('toner', 'mist'):
+        # Humectants 30, soothing 25, actives 20, irritation 10
+        _HUMECTANTS = {'glycerin','sodium hyaluronate','hyaluronic','panthenol','propanediol',
+                       'butylene glycol','beta-glucan','polyglutamic','sodium pca'}
+        _SOOTHING   = {'centella','allantoin','panthenol','bisabolol','aloe','chamomile',
+                       'licorice','madecassoside','asiaticoside','niacinamide','cica'}
+        humectant_count = sum(1 for kw in _HUMECTANTS if kw in ing_str)
+        soothing_count  = sum(1 for kw in _SOOTHING   if kw in ing_str)
+        humectant_pts   = min(30, humectant_count * 8)
+        soothing_pts    = min(25, soothing_count  * 7)
+
+        active_impact = sum(s for _, _, s, d in all_impact
+                            if str(d.get('Ingredient_Class','')).lower() == 'active')
+        active_pts = min(20, active_impact / 60)
+
+        irr_penalty = sum(3 for ing in ingredient_list[:10]
+                          if any(k in ing.lower() for k in ('fragrance','parfum','alcohol denat','sd alcohol')))
+        irr_score = max(0, 10 - irr_penalty)
+
+        formula_quality = humectant_pts + soothing_pts + active_pts + irr_score
+        component_details['A'].append(f"Humectants: {humectant_pts:.1f}/30, Soothing: {soothing_pts:.1f}/25")
+        component_details['B'].append(f"Actives: {active_pts:.1f}/20, Irritation: {irr_score}/10")
+
+    elif cat_lower in ('facial oil', 'oil'):
+        formula_quality = _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrations)
+        component_details['A'].append("Facial oil scored on oil quality + antioxidants + actives + irritation")
+        total_score = min(100, max(0, formula_quality))
+        price_score = _price_pts(price, size_ml, category, country)
+        score_breakdown['price_rationality'] = float(price_score)
+        score_breakdown['active_value'] = round(min(45, formula_quality * 0.45), 1)
+        score_breakdown['formula_quality'] = round(min(20, formula_quality * 0.20), 1)
+        score_breakdown['safety'] = round(min(10, formula_quality * 0.10), 1)
+        score_breakdown['claim_accuracy'] = 15
+        avg_price = _get_avg_price(price, size_ml, category, country)
+        ratio = round((price / size_ml) / avg_price, 2) if (size_ml > 0 and avg_price > 0 and price > 0) else 1.0
+        value_tier = _ratio_to_tier(ratio)
+        return _build_result(total_score, score_breakdown, component_details, identified_actives,
+                             all_impact, ingredient_list, price, size_ml, category, country,
+                             ratio, value_tier, multipliers_applied, concentrations, known_concentrations)
+
+    else:
+        # Generic fallback — active-weighted scoring
+        active_impact = sum(s for _, _, s, d in all_impact
+                            if str(d.get('Ingredient_Class','')).lower() in
+                            ('active','peptide','retinoid','brightening active'))
+        formula_quality = min(85, active_impact / 20)
+        component_details['A'].append("General scoring: active ingredient impact")
+
+    # ── PRICE FAIRNESS ─────────────────────────────────────────────────────────
+    price_score = _price_pts(price, size_ml, category, country)
+    price_component = (price_score / 10) * 15  # 15% weight
+
+    # ── FINAL WORTH SCORE ─────────────────────────────────────────────────────
+    # worth_score = 0.75 * formula_quality + 0.25 * price_fairness (normalised to 100)
+    formula_pct = min(85, formula_quality) / 85   # normalise formula to 0-1
+    price_pct   = price_score / 10                # normalise price to 0-1
+    total_score = min(100, max(0, round((0.75 * formula_pct + 0.25 * price_pct) * 100)))
+
+    # Safety deductions (Component D)
+    safety_score = 10.0
+    _frag_ded = _alc_ded = _irr_ded = _preg_ded = _allergen_ded = 0.0
+    safety_details = []
+    for i, ing in enumerate(ingredient_list):
+        il = ing.strip().lower()
+        data = data_loader.get_ingredient_data(ing)
+        if ('fragrance' in il or 'parfum' in il) and i < 10 and _frag_ded < 4:
+            d = min(4.0 - _frag_ded, 4.0); safety_score -= d; _frag_ded += d
+            safety_details.append(f"Contains fragrance ({ing})")
+        if ('alcohol denat' in il or 'sd alcohol' in il) and i < 10 and _alc_ded < 3:
+            d = min(3.0 - _alc_ded, 3.0); safety_score -= d; _alc_ded += d
+            safety_details.append(f"Contains denatured alcohol ({ing})")
+        if ('essential oil' in il or 'limonene' in il or 'linalool' in il) and _allergen_ded < 4:
+            d = min(2.0, 4.0 - _allergen_ded); safety_score -= d; _allergen_ded += d
+            safety_details.append(f"Contains potential allergen ({ing})")
+        if data:
+            irr = str(data.get('Irritation_Risk','')).lower()
+            if irr == 'high' and _irr_ded < 3:
+                d = min(3.0 - _irr_ded, 3.0); safety_score -= d; _irr_ded += d
+                safety_details.append(f"{ing} — high irritation risk")
+            elif irr in ('medium','moderate'):
                 safety_score -= 0.5
-
-            pregnancy = str(data.get('Pregnancy_Safety', 'Safe')).lower()
-            if ('avoid' in pregnancy or 'restricted' in pregnancy) and _pregnancy_deducted < 4.0:
-                deduct = min(4.0, 4.0 - _pregnancy_deducted)
-                safety_score -= deduct
-                _pregnancy_deducted += deduct
-                safety_details.append(f"{ing_name} flagged for pregnancy safety")
-
+            preg = str(data.get('Pregnancy_Safety','')).lower()
+            if ('avoid' in preg or 'restrict' in preg) and _preg_ded < 4:
+                d = min(4.0 - _preg_ded, 4.0); safety_score -= d; _preg_ded += d
+                safety_details.append(f"{ing} — pregnancy safety flag")
     safety_score = round(max(0, min(10, safety_score)), 1)
-    score_breakdown['safety'] = safety_score
 
-    if safety_score >= 9:
-        component_details['D'].append("Low irritation risk overall")
-    elif safety_score >= 6:
-        component_details['D'].append("Some safety considerations present")
-    else:
-        component_details['D'].append("Multiple safety flags detected")
-    for d in safety_details[:2]:
-        component_details['D'].append(d)
+    # Claim accuracy (Component C)
+    claim_score = 15
+    for _, _, _, data in all_impact:
+        if 'Overclaim risk' in str(data.get('Red_Flag_Tags','')):
+            claim_score = max(0, claim_score - 3)
+    for ing, _, _, data in all_impact:
+        conc = concentrations.get(ing, 0.3)
+        if get_concentration_factor(conc, data) == 0.0:
+            claim_score = max(0, claim_score - 2)
 
-    # --- Component E: Price Rationality (Max 10) ---
-    price_per_ml = price / size_ml if size_ml > 0 else 0
-    country_avgs = CATEGORY_AVERAGES.get(country)
-    price_note = None
-
-    # Edge case: missing size
-    if size_ml <= 0 or price <= 0:
-        price_note = 'Size not provided — price per ml unavailable' if size_ml <= 0 else 'Price not provided — value analysis unavailable'
-        price_score = 5
-        avg_price = 0
-        ratio = 1.0
-    elif country_avgs is None:
-        price_note = 'Price comparison unavailable for this country - score reflects formula quality only'
-        price_score = 5
-        avg_price = 0
-        ratio = 1.0
-    else:
-        cat_key = category.strip().lower()
-        cat_avg = country_avgs.get(cat_key, {'avg_price_per_ml': 1.0})
-        avg_price = cat_avg.get('avg_price_per_ml', 1.0)
-        ratio = round(price_per_ml / avg_price, 4) if avg_price > 0 else 1.0
-
-        if ratio < 0.70:
-            price_score = 10
-        elif ratio < 1.30:
-            price_score = 8
-        elif ratio < 2.00:
-            price_score = 5
-        else:
-            price_score = 2
-
-    score_breakdown['price_rationality'] = float(price_score)  # initial; adjusted below
-
-    # Formula-quality adjustment: high formula quality justifies slight price premium (Item 8)
-    formula_q = score_breakdown.get('formula_quality', 10)
-    if formula_q >= 17 and price_score > 0:
-        price_score = min(10, price_score + 1)
-        component_details['E'].append("High formula quality offsets price (+1 adjustment)")
-    elif formula_q <= 7 and price_score > 0:
-        price_score = max(0, price_score - 1)
-        component_details['E'].append("Poor formula quality worsens price value (-1 adjustment)")
+    score_breakdown['active_value']      = round(min(45, formula_quality / 85 * 45), 1)
+    score_breakdown['formula_quality']   = round(min(20, formula_quality / 85 * 20), 1)
+    score_breakdown['claim_accuracy']    = claim_score
+    score_breakdown['safety']            = safety_score
     score_breakdown['price_rationality'] = float(price_score)
 
-    # Derive value_tier from (adjusted) price_score
-    if price_score >= 9:
-        value_tier = "underpriced"
-    elif price_score >= 7:
-        value_tier = "fair"
-    elif price_score >= 5:
-        value_tier = "slightly_overpriced"
-    else:
-        value_tier = "overpriced"
+    if safety_score >= 9: component_details['D'].append("Low irritation risk overall")
+    elif safety_score >= 6: component_details['D'].append("Some safety considerations present")
+    else: component_details['D'].append("Multiple safety flags detected")
+    for d in safety_details[:2]: component_details['D'].append(d)
 
-    if price_score >= 9:
-        component_details['E'].append("Underpriced - excellent value at this price point")
-    elif price_score >= 7:
-        component_details['E'].append("Fairly priced for the category")
-    elif price_score >= 4:
-        component_details['E'].append("Slightly overpriced - brand premium detected")
-    else:
-        component_details['E'].append("Heavily overpriced for the active content")
-    if price_per_ml > 0 and avg_price > 0:
-        component_details['E'].append(f"{ratio:.1f}x vs category average ({price_per_ml:.2f}/ml vs avg {avg_price:.2f}/ml)")
-    if actives_found:
-        ppa = price / len(actives_found)
-        component_details['E'].append(f"Price per active ingredient: {ppa:.2f}")
+    avg_price = _get_avg_price(price, size_ml, category, country)
+    ratio = round((price / size_ml) / avg_price, 2) if (size_ml > 0 and avg_price > 0 and price > 0) else 1.0
+    value_tier = _ratio_to_tier(ratio)
 
-    # --- Worth Red Flags ---
+    price_note = None
+    if not size_ml or size_ml <= 0:
+        price_note = 'Size not provided — price per ml unavailable'
+    elif not price or price <= 0:
+        price_note = 'Price not provided — value analysis unavailable'
+
+    if price_score >= 9: component_details['E'].append("Underpriced — excellent value at this price point")
+    elif price_score >= 7: component_details['E'].append("Fairly priced for the category")
+    elif price_score >= 5: component_details['E'].append("Slightly overpriced for active content")
+    else: component_details['E'].append("Heavily overpriced for the active content")
+    if avg_price > 0 and price > 0 and size_ml > 0:
+        component_details['E'].append(f"{ratio:.1f}x vs category average ({price/size_ml:.2f}/ml vs avg {avg_price:.2f}/ml)")
+
     red_flags, red_flag_penalty = detect_red_flags(ingredient_list, concentrations, category)
-    for rf in red_flags:
-        component_details['E'].append(rf)
+    total_score = min(100, max(0, total_score + red_flag_penalty))
 
-    # Total
-    total_score = sum(score_breakdown.values()) + red_flag_penalty
+    return _build_result(total_score, score_breakdown, component_details, identified_actives,
+                         all_impact, ingredient_list, price, size_ml, category, country,
+                         ratio, value_tier, multipliers_applied, concentrations, known_concentrations,
+                         price_note=price_note, red_flags=red_flags)
 
-    # Worth Multipliers
-    ing_str = " ".join(ingredient_list).lower()
-    has_fragrance = any('fragrance' in i.lower() or 'parfum' in i.lower() for i in ingredient_list)
-    has_denat = any('alcohol denat' in i.lower() or 'sd alcohol' in i.lower() for i in ingredient_list)
 
-    if 'encapsulated' in ing_str and 'retinol' in ing_str:
-        total_score *= WORTH_MULTIPLIERS.get('Stability Engineering', 1.0)
-        multipliers_applied.append('Stability Engineering (2.0x)')
+def _get_avg_price(price, size_ml, category, country):
+    from config import CATEGORY_AVERAGES
+    country_avgs = CATEGORY_AVERAGES.get(country, {})
+    cat_key = category.strip().lower()
+    return country_avgs.get(cat_key, {}).get('avg_price_per_ml', 1.0) or 1.0
 
-    has_ceramide = 'ceramide' in ing_str
-    has_panthenol = 'panthenol' in ing_str
-    if has_ceramide and has_panthenol and not has_fragrance and not has_denat:
-        total_score *= WORTH_MULTIPLIERS.get('Barrier Neutrality', 1.0)
-        multipliers_applied.append('Barrier Neutrality (1.3x)')
 
-    total_score = min(100, max(0, total_score))
-    active_ratio = len(actives_found) / len(ingredient_list) if ingredient_list else 0
+def _ratio_to_tier(ratio):
+    if ratio <= 0.70: return 'underpriced'
+    if ratio <= 1.30: return 'fair'
+    if ratio <= 2.00: return 'slightly_overpriced'
+    return 'overpriced'
 
-    # --- Active Classes: four buckets (scale-aware tiered classification) ---
-    # DB has two ESW scales:
-    #   UV filters:      ESW 5.0  → always Primary
-    #   Regular actives: ESW 0-1  → Primary ≥0.80, Supporting ≥0.50, else Antioxidant/Barrier
-    ANTIOXIDANT_NAMES = {
-        'tocopherol', 'ascorbic acid', 'ferulic acid', 'resveratrol', 'astaxanthin',
-        'coenzyme q10', 'ergothioneine', 'green tea', 'egcg', 'idebenone', 'quercetin',
-    }
-    BARRIER_FUNC_CATS = {'barrier', 'emollient', 'occlusive', 'humectant'}
-    UV_FUNC_CATS = {'uv filter', 'mineral uv filter', 'organic uv filter', 'sunscreen'}
 
-    primary_actives = []
-    supporting_actives = []
-    antioxidant_actives = []
-    barrier_actives = []
-    classified_names = set()
+def _build_result(total_score, score_breakdown, component_details, identified_actives,
+                  all_impact, ingredient_list, price, size_ml, category, country,
+                  ratio, value_tier, multipliers_applied, concentrations, known_concentrations,
+                  price_note=None, red_flags=None):
+    """Assemble final return dict (same schema as before for frontend compatibility)."""
+    red_flags = red_flags or []
+    price_per_ml = round(price / size_ml, 2) if size_ml and size_ml > 0 and price else 0
+    avg_price = _get_avg_price(price, size_ml, category, country)
+    active_count = len(identified_actives)
+    ing_count = len(ingredient_list)
+    active_ratio = round(active_count / ing_count * 100, 1) if ing_count else 0
 
-    def _classify_active(weight, func_cat_lower, ing_class_lower):
-        """Scale-aware classification. UV filters use 5.0 scale; regular actives use 0–1 scale."""
-        if any(uv in func_cat_lower for uv in UV_FUNC_CATS) or 'uv filter' in ing_class_lower:
-            return 'primary'   # UV filters always primary — their ESW=5.0 is a different scale
-        if weight >= 0.80:
-            return 'primary'
-        elif weight >= 0.50:
-            return 'supporting'
-        elif weight >= 0.30:
-            return 'antioxidant'
-        else:
-            return 'barrier_support'
+    # Active classes
+    _AO_NAMES = {'tocopherol','ascorbic acid','ferulic acid','resveratrol','astaxanthin',
+                 'coenzyme q10','ergothioneine','green tea','egcg','idebenone','quercetin'}
+    _BARRIER_FC = {'barrier','emollient','occlusive','humectant'}
+    _UV_FC = {'uv filter','mineral uv filter','organic uv filter','sunscreen'}
 
-    for ac in active_contributions:
-        name = ac['name']
-        classified_names.add(name.lower())
-        data = data_loader.get_ingredient_data(name)
-        func_cat_lower = str(data.get('Functional_Category', '') if data else '').lower()
-        ing_class_lower = str(data.get('Ingredient_Class', '') if data else '').lower()
-        bucket = _classify_active(ac['weight'], func_cat_lower, ing_class_lower)
-        if bucket == 'primary':
-            primary_actives.append(name)
-        elif bucket == 'supporting':
-            supporting_actives.append(name)
-        elif bucket == 'antioxidant':
-            antioxidant_actives.append(name)
-        else:
-            barrier_actives.append(name)
+    primary_actives = []; supporting_actives = []
+    antioxidant_actives = []; barrier_actives = []
+    classified = set()
 
-    for ing_name in ingredient_list:
-        ing_lower = ing_name.lower()
-        if ing_lower in classified_names:
-            continue
-        data = data_loader.get_ingredient_data(ing_name)
-        if not data:
-            continue
-        func_cat = str(data.get('Functional_Category', '')).lower()
-        ing_class = str(data.get('Ingredient_Class', '')).lower()
-        if any(kw in ing_lower for kw in ANTIOXIDANT_NAMES) or 'antioxidant' in func_cat:
-            antioxidant_actives.append(ing_name)
-            classified_names.add(ing_lower)
-        elif any(kw in func_cat for kw in BARRIER_FUNC_CATS) or any(kw in ing_class for kw in BARRIER_FUNC_CATS):
-            barrier_actives.append(ing_name)
-            classified_names.add(ing_lower)
-
-    active_classes = {
-        'primary': primary_actives[:8],
-        'supporting': supporting_actives[:8],
-        'antioxidants': antioxidant_actives[:6],
-        'barrier_support': barrier_actives[:6],
-    }
+    for ing, pos, imp_score, data in all_impact:
+        il = ing.strip().lower()
+        if il in classified: continue
+        ing_class = str(data.get('Ingredient_Class','')).lower()
+        func_cat  = str(data.get('Functional_Category','')).lower()
+        rw = _get_role_weight(data)
+        if any(uv in func_cat for uv in _UV_FC) or 'uv filter' in ing_class:
+            primary_actives.append(ing); classified.add(il)
+        elif rw >= 8 and ing_class in ('active','peptide','retinoid','brightening active'):
+            primary_actives.append(ing); classified.add(il)
+        elif ing_class in ('active','peptide','retinoid','brightening active'):
+            supporting_actives.append(ing); classified.add(il)
+        elif any(kw in il for kw in _AO_NAMES) or 'antioxidant' in func_cat:
+            antioxidant_actives.append(ing); classified.add(il)
+        elif any(kw in func_cat for kw in _BARRIER_FC):
+            barrier_actives.append(ing); classified.add(il)
 
     return {
         'score': int(total_score),
         'breakdown': score_breakdown,
         'component_details': component_details,
         'stats': {
-            'price_per_ml': round(price_per_ml, 2),
+            'price_per_ml': price_per_ml,
             'category_avg': round(avg_price, 2),
             'vs_average': round(ratio, 1),
-            'active_count': len(actives_found),
-            'active_ratio': round(active_ratio * 100, 1),
-            'price_per_active': round(price / len(actives_found), 2) if actives_found else price
+            'active_count': active_count,
+            'active_ratio': round(active_ratio, 1),
+            'price_per_active': round(price / active_count, 2) if active_count and price else price or 0,
         },
         'tier_badge': get_tier_badge(total_score, value_tier),
         'score_title': get_score_title(total_score, value_tier),
         'value_tier': value_tier,
-        'ratio': round(ratio, 2),
+        'ratio': ratio,
         'identified_actives': identified_actives,
-        'active_classes': active_classes,
+        'active_classes': {
+            'primary': primary_actives[:8],
+            'supporting': supporting_actives[:8],
+            'antioxidants': antioxidant_actives[:6],
+            'barrier_support': barrier_actives[:6],
+        },
         'multipliers_applied': multipliers_applied,
         'price_note': price_note,
         'red_flags': red_flags,
@@ -2239,7 +2558,34 @@ def analyze_product(product_data):
     concern_dict = concern_fit.get('concerns', {})
     am_pm = concern_fit.get('am_pm', 'Suitable for: AM & PM')
 
-    return {
+    # New analyses — 1% marker, conflicts, pH, delivery systems
+    marker_idx, marker_name = _find_one_percent_marker(ingredient_list)
+    one_percent_marker = None
+    if marker_idx is not None:
+        one_percent_marker = {
+            'index': marker_idx,
+            'ingredient': marker_name,
+            'above_marker': ingredient_list[:marker_idx],
+            'below_marker': ingredient_list[marker_idx:],
+        }
+
+    ingredient_conflicts  = detect_ingredient_conflicts(ingredient_list)
+    ph_analysis           = infer_ph_and_check(ingredient_list)
+    delivery_systems      = detect_delivery_systems(ingredient_list)
+
+    # Score confidence label
+    has_confirmed_concs = any(a.get('concentration_known') for a in main_score['identified_actives'])
+    if one_percent_marker:
+        score_confidence = f"Based on confirmed INCI order — 1% line found at {marker_name}"
+        score_confidence_level = "medium"
+    elif has_confirmed_concs:
+        score_confidence = "Some concentrations confirmed from product page"
+        score_confidence_level = "medium"
+    else:
+        score_confidence = "Estimated from INCI position only — no concentration data available"
+        score_confidence_level = "low"
+
+        return {
         "main_worth_score": main_score['score'],
         "main_worth_tier": main_score['tier_badge'],
         "score_title": main_score['score_title'],
@@ -2284,5 +2630,11 @@ def analyze_product(product_data):
         "allergen_warnings": skin_compat.get('allergen_warnings', []),
         "upgrade_suggestions": upgrade_suggestions,
         "ingredient_count": len(ingredient_list),
-        "disclaimer": "Science-based estimates. Not medical advice."
+        "disclaimer": "Science-based estimates. Not medical advice.",
+        "one_percent_marker": one_percent_marker,
+        "ingredient_conflicts": ingredient_conflicts,
+        "ph_analysis": ph_analysis,
+        "delivery_systems": delivery_systems,
+        "score_confidence": score_confidence,
+        "score_confidence_level": score_confidence_level,
     }

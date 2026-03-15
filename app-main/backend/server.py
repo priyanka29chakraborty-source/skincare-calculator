@@ -624,7 +624,7 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
             if r['name'] not in seen:
                 deduped.append(r)
                 seen.add(r['name'])
-        basic_alternatives = deduped[:8]
+        basic_alternatives = deduped[:3]
 
         serp_urls = [r['link'] for r in basic_alternatives if r.get('link')][:3]
         if serp_urls:
@@ -688,7 +688,7 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
 
     scored_alternatives.sort(key=lambda x: x.get('score_delta', 0), reverse=True)
     scored_names = {a['name'] for a in scored_alternatives}
-    basic_alternatives = [r for r in basic_alternatives if r['name'] not in scored_names][:6]
+    basic_alternatives = [r for r in basic_alternatives if r['name'] not in scored_names][:3]
 
     search_message = None
     if not scored_alternatives and not basic_alternatives:
