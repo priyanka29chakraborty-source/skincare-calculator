@@ -757,17 +757,33 @@ def _normalize_product_key(name, brand=None, size=None):
 
 
 def _is_same_product(result_title, brand, product_name, size_ml):
-    """Check if a SERP result is the same product (same brand, variant, not a bundle)."""
+    """Check if a SERP result is the same product.
+    Rules:
+    - Bundles/combos/multi-packs → always reject
+    - Brand match ≥ 90% fuzzy (partial_ratio)
+    - Product name match ≥ 85% fuzzy (token_set_ratio)
+    - Size within 5ml/g tolerance (if size provided and title has a size)
+    """
+    from rapidfuzz import fuzz as _fuzz
     title_lower = result_title.lower()
+
     # Discard bundles and multi-packs
-    if any(kw in title_lower for kw in ['pack of', 'combo', 'bundle', 'set of', 'kit', '2x', '3x']):
+    if any(kw in title_lower for kw in ['pack of', 'combo', 'bundle', 'set of', 'kit', '2x', '3x', 'multi-pack', 'multipack']):
         return False
-    # Must match brand
+
+    # Brand match >= 90%
     if brand:
-        brand_lower = brand.lower()
-        if brand_lower not in title_lower:
+        brand_score = _fuzz.partial_ratio(brand.lower(), title_lower)
+        if brand_score < 90:
             return False
-    # Check size match if provided
+
+    # Product name match >= 85% (token_set_ratio handles word order differences)
+    if product_name:
+        name_score = _fuzz.token_set_ratio(product_name.lower(), title_lower)
+        if name_score < 85:
+            return False
+
+    # Size match within 5ml/g tolerance
     if size_ml:
         size_matches = re.findall(r'(\d+\.?\d*)\s*(ml|g)', title_lower)
         if size_matches:
@@ -775,7 +791,8 @@ def _is_same_product(result_title, brand, product_name, size_ml):
                 val = float(val_str)
                 if abs(val - size_ml) <= 5:
                     return True
-            return False
+            return False  # sizes present but none matched
+
     return True
 
 

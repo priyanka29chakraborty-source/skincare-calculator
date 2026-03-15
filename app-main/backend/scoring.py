@@ -381,10 +381,7 @@ PH_DEPENDENT_ACTIVES = {
 }
 
 ALKALINE_BASES = {
-    # True high-pH surfactants/soaps that genuinely conflict with acid actives at formulation level.
-    # NOTE: sodium hydroxide, potassium hydroxide, and triethanolamine are intentionally excluded —
-    # they are pH adjusters used in trace amounts in most acid-containing products and do NOT
-    # conflict at finished-formula pH. Including them caused near-universal false positives.
+    'sodium hydroxide', 'potassium hydroxide', 'triethanolamine',
     'sodium lauryl sulfate', 'sodium laureth sulfate', 'soap',
     'cocamidopropyl betaine',
 }
@@ -556,11 +553,18 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 'conc_label': conc_label, 'ev_label': ev_label,
                 'position': ingredient_list.index(ing_name)
             })
+            # Check if this ingredient's concentration is from a known source
+            # (scraped from product page, inline INCI %, or product name)
+            _ing_lower = ing_name.lower()
+            _kc = known_concentrations or {}
+            _conc_is_known = _ing_lower in _kc
             identified_actives.append({
                 'name': ing_name,
                 'position': ingredient_list.index(ing_name) + 1,
                 'evidence': ev_label,
                 'concentration': conc_label,
+                'concentration_pct': round(conc, 2) if _conc_is_known else None,
+                'concentration_known': _conc_is_known,
                 'score_contribution': round(eq_factor * conc_factor * weight, 2),
                 'primary_benefits': (lambda d: (
                     # Try Primary_Benefits first
@@ -687,7 +691,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         if has_antioxidant_boost:
             formula_score += 2
             component_details['B'].append("Antioxidant UV boosters present (+2)")
-    elif cat_lower in ('toner', 'mist'):
+    elif cat_lower in ('toner', 'mist', 'essence'):
         formula_score += 1  # Lighter category — less infrastructure expected
     elif cat_lower == 'cleanser':
         has_conditioning = any(
@@ -1897,7 +1901,6 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
     helpful_ingredients = []
     look_for_suggestions = []
     total_penalty = 0  # track cumulative penalty for risk_level
-    _helpful_seen_names = set()  # track ingredient names (not full label) to prevent duplicates
 
     ing_str = " ".join(ingredient_list).lower()
 
@@ -1933,26 +1936,27 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
             if skin_type in {'dry', 'combination'}:
                 pb_lower = primary_benefit.lower()
                 if any(k in pb_lower for k in ['hydration', 'barrier', 'moisture']):
-                    if ing_lower not in _helpful_seen_names:
-                        benefit_label = primary_benefit.split(';')[0].strip().lower()
-                        helpful_ingredients.append(f"{ing} ({benefit_label})")
-                        _helpful_seen_names.add(ing_lower)
+                    # Grab first benefit token as a short label
+                    benefit_label = primary_benefit.split(';')[0].strip().lower()
+                    enriched = f"{ing} ({benefit_label})"
+                    if enriched not in helpful_ingredients:
+                        helpful_ingredients.append(enriched)
 
             # For oily skin: flag sebum-regulation / acne-targeting ingredients
             if skin_type == 'oily':
                 if 'acne' in concerns_map or 'sebum' in concerns_map or 'pore' in concerns_map:
-                    if ing_lower not in _helpful_seen_names:
-                        helpful_ingredients.append(f"{ing} (acne support)")
-                        _helpful_seen_names.add(ing_lower)
+                    enriched = f"{ing} (acne support)"
+                    if enriched not in helpful_ingredients:
+                        helpful_ingredients.append(enriched)
 
             # For sensitive skin: flag soothing / anti-inflammatory ingredients
             if skin_type == 'sensitive':
                 pb_lower = primary_benefit.lower()
                 if any(k in pb_lower for k in ['sooth', 'calm', 'anti-inflam']):
-                    if ing_lower not in _helpful_seen_names:
-                        benefit_label = primary_benefit.split(';')[0].strip().lower()
-                        helpful_ingredients.append(f"{ing} ({benefit_label})")
-                        _helpful_seen_names.add(ing_lower)
+                    benefit_label = primary_benefit.split(';')[0].strip().lower()
+                    enriched = f"{ing} ({benefit_label})"
+                    if enriched not in helpful_ingredients:
+                        helpful_ingredients.append(enriched)
 
         if skin_type == 'oily':
             if data:
@@ -1976,16 +1980,12 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                 score += 5
                 bonus.append(f"{ing} (Sebum regulation)")
                 why_bullets.append("Niacinamide helps control sebum")
-                if ing_lower not in _helpful_seen_names:
-                    helpful_ingredients.append(f"{ing} (sebum regulation)")
-                    _helpful_seen_names.add(ing_lower)
+                helpful_ingredients.append(f"{ing} (sebum regulation)")
             if 'zinc pca' in ing_lower or 'salicylic' in ing_lower:
                 score += 5
                 bonus.append(f"{ing} (Oil control)")
                 why_bullets.append(f"{ing} helps with oil control")
-                if ing_lower not in _helpful_seen_names:
-                    helpful_ingredients.append(f"{ing} (oil control)")
-                    _helpful_seen_names.add(ing_lower)
+                helpful_ingredients.append(f"{ing} (oil control)")
 
             look_for_suggestions = ["Products with Zinc PCA, Salicylic Acid, or mattifying agents may work better for excess sebum control."]
 
@@ -1998,15 +1998,11 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                 score += 5
                 bonus.append(f"{ing} (Hydrating)")
                 why_bullets.append(f"{ing} provides hydration")
-                if ing_lower not in _helpful_seen_names:
-                    helpful_ingredients.append(f"{ing} (hydrating)")
-                    _helpful_seen_names.add(ing_lower)
+                helpful_ingredients.append(f"{ing} (hydrating)")
             if 'shea butter' in ing_lower or 'squalane' in ing_lower:
                 score += 5
                 bonus.append(f"{ing} (Moisturizing)")
-                if ing_lower not in _helpful_seen_names:
-                    helpful_ingredients.append(f"{ing} (moisturizing)")
-                    _helpful_seen_names.add(ing_lower)
+                helpful_ingredients.append(f"{ing} (moisturizing)")
 
             look_for_suggestions = ["Look for products with Ceramides, Squalane, or Hyaluronic Acid for better moisture retention."]
 
@@ -2038,9 +2034,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                 score += 5
                 bonus.append(f"{ing} (Soothing)")
                 why_bullets.append(f"{ing} provides soothing benefits")
-                if ing_lower not in _helpful_seen_names:
-                    helpful_ingredients.append(f"{ing} (soothing)")
-                    _helpful_seen_names.add(ing_lower)
+                helpful_ingredients.append(f"{ing} (soothing)")
 
             look_for_suggestions = ["Look for products with Centella Asiatica, Allantoin, or fragrance-free formulas."]
 
@@ -2051,18 +2045,14 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
             if 'niacinamide' in ing_lower or 'zinc pca' in ing_lower:
                 score += 4
                 bonus.append(f"{ing} (Balancing)")
-                if ing_lower not in _helpful_seen_names:
-                    helpful_ingredients.append(f"{ing} (balancing)")
-                    _helpful_seen_names.add(ing_lower)
+                helpful_ingredients.append(f"{ing} (balancing)")
             if 'fragrance' in ing_lower or 'parfum' in ing_lower:
                 score -= 10
                 penalty.append(f"{ing} (Fragrance)")
             if 'glycerin' in ing_lower or 'sodium hyaluronate' in ing_lower:
                 score += 3
                 bonus.append(f"{ing} (Hydrating)")
-                if ing_lower not in _helpful_seen_names:
-                    helpful_ingredients.append(f"{ing} (hydrating)")
-                    _helpful_seen_names.add(ing_lower)
+                helpful_ingredients.append(f"{ing} (hydrating)")
             if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower:
                 score -= 15
                 penalty.append(f"{ing} (Drying)")

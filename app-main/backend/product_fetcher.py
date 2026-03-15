@@ -280,11 +280,9 @@ def _extract_ingredients_from_body_html(body_html):
 def _parse_size(text, product_name=None):
     """Extract size (value + unit) from text. Returns (float, str) or (None, 'ml')."""
     search_text = (product_name or '') + ' ' + (text or '')
-    # Identify SPF token spans so we can skip size numbers that are the SPF value itself
-    # e.g. "SPF50ml" or "SPF 50ml" — the 50 is the SPF value, not a product size
-    # But "SPF50 60ml" or "Sunscreen SPF50 60ml" — 60ml is a separate real size
+    # Find positions of SPF tokens so we can skip numbers that are part of "SPF 50"
     _SPF_CONTEXT = re.compile(r'\bSPF\s*\d+', re.I)
-    spf_spans = [(m.start(), m.end()) for m in _SPF_CONTEXT.finditer(search_text)]
+    spf_positions = [m.start() for m in _SPF_CONTEXT.finditer(search_text)]
     matches = list(re.finditer(
         r'(\d+\.?\d*)\s*(ml|g|fl\s*\.?\s*oz|oz)\b',
         search_text, re.IGNORECASE
@@ -293,9 +291,10 @@ def _parse_size(text, product_name=None):
         val = float(m.group(1))
         if not (5 <= val <= 1000):
             continue
-        # Skip only if the size number's start position is strictly INSIDE an SPF token span
-        # This catches "SPF50ml" and "SPF 50ml" but NOT "SPF50 60ml"
-        if any(sp_start <= m.start() < sp_end for sp_start, sp_end in spf_spans):
+        # Skip only if an SPF token appears immediately BEFORE this number (within 8 chars)
+        # e.g. "SPF 50ml" or "SPF50ml" — but NOT "20ml SPF 30"
+        skip = any(sp < m.start() and (m.start() - sp) <= 8 for sp in spf_positions)
+        if skip:
             continue
         unit = m.group(2).lower().replace(' ', '').replace('.', '')
         if unit in ('oz', 'floz'):
@@ -642,26 +641,60 @@ def _extract_metadata(html, url):
         price = max(_jsonld_candidates)
         price_confidence = "high"
 
+    # Priority 1b: OpenGraph price meta tags (very reliable for Indian ecommerce)
+    if not price:
+        for og_price_tag in ['product:price:amount', 'og:price:amount']:
+            og_el = soup.find('meta', property=og_price_tag)
+            if og_el and og_el.get('content'):
+                try:
+                    val = float(str(og_el['content']).replace(',', ''))
+                    if 0 < val < 500000:
+                        price = val
+                        price_confidence = "high"
+                        break
+                except (ValueError, TypeError):
+                    pass
+
     # Priority 2: Structured HTML price selectors (medium confidence)
     if not price:
         price_selectors = [
+            # Meta / microdata
+            {'itemprop': 'price'},
             # Amazon
             {'id': 'priceblock_ourprice'}, {'id': 'priceblock_dealprice'},
             {'id': 'price_inside_buybox'}, {'id': 'apex_offerDisplay_desktop'},
             {'class': 'a-price-whole'},
-            # Nykaa
-            {'class': 'css-1jczs19'}, {'class': 'price-box'},
-            {'class': 'final-price'}, {'class': 'selling-price'},
-            # Tira Beauty (Reliance React platform)
+            {'id': 'corePrice_desktop'}, {'id': 'corePrice_feature_div'},
+            # Nykaa (classname changes deploy-to-deploy; target data attrs instead)
+            {'data-price': True},
+            {'class': 'css-1jczs19'}, {'class': 'css-17x5m0r'}, {'class': 'css-1u6bsv2'},
+            {'class': 'price-box'}, {'class': 'final-price'}, {'class': 'selling-price'},
+            # Purplle / Myntra / generic Indian ecommerce
+            {'class': re.compile(r'product[-_]?price|item[-_]?price|offer[-_]?price|current[-_]?price', re.I)},
+            {'id': re.compile(r'product[-_]?price|item[-_]?price|offer[-_]?price', re.I)},
+            # Tira Beauty / Reliance React platform
             {'data-testid': 'selling-price'}, {'data-testid': 'product-price'},
             {'class': re.compile(r'wt-text-base-max|sellingPrice|product.*price|price.*value', re.I)},
             # Generic structured selectors
-            {'itemprop': 'price'},
             {'class': re.compile(r'sale.?price|selling.?price|offer.?price|current.?price|final.?price', re.I)},
             {'id': re.compile(r'sale.?price|selling.?price|offer.?price|current.?price', re.I)},
         ]
         sym = CURRENCY_SYMBOLS.get(currency, r'[\$₹£€]')
         for sel in price_selectors:
+            # Handle 'data-price': True (any element with data-price attr)
+            if sel == {'data-price': True}:
+                el = soup.find(attrs={'data-price': True})
+                if el:
+                    raw = el.get('data-price', '')
+                    try:
+                        p = float(str(raw).replace(',', ''))
+                        if 0 < p < 500000:
+                            price = p
+                            price_confidence = "medium"
+                            break
+                    except (ValueError, TypeError):
+                        pass
+                continue
             el = soup.find(attrs=sel) if not any(isinstance(v, re.Pattern) for v in sel.values()) else soup.find(True, attrs=sel)
             if el:
                 raw = el.get('content') or el.get('data-price') or el.get_text(strip=True)

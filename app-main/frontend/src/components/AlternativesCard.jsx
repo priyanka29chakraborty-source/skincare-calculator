@@ -79,7 +79,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
         <>
           <div className="alt-section-label">Alternatives</div>
           <div className="scored-alt-list" data-testid="scored-alternatives-list">
-            {alternatives.scored_alternatives.map((alt, i) => (
+            {alternatives.scored_alternatives.slice(0, 3).map((alt, i) => (
               <div key={i} className="scored-alt-card" data-testid={`scored-alt-${i}`}>
                 <div className="scored-alt-header">
                   <span className="scored-alt-name">{alt.name}</span>
@@ -145,20 +145,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
         </>
       )}
 
-      {!altLoading && !alternatives?.scored_alternatives?.length && !alternatives?.basic_alternatives?.length && result.upgrade_suggestions?.length > 0 && (
-        <div className="alt-search-failed" data-testid="alt-search-failed">
-          <p className="alt-empty">
-            <i className="fa-solid fa-magnifying-glass"></i>{" "}
-            {alternatives?.search_message || "Live product search was unavailable. Search for these ingredients manually:"}
-          </p>
-          <ul className="alt-manual-list">
-            {result.upgrade_suggestions.map((sug, i) => (
-              <li key={i}><strong>{sug.upgrade}</strong> — for {sug.concern}</li>
-            ))}
-          </ul>
-          <p className="alt-manual-sites">Try: Amazon, Nykaa, Purplle, Sephora or your local skincare retailer.</p>
-        </div>
-      )}
+
     </div>
   );
 }

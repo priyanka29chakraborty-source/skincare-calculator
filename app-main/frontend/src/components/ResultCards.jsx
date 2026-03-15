@@ -64,14 +64,22 @@ function IngredientBreakdownTable({ actives }) {
               <td style={{ padding: "5px 10px", color: "var(--text-sub)", fontSize: "0.78rem", maxWidth: "200px" }}>
                 {a.primary_benefits || a.functional_category || "—"}
               </td>
-              <td style={{ padding: "5px 10px", textAlign: "center", color: "var(--text-sub)", fontSize: "0.78rem" }}>{a.concentration}</td>
+              <td style={{ padding: "5px 10px", textAlign: "center", fontSize: "0.78rem" }}>
+                {a.concentration_known && a.concentration_pct != null ? (
+                  <span style={{ color: '#267C36', fontWeight: 700 }} title="Confirmed from product page or INCI annotation">
+                    ✓ {a.concentration_pct}%
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--text-sub)' }}>{a.concentration}</span>
+                )}
+              </td>
 
             </tr>
           ))}
         </tbody>
       </table>
       <p style={{ fontSize: "0.72rem", color: "var(--text-sub)", marginTop: "8px", fontStyle: "italic" }}>
-        ℹ️ Concentration estimates are based on INCI position and may not reflect actual formulation.
+        ℹ️ <span style={{ color: '#267C36', fontWeight: 600 }}>✓ Green % = confirmed from product page or INCI annotation.</span> All other estimates are based on INCI position and may not reflect actual formulation.
       </p>
     </div>
   );
@@ -335,9 +343,11 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           </div>
         )}
 
-        {/* Ingredient Breakdown Table — always visible, no toggle */}
+        {/* Ingredient Breakdown Table — always visible when actives exist */}
         {result.identified_actives?.length > 0 && (
-          <IngredientBreakdownTable actives={result.identified_actives} />
+          <div style={{ marginTop: "1rem" }}>
+            <IngredientBreakdownTable actives={result.identified_actives} />
+          </div>
         )}
 
         {/* Active Classes Buckets */}
