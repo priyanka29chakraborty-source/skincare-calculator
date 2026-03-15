@@ -12,7 +12,7 @@ function getValueChip(valueTier, ratio) {
     case 'fair':
       return { label: 'Average Value', subtitle: `Priced around category average (~${(ratio || 1).toFixed(1)}×).`, color: '#2D7FD3' };
     case 'slightly_overpriced':
-      return { label: 'Below Average Value', subtitle: 'Priced somewhat above category average for what's inside.', color: '#E6A817' };
+      return { label: 'Below Average Value', subtitle: "Priced somewhat above category average for what's inside.", color: '#E6A817' };
     case 'overpriced':
       return { label: 'Poor Value', subtitle: 'Significantly overpriced relative to active ingredient content.', color: '#D06030' };
     default:
