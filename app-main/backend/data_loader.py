@@ -327,7 +327,6 @@ class DataLoader:
                                 esw = float(esw_raw)
                         except (ValueError, TypeError):
                             ef, esw = 0.4, 0.5
-                        import math
                         if math.isnan(ef):
                             ef = 0.4
                         if math.isnan(esw):

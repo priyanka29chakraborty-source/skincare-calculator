@@ -69,6 +69,22 @@ def parse_ingredients(ingredient_list_str):
     # Split by comma, semicolon, or line breaks
     raw_parts = re.split(r'[,;\n\r]+', ingredient_list_str)
 
+    # Merge IUPAC numbering fragments: "1, 3 Butylene Glycol" → "1,3 Butylene Glycol"
+    # A lone numeric segment (like "1" or "3") is never a real INCI name — it's part
+    # of a chemical locant prefix that got split at the comma.
+    merged_parts = []
+    i = 0
+    while i < len(raw_parts):
+        seg = raw_parts[i].strip()
+        # If this segment is ONLY digits (optional hyphen), merge with next
+        if re.match(r'^\d[\d\-]*$', seg) and i + 1 < len(raw_parts):
+            merged_parts.append(seg + ',' + raw_parts[i + 1].strip())
+            i += 2
+        else:
+            merged_parts.append(raw_parts[i])
+            i += 1
+    raw_parts = merged_parts
+
     cleaned = []
     seen = set()
 
@@ -106,6 +122,8 @@ def parse_ingredients(ingredient_list_str):
 
             # Remove parenthetical descriptors: "(Vitamin B3)", "(Provitamin B5)", etc.
             ing = re.sub(r'\([^)]*\)', '', ing).strip()
+            # Collapse multiple spaces left by parenthetical removal
+            ing = re.sub(r'\s{2,}', ' ', ing).strip()
 
             # Remove percentage annotations inline: "10%", "0.3 %", "10 percent"
             ing = re.sub(r'\s*[\d\.]+\s*(?:%|percent)\s*', '', ing, flags=re.IGNORECASE).strip()
@@ -411,7 +429,6 @@ def _find_one_percent_marker(ingredient_list):
     Everything before this marker is confirmed >1%. Everything after may be <1%.
     Returns (index, ingredient_name) or (None, None).
     """
-    from config import CONCENTRATION_THRESHOLDS
     for i, ing in enumerate(ingredient_list):
         for marker in CONCENTRATION_THRESHOLDS:
             if marker.lower() in ing.lower():
@@ -916,11 +933,13 @@ def _price_pts(price, size_ml, category, country):
     """Return price score 0-10 using category average comparison."""
     if not price or not size_ml or size_ml <= 0:
         return 5
-    from config import CATEGORY_AVERAGES, CATEGORY_AVERAGES_DEFAULT
     country_avgs = CATEGORY_AVERAGES.get(country)
     if not country_avgs:
         return 5
     cat_key = category.strip().lower()
+    # Normalise category aliases: 'facial oil' ↔ 'oil' (inconsistency across countries)
+    if cat_key not in country_avgs:
+        cat_key = 'oil' if cat_key == 'facial oil' else ('facial oil' if cat_key == 'oil' else cat_key)
     avg_price = country_avgs.get(cat_key, {}).get('avg_price_per_ml', 1.0)
     if not avg_price:
         return 5
@@ -980,10 +999,10 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         eq_factor = get_evidence_factor(data)
 
         conc_label = (
-            "likely at optimal functional level"    if conc_factor >= 1.0 else
-            "likely within functional range"        if conc_factor >= 0.7 else
-            "concentration range unknown"           if conc_factor >= 0.5 else
-            "may be below typical functional range"
+            "At or above effective concentration"   if conc_factor >= 1.0 else
+            "Likely within effective range"         if conc_factor >= 0.7 else
+            "Likely underdosed — deep in formula"   if conc_factor >= 0.5 else
+            "Likely trace amount — position too deep"
         )
 
         _kc = known_concentrations or {}
@@ -1017,10 +1036,26 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
 
     if cat_lower in ('serum', 'treatment', 'essence', 'ampoule'):
         # Active potency 40, evidence 20, formula balance 15, irritation 10
-        active_impact_sum = sum(s for _, _, s, d in all_impact
-                                if str(d.get('Ingredient_Class','')).lower() in
-                                ('active','peptide','retinoid','brightening active'))
-        active_potency = min(40, active_impact_sum / 50)
+        # Actives above 1% line → full positional impact score
+        # Actives below 1% line → flat evidence credit (presence × evidence quality)
+        # This prevents near-zero scores when a well-formulated product puts
+        # all actives below the 1% threshold (common in ceramide/HA serums).
+        _ACTIVE_CLASSES = ('active','peptide','retinoid','brightening active')
+        one_pct_idx = next(
+            (i for i, (ing, pos, _, _) in enumerate(all_impact)
+             if any(m.lower() in ing.lower() for m in CONCENTRATION_THRESHOLDS)),
+            len(all_impact)
+        )
+        above_impact = sum(
+            s for i, (_, pos, s, d) in enumerate(all_impact)
+            if i < one_pct_idx and str(d.get('Ingredient_Class','')).lower() in _ACTIVE_CLASSES
+        )
+        below_evidence = sum(
+            _get_evidence_weight(d.get('Evidence_Strength','')) * 0.6
+            for i, (_, pos, s, d) in enumerate(all_impact)
+            if i >= one_pct_idx and str(d.get('Ingredient_Class','')).lower() in _ACTIVE_CLASSES
+        )
+        active_potency = min(40, above_impact / 50 + below_evidence)
 
         ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength','')) for _, _, _, d in all_impact
                      if str(d.get('Ingredient_Class','')).lower() == 'active')
@@ -1187,8 +1222,9 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 safety_score -= 0.5
             preg = str(data.get('Pregnancy_Safety','')).lower()
             if ('avoid' in preg or 'restrict' in preg) and _preg_ded < 4:
-                d = min(4.0 - _preg_ded, 4.0); safety_score -= d; _preg_ded += d
-                safety_details.append(f"{ing} — pregnancy safety flag")
+                # Note only — not everyone is pregnant. Flag for info but don't penalise score.
+                _preg_ded += 1  # track so we cap at a few notes
+                safety_details.append(f"{ing} — caution if pregnant (check with your doctor)")
     safety_score = round(max(0, min(10, safety_score)), 1)
 
     # Claim accuracy (Component C)
@@ -1209,7 +1245,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
 
     if safety_score >= 9: component_details['D'].append("Low irritation risk overall")
     elif safety_score >= 6: component_details['D'].append("Some safety considerations present")
-    else: component_details['D'].append("Multiple safety flags detected")
+    else: component_details['D'].append("Contains flagged ingredients — see details")
     for d in safety_details[:2]: component_details['D'].append(d)
 
     avg_price = _get_avg_price(price, size_ml, category, country)
@@ -1239,9 +1275,10 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
 
 
 def _get_avg_price(price, size_ml, category, country):
-    from config import CATEGORY_AVERAGES
     country_avgs = CATEGORY_AVERAGES.get(country, {})
     cat_key = category.strip().lower()
+    if cat_key not in country_avgs:
+        cat_key = 'oil' if cat_key == 'facial oil' else ('facial oil' if cat_key == 'oil' else cat_key)
     return country_avgs.get(cat_key, {}).get('avg_price_per_ml', 1.0) or 1.0
 
 
@@ -1332,7 +1369,7 @@ def get_tier_badge(score, value_tier=None):
             return "Acceptable & Fairly Priced"
         return "Acceptable but Overpriced"
     if score >= 40:
-        return "Questionable Value"
+        return "Below Average Value"
     return "Mostly Marketing"
 
 
@@ -1350,7 +1387,7 @@ def get_score_title(score, value_tier=None):
             return "Good formula at acceptable value"
         return "Good formula, on the pricey side"
     if score >= 40:
-        return "Limited actives for the cost"
+        return "Few key actives relative to price"
     return "Mostly marketing, minimal substance"
 
 
@@ -2014,11 +2051,11 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             # Support ingredients (humectants, emollients, etc.) don't need a % judgment.
             if not is_support_ingredient(data):
                 if conc_factor >= 1.0:
-                    conc_info.append(f"{info['inci']} — likely at optimal functional level (INCI estimate)")
+                    conc_info.append(f"{info['inci']} — at or above effective concentration")
                 elif conc_factor >= 0.7:
-                    conc_info.append(f"{info['inci']} — likely within functional range (INCI estimate)")
+                    conc_info.append(f"{info['inci']} — likely within effective range")
                 else:
-                    conc_info.append(f"{info['inci']} — may be below typical functional range (INCI estimate)")
+                    conc_info.append(f"{info['inci']} — likely underdosed based on INCI position")
 
             # Synergy factor (check if this active pairs with another present active)
             syn_factor = 1.0

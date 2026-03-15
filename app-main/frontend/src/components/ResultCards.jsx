@@ -8,13 +8,13 @@ import BestPriceCard from "./BestPriceCard";
 function getValueChip(valueTier, ratio) {
   switch (valueTier) {
     case 'underpriced':
-      return { label: 'Excellent Value', subtitle: 'Good formula, priced below category average.', color: '#267C36' };
+      return { label: 'Good Value', subtitle: 'Priced below category average for the formula quality.', color: '#267C36' };
     case 'fair':
-      return { label: 'Acceptable & Fairly Priced', subtitle: `Good formula, ~${(ratio || 1).toFixed(1)}× category price.`, color: '#2D7FD3' };
+      return { label: 'Average Value', subtitle: `Priced around category average (~${(ratio || 1).toFixed(1)}×).`, color: '#2D7FD3' };
     case 'slightly_overpriced':
-      return { label: 'Acceptable but Slightly Overpriced', subtitle: 'Formula is decent but priced above category average.', color: '#E6A817' };
+      return { label: 'Below Average Value', subtitle: 'Priced somewhat above category average for what's inside.', color: '#E6A817' };
     case 'overpriced':
-      return { label: 'Overpriced for Actives Inside', subtitle: 'Active ingredient value does not justify the price point.', color: '#D06030' };
+      return { label: 'Poor Value', subtitle: 'Significantly overpriced relative to active ingredient content.', color: '#D06030' };
     default:
       return { label: 'Analysed', subtitle: '', color: '#7A7168' };
   }
@@ -79,7 +79,7 @@ function IngredientBreakdownTable({ actives }) {
         </tbody>
       </table>
       <p style={{ fontSize: "0.72rem", color: "var(--text-sub)", marginTop: "8px", fontStyle: "italic" }}>
-        ℹ️ <span style={{ color: '#267C36', fontWeight: 600 }}>✓ Green % = confirmed from product page or INCI annotation.</span> All other estimates are based on INCI position and may not reflect actual formulation.
+        ℹ️ <span style={{ color: '#267C36', fontWeight: 600 }}>Confirmed concentrations (shown in green) are sourced directly from the product page or INCI inline annotations.</span> All other values are estimated from INCI list position and may not reflect the actual formulation.
       </p>
     </div>
   );
@@ -152,14 +152,27 @@ function OnePercentVisualiser({ marker }) {
 }
 
 // ── pH Analysis Card ────────────────────────────────────────────────────────
+function getPhInterpretation(phRange) {
+  if (!phRange) return null;
+  const [lo, hi] = phRange;
+  const mid = (lo + hi) / 2;
+  if (mid <= 3.5) return { text: "Very acidic — optimised for strong AHA/Vitamin C activity. May sting on sensitive skin.", color: '#C9A96E' };
+  if (mid <= 4.5) return { text: "Acidic — ideal range for AHAs, BHAs, and Vitamin C serums. Good efficacy window.", color: '#267C36' };
+  if (mid <= 5.5) return { text: "Mildly acidic — close to skin's natural pH. Gentle and well-tolerated by most skin types.", color: '#267C36' };
+  if (mid <= 6.5) return { text: "Near-neutral — suitable for barrier-focused and ceramide-based formulas.", color: '#2D7FD3' };
+  if (mid <= 7.5) return { text: "Neutral to slightly alkaline — fine for most moisturisers but not ideal for acid actives.", color: '#C9A96E' };
+  return { text: "Alkaline — could reduce efficacy of pH-sensitive actives like AHAs and Vitamin C.", color: '#D06030' };
+}
+
 function PhAnalysisSection({ ph }) {
   if (!ph || !ph.ph_range) return null;
   const hasWarnings = ph.warnings && ph.warnings.length > 0;
+  const interp = getPhInterpretation(ph.ph_range);
   return (
     <div style={{ marginTop: '14px', borderRadius: '10px',
       background: hasWarnings ? '#fffaf0' : '#f7fbff',
       border: `1px solid ${hasWarnings ? '#fde8b0' : '#c8e0f4'}`, padding: '12px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
         <i className="fa-solid fa-flask-vial" style={{ color: hasWarnings ? '#C9A96E' : '#2D7FD3', fontSize: '0.9rem' }}></i>
         <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-main)' }}>
           Formula pH Inference
@@ -168,13 +181,20 @@ function PhAnalysisSection({ ph }) {
           borderRadius: '10px', color: 'var(--text-sub)' }}>
           {ph.confidence === 'medium' ? 'Medium confidence' : 'Estimate only'}
         </span>
-        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '0.8rem',
+        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '0.82rem',
           color: hasWarnings ? '#C9A96E' : '#2D7FD3' }}>
           pH {ph.ph_range[0]}–{ph.ph_range[1]}
         </span>
       </div>
+      {interp && (
+        <div style={{ fontSize: '0.76rem', fontWeight: 600, color: interp.color,
+          background: interp.color + '11', border: `1px solid ${interp.color}33`,
+          borderRadius: '6px', padding: '6px 10px', marginBottom: '8px' }}>
+          {interp.text}
+        </div>
+      )}
       {ph.notes && ph.notes.map((n, i) => (
-        <div key={i} style={{ fontSize: '0.75rem', color: 'var(--text-sub)', marginBottom: '4px',
+        <div key={i} style={{ fontSize: '0.74rem', color: 'var(--text-sub)', marginBottom: '4px',
           paddingLeft: '4px' }}>{n}</div>
       ))}
       {hasWarnings && ph.warnings.map((w, i) => (
@@ -184,8 +204,7 @@ function PhAnalysisSection({ ph }) {
         </div>
       ))}
       <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', marginTop: '8px', fontStyle: 'italic' }}>
-        pH is inferred from buffering/adjusting ingredients in the INCI — brands rarely disclose actual pH.
-        This estimate is directional, not a lab measurement.
+        pH is inferred from buffering/adjusting ingredients in the INCI — brands rarely disclose actual pH. This estimate is directional, not a lab measurement.
       </div>
     </div>
   );
@@ -470,10 +489,10 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
                 background: result.score_confidence_level === 'medium' ? '#f0faf2' : '#faf8f3',
                 border: `1px solid ${result.score_confidence_level === 'medium' ? '#a8dab5' : 'var(--border)'}`,
                 color: result.score_confidence_level === 'medium' ? '#1a5c2a' : '#7A7168',
-                display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
+                display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
                 <i className={`fa-solid ${result.score_confidence_level === 'medium' ? 'fa-circle-check' : 'fa-circle-info'} fa-xs`}
-                  style={{ marginTop: '2px', flexShrink: 0 }}></i>
-                <span>{result.score_confidence}</span>
+                  style={{ flexShrink: 0 }}></i>
+                <span style={{ lineHeight: '1.3' }}>{result.score_confidence}</span>
               </div>
             )}
             {result.worth_multipliers_applied?.length > 0 && (
@@ -488,7 +507,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           <div className="pg-box"><div className="pg-val" style={{ color: "#267C36" }}>{result.price_analysis?.vs_average}</div><div className="pg-lbl">vs average</div></div>
           <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.price_per_active}</div><div className="pg-lbl">per active</div></div>
           <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.active_count}</div><div className="pg-lbl">actives found</div></div>
-          <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.active_ratio}</div><div className="pg-lbl">active ratio <i className="fa-solid fa-circle-info" title="% of total ingredients that are true therapeutic actives" style={{ fontSize: "0.65rem", color: "var(--text-sub)", cursor: "help" }}></i></div></div>
+          <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.active_ratio}</div><div className="pg-lbl">active ratio <i className="fa-solid fa-circle-info" title="Percentage of total ingredients classified as therapeutic actives in the database" style={{ fontSize: "0.65rem", color: "var(--text-sub)", cursor: "help" }}></i></div></div>
         </div>
         {result.price_analysis?.price_note && <div className="price-note" data-testid="price-note"><i className="fa-solid fa-info-circle"></i> {result.price_analysis.price_note}</div>}
         {result.price_analysis?.global_markup_detected && <div className="markup-alert" data-testid="markup-alert"><i className="fa-solid fa-exclamation-triangle"></i> Global Markup Detected</div>}
