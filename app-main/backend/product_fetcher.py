@@ -883,50 +883,77 @@ def _extract_metadata(html, url):
 
     # Helper: detect if text looks like marketing descriptions instead of INCI
     def _is_marketing_description(text):
-        """Return True if text looks like 'Ingredient : does X' marketing copy, not INCI list."""
-        _MARKETING_VERBS = re.compile(
+        """Return True if text looks like marketing copy, not a real INCI list.
+        Four independent signals — any one hit = reject as marketing.
+        """
+        import re as _re
+        _MARKETING_VERBS = _re.compile(
             r'\b(brighten|moisturi[sz]|protect|reduce|smooth|hydrat|repair|nourish|sooth|firm|tone|revitaliz|rejuvenat|stimulat|boost|energi[sz]|defend|restore|strengthen|reviv|calm|heal)\b',
-            re.I
+            _re.I
         )
-        # Check comma-separated format ("Ing1, Ing2 : does X, Ing3")
-        segs = text.split(',')
+        _SENTENCE_VERBS = _re.compile(
+            r'\b(helps?\b|reduces?\b|promotes?\b|improves?\b|provides?\b|supports?\b|balances?\b|leaves?\b|coupled|formulated|derived?\b|regulate|proven|clinically|synthesis|complexion|oiliness)\b',
+            _re.I
+        )
+        _MARKETING_PHRASES = _re.compile(
+            r'\b(clinically\s+proven|skin\s+complexion|sebum\s+activ|protein\s+synthesis|'
+            r'biotechnolog|microorganism|sticky\s+residue|global\s+suppli|'
+            r'regardless\s+of\s+skin|appearance\s+of\s+pores|'
+            r'helps?\s+regulate|helps?\s+reduce|in\s+\d+\s+weeks?|'
+            r'is\s+(?:one\s+of|clinically|proven|derived?)|'
+            r'coupled\s+with|from\s+(?:a\s+)?marine|from\s+leading)\b',
+            _re.I
+        )
+
+        segs = [s.strip() for s in text.split(',') if s.strip()]
+
+        # Signal 1: avg words per comma-segment > 5  (INCI = 1-4 words; sentences = 8-20)
         if len(segs) >= 3:
-            desc_count = sum(
-                1 for s in segs
-                if ':' in s and re.search(r':\s*\w.{5,}', s)
-            )
+            avg_words = sum(len(s.split()) for s in segs) / len(segs)
+            if avg_words > 5:
+                return True
+
+        # Signal 2: >25% of segments contain sentence verbs
+        if segs:
+            verb_segs = sum(1 for s in segs if _SENTENCE_VERBS.search(s))
+            if verb_segs / len(segs) > 0.25:
+                return True
+
+        # Signal 3: known marketing phrases present anywhere in the text
+        if _MARKETING_PHRASES.search(text):
+            return True
+
+        # Signal 4: colon-separated marketing format ("Ingredient : does X")
+        if len(segs) >= 3:
+            desc_count = sum(1 for s in segs if ':' in s and _re.search(r':\s*\w.{5,}', s))
             if desc_count / len(segs) > 0.3:
                 return True
 
-        # Check newline/bullet format ("Vitamin C : Brightens\nYerba mate : Reduces...")
-        # Each line has pattern "IngredientName : marketing sentence"
-        lines = [l.strip() for l in re.split(r'[\n\r]+', text) if l.strip()]
+        # Signal 5: line-by-line format with marketing verbs after colon
+        lines = [l.strip() for l in _re.split(r'[\n\r]+', text) if l.strip()]
         if len(lines) >= 2:
-            desc_lines = sum(
-                1 for l in lines
-                if ':' in l and _MARKETING_VERBS.search(l.split(':', 1)[-1])
-            )
+            desc_lines = sum(1 for l in lines if ':' in l and _MARKETING_VERBS.search(l.split(':', 1)[-1]))
             if desc_lines >= 2 or (len(lines) > 0 and desc_lines / len(lines) > 0.4):
                 return True
 
-        # Check if overall text has many marketing verbs relative to its length
-        # (catches cases like "Vitamin C Brightens skin. Caffeine reduces puffiness.")
+        # Signal 6: overall verb density
         word_count = len(text.split())
-        verb_hits = len(_MARKETING_VERBS.findall(text))
+        verb_hits  = len(_MARKETING_VERBS.findall(text))
         if word_count > 10 and verb_hits / max(1, word_count) > 0.05:
             return True
 
         return False
 
     for pat in inci_patterns:
-        m = pat.search(text_clean)
-        if m:
-            # Extra guard: skip if the matched heading is a marketing adjective form
+        # Use finditer to try ALL matches of this pattern, not just the first.
+        # This way if "Key Ingredients:" appears before "All Ingredients:", we skip
+        # the marketing one and find the real INCI section further down.
+        for m in pat.finditer(text_clean):
+            # Skip if this match is inside a marketing adjective heading
             match_text = text_clean[max(0, m.start()-30):m.end()]
             if _MKTG_ADJECTIVE.search(match_text):
                 continue
             after = text_clean[m.end():m.end() + 3000]
-            # Strip any trailing UI text
             after = _UI_TAIL_RE.sub('', after).strip()
             # Trim at the next section heading
             section_break = re.search(
@@ -935,14 +962,14 @@ def _extract_metadata(html, url):
             )
             if section_break:
                 after = after[:section_break.start()]
-            # Accept comma-list — does NOT require Aqua/Water (handles anhydrous products)
             cb = re.match(r'([^.]{10,}(?:,\s*[^.,]{2,}){3,})', after)
             if cb:
                 candidate = cb.group(1).strip()
-                # Must have enough commas to be an INCI list
                 if candidate.count(',') >= 3 and not _is_marketing_description(candidate):
                     ingredients = candidate
                     break
+        if ingredients:
+            break
 
     # Strategy 2: Aqua/Water pattern
     if not ingredients:

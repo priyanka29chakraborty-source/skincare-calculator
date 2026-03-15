@@ -199,44 +199,54 @@ def estimate_concentration(ingredient_list, known_concentrations=None):
 
 def _parse_concentrations_from_name(product_name):
     """Extract known concentrations from product name.
-    e.g. '10% Niacinamide + 1% Zinc Serum' → {'niacinamide': 10.0, 'zinc': 1.0}
-    Avoids double-counting if ingredient name also appears in INCI list.
+    e.g. '10% Niacinamide + 1% Zinc Serum' -> {'niacinamide': 10.0, 'zinc': 1.0}
+    Handles: "Pure 10% Niacinamide", "The Ordinary Niacinamide 10%", "2% Salicylic Acid"
     """
     if not product_name:
         return {}
 
-    # Stop words that should never be treated as ingredient names
     STOP_WORDS = {
         'serum', 'cream', 'lotion', 'gel', 'toner', 'essence', 'oil', 'moisturizer',
         'solution', 'formula', 'treatment', 'complex', 'blend', 'mix', 'booster',
         'the', 'and', 'with', 'for', 'skin', 'face', 'body', 'anti', 'plus',
+        'pure', 'in', 'a', 'of', 'by', 'new', 'best', 'natural', 'organic',
     }
-    # Known brand words that leak into name parsing
-    BRAND_WORDS = {'ordinary', 'inkey', 'paula', 'cosrx', 'cerave', 'neutrogena',
-                   'dermalogica', 'skinceuticals', 'olay', 'estee', 'lauder'}
+    BRAND_WORDS = {
+        'ordinary', 'inkey', 'paula', 'cosrx', 'cerave', 'neutrogena',
+        'dermalogica', 'skinceuticals', 'olay', 'estee', 'lauder',
+        'minimalist', 'foxtale', 'beaminimalist', 'dotandkey',
+        'plum', 'mcaffeine', 'mamaearth', 'pilgrim',
+    }
 
     known = {}
     patterns = [
-        # "10% Niacinamide" pattern
-        re.compile(r'([\d]+\.?\d*)\s*%\s+([a-zA-Z][a-zA-Z0-9 \-]{2,30}?)(?=\s*[+&,|\n]|$|\s+\d)', re.I),
-        # "Niacinamide 10%" pattern
-        re.compile(r'([a-zA-Z][a-zA-Z0-9 \-]{2,30}?)\s+(\d+\.?\d*)\s*%', re.I),
+        # "10% Niacinamide" or "2% Salicylic Acid" -- number before name
+        re.compile(r'(?<!\d)(\d+\.?\d*)\s*%\s+([A-Za-z][A-Za-z0-9\-]{2,30}(?:\s+[A-Za-z][A-Za-z0-9\-]{2,20})?)', re.I),
+        # "Kojic Acid 2%" -- two-word name before number
+        re.compile(r'\b([A-Za-z][A-Za-z0-9\-]{2,20}\s+[A-Za-z][A-Za-z0-9\-]{2,20})\s+(\d+\.?\d*)\s*%', re.I),
+        # "Niacinamide 10%" -- single word name before number
+        re.compile(r'\b([A-Za-z][A-Za-z0-9\-]{3,30})\s+(\d+\.?\d*)\s*%', re.I),
     ]
+
     for pat in patterns:
         for m in pat.finditer(product_name):
-            groups = m.groups()
+            g = m.groups()
             try:
-                if groups[0][0].isdigit():
-                    pct, name = float(groups[0]), groups[1].strip().lower()
+                if g[0][0].isdigit():
+                    pct, raw_name = float(g[0]), g[1].strip().lower()
                 else:
-                    name, pct = groups[0].strip().lower(), float(groups[1])
-                name = name.rstrip('s').strip()
-                # Skip stop words, brand words, single chars, or out-of-range %
-                if 0 < pct <= 100 and len(name) > 2:
-                    name_parts = name.split()
-                    if not any(w in STOP_WORDS | BRAND_WORDS for w in name_parts):
-                        if name not in known:
-                            known[name] = pct
+                    raw_name, pct = g[0].strip().lower(), float(g[1])
+                if not (0 < pct <= 100 and len(raw_name) > 2):
+                    continue
+                # Strip leading/trailing stop and brand words
+                name_parts = raw_name.split()
+                while name_parts and name_parts[0] in STOP_WORDS | BRAND_WORDS:
+                    name_parts = name_parts[1:]
+                while name_parts and name_parts[-1] in STOP_WORDS | BRAND_WORDS:
+                    name_parts = name_parts[:-1]
+                clean_name = ' '.join(name_parts).strip()
+                if len(clean_name) > 2 and clean_name not in known:
+                    known[clean_name] = pct
             except (ValueError, IndexError):
                 pass
     return known
