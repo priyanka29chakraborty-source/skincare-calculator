@@ -2595,7 +2595,7 @@ def analyze_product(product_data):
         score_confidence = "Estimated from INCI position only — no concentration data available"
         score_confidence_level = "low"
 
-        return {
+    return {
         "main_worth_score": main_score['score'],
         "main_worth_tier": main_score['tier_badge'],
         "score_title": main_score['score_title'],

@@ -243,7 +243,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
         _cache_set(cache_key, result)
         return result
     except Exception as e:
-        logger.error(f"Analysis failed: {e}")
+        import traceback
+        logger.error(f"Analysis failed: {e}\n{traceback.format_exc()}")
         return JSONResponse(status_code=500, content={"error": "Analysis failed. Please check your inputs."})
 
 
