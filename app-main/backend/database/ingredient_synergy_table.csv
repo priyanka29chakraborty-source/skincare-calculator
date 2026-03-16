@@ -4,7 +4,6 @@ Tranexamic Acid,Niacinamide;Azelaic Acid
 Kojic Acid,Vitamin C
 Ferulic Acid,Vitamin C;Vitamin E
 Tocopherol,Vitamin C
-Tocopheryl Acetate,Ceramides
 Resveratrol,Ferulic Acid
 Green Tea Extract,Niacinamide
 Centella Asiatica Extract,Panthenol
@@ -90,7 +89,7 @@ Niacinamide Ascorbate,Ferulic Acid
 Ascorbyl Glucoside,Niacinamide
 3-O-Ethyl Ascorbic Acid,Ferulic Acid
 Magnesium Ascorbyl Phosphate,Niacinamide
-Sodium Ascorbyl Phosphate,Zinc PCA
+Sodium Ascorbyl Phosphate,Zinc PCA; Tocopheryl Acetate; Tocopherol
 Retinal,Niacinamide
 Hydroxypinacolone Retinoate,Peptides
 Bakuchiol,Niacinamide
@@ -878,3 +877,4 @@ Potassium Cocoyl Glycinate,
 Hydroxypropyl Methylcellulose,
 Liposomes,
 Niosomes,
+Tocopheryl Acetate,Ascorbic Acid; Sodium Ascorbyl Phosphate; Ferulic Acid; Niacinamide

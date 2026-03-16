@@ -164,17 +164,17 @@ CONCENTRATION_THRESHOLDS = {
 
 CONCERNS_MAP = {
     'Acne & Oily Skin':  ['Salicylic Acid', 'Benzoyl Peroxide', 'Azelaic Acid', 'Niacinamide', 'Retinol', 'Zinc PCA'],
-    'Pigmentation':      ['Tranexamic Acid', 'Azelaic Acid', 'Alpha Arbutin', 'Niacinamide', 'Ascorbic Acid', 'Kojic Acid'],
-    'Aging & Fine Lines': ['Retinol', 'Retinal', 'Peptides', 'Ascorbic Acid', 'Glycolic Acid', 'Bakuchiol'],
+    'Pigmentation':      ['Tranexamic Acid', 'Azelaic Acid', 'Alpha Arbutin', 'Niacinamide', 'Ascorbic Acid', 'Kojic Acid', 'Sodium Ascorbyl Phosphate', 'Magnesium Ascorbyl Phosphate', 'Tocopheryl Acetate'],
+    'Aging & Fine Lines': ['Retinol', 'Retinal', 'Peptides', 'Ascorbic Acid', 'Glycolic Acid', 'Bakuchiol', 'Tocopheryl Acetate', 'Sodium Ascorbyl Phosphate'],
     'Barrier Repair':    ['Ceramide', 'Cholesterol', 'Fatty Acid', 'Panthenol', 'Niacinamide'],
     'Sensitive Skin':    ['Centella Asiatica', 'Panthenol', 'Allantoin', 'Ceramide', 'Madecassoside'],
     'Hydration':         ['Sodium Hyaluronate', 'Glycerin', 'Panthenol', 'Sodium PCA', 'Urea'],
     'Large Pores':       ['Niacinamide', 'Salicylic Acid', 'Retinol', 'Glycolic Acid'],
-    'Dullness':          ['Ascorbic Acid', 'Niacinamide', 'Glycolic Acid', 'Licorice Extract'],
+    'Dullness':          ['Ascorbic Acid', 'Niacinamide', 'Glycolic Acid', 'Licorice Extract', 'Sodium Ascorbyl Phosphate', 'Magnesium Ascorbyl Phosphate', 'Tocopheryl Acetate'],
     'Uneven Texture':    ['Glycolic Acid', 'Salicylic Acid', 'Retinol', 'Lactic Acid'],
     'Dark Circles':      ['Caffeine', 'Vitamin K', 'Ascorbic Acid', 'Peptides', 'Niacinamide'],
     'Sun Protection':    ['Zinc Oxide', 'Titanium Dioxide', 'Avobenzone', 'Octinoxate', 'Homosalate', 'Bemotrizinol'],
-    'UV Damage':         ['Ferulic Acid', 'Polypodium Leucotomos', 'Ascorbic Acid', 'Astaxanthin', 'Resveratrol', 'Green Tea Extract'],
+    'UV Damage':         ['Ferulic Acid', 'Polypodium Leucotomos', 'Ascorbic Acid', 'Astaxanthin', 'Resveratrol', 'Green Tea Extract', 'Tocopheryl Acetate', 'Sodium Ascorbyl Phosphate'],
     'Tanning':           ['Alpha Arbutin', 'Kojic Acid', 'Tranexamic Acid', 'Ascorbic Acid', 'Niacinamide', 'Glutathione'],
     'Puffiness':         ['Caffeine', 'Acetyl Tetrapeptide-5', 'Hesperidin Methyl Chalcone', 'Niacinamide', 'Centella Asiatica'],
 }

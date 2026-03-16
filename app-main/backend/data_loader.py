@@ -184,6 +184,7 @@ class DataLoader:
         self.uv_sun_db = {}  # INCI_Name.lower() -> row dict for UV/Sun/Tanning data
         self.surfactant_db = {}  # INCI_lower -> row dict (harshness, foam, irritation)
         self.role_weight_table = {}  # role_lower -> float weight
+        self.role_sets = {}   # DB-driven ingredient role sets built at startup
         self.load_data()
 
     def load_data(self):
@@ -255,6 +256,160 @@ class DataLoader:
         self._load_uv_sun_tanning_db()
         self._load_surfactant_db()
         self._load_role_weight_table()
+        self._build_role_sets()
+
+
+    def _build_role_sets(self):
+        """Build DB-driven ingredient role sets from the master database.
+        Replaces hardcoded keyword lists in scoring.py with live DB lookups.
+        Exposed as data_loader.role_sets dict with lowercase INCI name sets.
+        Called once at startup — O(n) over 856 rows."""
+        active_classes = {
+            'active', 'peptide', 'retinoid', 'brightening active',
+            'ferment', 'antioxidant', 'humectant', 'emollient',
+            'barrier', 'plant oil', 'emollient ester', 'botanical extract',
+            'botanical', 'delivery system', 'delivery',
+        }
+        sets = {
+            'active':      set(),
+            'humectant':   set(),
+            'barrier':     set(),
+            'soothing':    set(),
+            'emollient':   set(),
+            'occlusive':   set(),
+            'antioxidant': set(),
+            'preservative':set(),
+            'surfactant':  set(),
+            'exfoliant':   set(),
+            'peptide':     set(),
+            'filler':      set(),
+            'dry_oil':     set(),
+            'brightening': set(),
+            'anti_acne':   set(),
+            'anti_aging':  set(),
+            'uv_filter':   set(),
+            'delivery':    set(),
+        }
+
+        if self.ingredient_master is None:
+            self.role_sets = sets
+            return
+
+        for _, row in self.ingredient_master.iterrows():
+            inci = str(row.get('INCI_Name', '')).strip()
+            if not inci or inci == 'nan':
+                continue
+            key = inci.lower()
+            cls  = str(row.get('Ingredient_Class', '')).lower().strip()
+            fc   = str(row.get('Functional_Category', '')).lower()
+            pb   = str(row.get('Primary_Benefits', '')).lower()
+            sc   = str(row.get('Skin_Concerns', '')).lower()
+
+            # Active — any therapeutic ingredient
+            if cls in active_classes or any(x in fc for x in ['active', 'antioxidant',
+               'brightening', 'anti-acne', 'anti-aging', 'anti-wrinkle', 'peptide',
+               'exfoliant', 'repair', 'retinoid', 'depigmenting', 'soothing']):
+                sets['active'].add(key)
+
+            # Humectant — water-binding
+            sc_lower = str(row.get('Skin_Concerns', '')).lower()
+            if (cls == 'humectant' or 'humectant' in fc or 'humectant' in pb
+                    or 'hydration' in fc or 'water-binding' in pb or 'hygroscopic' in pb
+                    or ('hydration' in sc_lower and 'emollient' not in fc and 'oil' not in fc)):
+                sets['humectant'].add(key)
+
+            # Barrier — lipid, ceramide, fatty acid, cholesterol, sphingoid
+            if (cls == 'barrier' or any(x in fc for x in [
+                    'barrier', 'ceramide', 'barrier lipid', 'barrier repair',
+                    'barrier support', 'lipid', 'sphingosine', 'phytosphingosine'])
+                    or any(x in pb for x in ['barrier', 'ceramide', 'lipid replenish'])):
+                sets['barrier'].add(key)
+
+            # Soothing / anti-inflammatory
+            if any(x in fc for x in ['soothing', 'anti-inflammatory', 'calming',
+                                       'skin calming', 'redness']):
+                sets['soothing'].add(key)
+            if any(x in pb for x in ['soothing', 'anti-inflammatory', 'calming',
+                                       'reduces redness', 'calms']):
+                sets['soothing'].add(key)
+
+            # Emollient — softening, smoothing oils and esters
+            if (cls in ('emollient', 'plant oil', 'emollient ester')
+                    or any(x in fc for x in ['emollient', 'skin conditioning',
+                                              'conditioning', 'softening'])):
+                sets['emollient'].add(key)
+
+            # Occlusive — sealing, heavy oils/waxes
+            if 'occlusive' in fc or 'occlusive' in pb:
+                sets['occlusive'].add(key)
+
+            # Dry/lightweight oils — non-comedogenic preferred oils
+            if any(x in fc for x in ['dry oil', 'lightweight oil', 'non-comedogenic oil',
+                                       'barrier repair oil']) and 'occlusive' not in fc:
+                sets['dry_oil'].add(key)
+
+            # Antioxidant
+            if (cls == 'antioxidant' or 'antioxidant' in fc
+                    or 'antioxidant' in pb or 'free radical' in pb):
+                sets['antioxidant'].add(key)
+
+            # Preservative
+            if cls == 'preservative' or 'preservative' in fc:
+                sets['preservative'].add(key)
+
+            # Surfactant / cleanser
+            if (cls == 'surfactant' or any(x in fc for x in
+                    ['surfactant', 'mild surfactant', 'cleansing', 'foaming'])):
+                sets['surfactant'].add(key)
+
+            # Exfoliant — AHAs, BHAs, enzymes
+            if 'exfoliant' in fc or 'exfoliat' in pb or any(x in key for x in
+                    ['glycolic', 'lactic', 'mandelic', 'salicylic', 'gluconolactone',
+                     'malic acid', 'tartaric', 'citric acid', 'papain', 'bromelain']):
+                sets['exfoliant'].add(key)
+
+            # Peptide
+            if cls == 'peptide' or 'peptide' in fc or 'peptide' in key:
+                sets['peptide'].add(key)
+
+            # Filler — basic carriers with no therapeutic function
+            if (cls == 'filler' or any(x in fc for x in
+                    ['solvent', 'thickener', 'gel former', 'polymer', 'film former',
+                     'viscosity', 'chelating', 'colorant', 'fragrance'])):
+                sets['filler'].add(key)
+
+            # Brightening
+            if any(x in fc for x in ['brightening', 'depigmenting', 'lightening']):
+                sets['brightening'].add(key)
+
+            # Anti-acne — also check Skin_Concerns column
+            sc_lower = str(row.get('Skin_Concerns', '')).lower()
+            if ('anti-acne' in fc or 'anti-acne' in pb or 'antimicrobial' in fc
+                    or 'acne' in sc_lower or 'sebum' in fc or 'oil control' in fc
+                    or 'sebum' in pb):
+                sets['anti_acne'].add(key)
+
+            # Anti-aging
+            if any(x in fc for x in ['anti-aging', 'anti-wrinkle', 'anti-ageing',
+                                       'firming', 'collagen']):
+                sets['anti_aging'].add(key)
+
+            # UV filter
+            if cls in ('organic uv filter', 'mineral uv filter') or 'uv filter' in fc:
+                sets['uv_filter'].add(key)
+
+            # Delivery system — encapsulation, liposomal
+            if (cls in ('delivery system', 'delivery')
+                    or any(x in fc for x in ['liposomal', 'encapsulated', 'nano',
+                                              'cyclodextrin', 'microsphere'])):
+                sets['delivery'].add(key)
+
+        self.role_sets = sets
+
+        # Log summary
+        for role, s in sorted(sets.items()):
+            if s:
+                logger.info(f"  role_set[{role!r}]: {len(s)} ingredients")
 
     def _load_synergy_registry(self):
         """Load pair-based synergy data from ingredient_synergy_table.csv.

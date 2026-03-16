@@ -527,7 +527,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           <div className="red-flags-section" data-testid="red-flags-section">
             <h4 className="red-flags-title"><i className="fa-solid fa-triangle-exclamation"></i> Worth Red Flags</h4>
             <ul className="red-flags-list">
-              {result.red_flags.map((rf, i) => <li key={i} data-testid={`red-flag-${i}`}>{rf}</li>)}
+              {(result.red_flags || []).map((rf, i) => <li key={i} data-testid={`red-flag-${i}`}>{rf}</li>)}
             </ul>
           </div>
         )}
@@ -602,7 +602,14 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading} currency={currency} fetchInput={fetchInput} />
 
       <div className="disclaimer" data-testid="disclaimer">
-        <strong>How to read this analysis:</strong> Scores are estimates based on INCI ingredient position and clinical evidence data — not lab measurements. Ingredient concentrations are inferred from list order (EU/US law requires &gt;1% ingredients in descending order). Confirmed % values (shown in green) come from the product page or INCI annotations only. pH inference is directional, not a lab test. Ingredient conflicts shown are within the single formula — always patch test new products. This tool is for educational purposes only and is not medical or dermatological advice. Consult a dermatologist for personalised skin concerns.
+        <div className="disclaimer-title"><i className="fa-solid fa-circle-info"></i> How scores are calculated</div>
+        <ul className="disclaimer-list">
+          <li><strong>Scores are estimates</strong> based on INCI ingredient position and clinical evidence — not lab measurements.</li>
+          <li><strong>Concentrations are inferred</strong> from list order. EU/US law requires ingredients above 1% in descending order. Confirmed % values (shown in green) come from the product page only.</li>
+          <li><strong>pH is directional</strong>, not a lab measurement. It is inferred from buffering ingredients in the formula.</li>
+          <li><strong>Ingredient conflicts</strong> are within the single formula only — always patch test new products.</li>
+          <li><strong>Not medical advice.</strong> This tool is for educational use only. Consult a dermatologist for personalised skin concerns.</li>
+        </ul>
       </div>
     </>
   );

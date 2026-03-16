@@ -218,14 +218,26 @@ def estimate_concentration(ingredient_list, known_concentrations=None):
 def _parse_concentrations_from_name(product_name):
     """Extract known concentrations from product name.
     e.g. '10% Niacinamide + 1% Zinc Serum' -> {'niacinamide': 10.0, 'zinc': 1.0}
-    Handles: "Pure 10% Niacinamide", "The Ordinary Niacinamide 10%", "2% Salicylic Acid"
+    Handles: "Pure 10% Niacinamide", "Niacinamide 10%", "2% Salicylic Acid",
+             "10% Vitamin C+E+F Booster", "Vitamin C 10% Serum", "Kojic Acid 2% Cream"
     """
     if not product_name:
         return {}
 
+    # Marketing shorthand → canonical INCI name (lowercase key)
+    VITAMIN_ALIASES = {
+        'vitamin c': 'ascorbic acid',  'vit c':  'ascorbic acid',
+        'vitamin e': 'tocopheryl acetate', 'vit e': 'tocopheryl acetate',
+        'vitamin a': 'retinol',        'vit a':  'retinol',
+        'vitamin b3': 'niacinamide',   'vitamin b5': 'panthenol',
+        'aha': 'glycolic acid',        'bha': 'salicylic acid',
+        'pha': 'gluconolactone',
+    }
+
     STOP_WORDS = {
         'serum', 'cream', 'lotion', 'gel', 'toner', 'essence', 'oil', 'moisturizer',
         'solution', 'formula', 'treatment', 'complex', 'blend', 'mix', 'booster',
+        'cleanser', 'wash', 'scrub', 'mask', 'peel', 'mist', 'spray', 'balm',
         'the', 'and', 'with', 'for', 'skin', 'face', 'body', 'anti', 'plus',
         'pure', 'in', 'a', 'of', 'by', 'new', 'best', 'natural', 'organic',
     }
@@ -236,25 +248,29 @@ def _parse_concentrations_from_name(product_name):
         'plum', 'mcaffeine', 'mamaearth', 'pilgrim',
     }
 
+    # Pre-process: strip +E+F / +B3+Zinc style multi-vitamin suffixes
+    # "Vitamin C+E+F" → "Vitamin C",  "Niacinamide+Zinc" → "Niacinamide"
+    name_clean = re.sub(r'([A-Za-z])(\+[A-Za-z0-9+]+)', r'\1', product_name)
+
     known = {}
     patterns = [
-        # "10% Niacinamide" or "2% Salicylic Acid" -- number before name
-        re.compile(r'(?<!\d)(\d+\.?\d*)\s*%\s+([A-Za-z][A-Za-z0-9\-]{2,30}(?:\s+[A-Za-z][A-Za-z0-9\-]{2,20})?)', re.I),
-        # "Kojic Acid 2%" -- two-word name before number
-        re.compile(r'\b([A-Za-z][A-Za-z0-9\-]{2,20}\s+[A-Za-z][A-Za-z0-9\-]{2,20})\s+(\d+\.?\d*)\s*%', re.I),
-        # "Niacinamide 10%" -- single word name before number
+        # "10% Vitamin C" / "2% Salicylic Acid" -- number BEFORE name (up to 3 words)
+        re.compile(r'(?<!\d)(\d+\.?\d*)\s*%\s+([A-Za-z][A-Za-z0-9\-]{0,30}(?:\s+[A-Za-z][A-Za-z0-9\-]{0,20}){0,2})', re.I),
+        # "Kojic Acid 2%" / "Vitamin C 10%" -- multi-word name BEFORE number
+        re.compile(r'\b([A-Za-z][A-Za-z0-9\-]{0,20}\s+[A-Za-z][A-Za-z0-9\-]{0,20})\s+(\d+\.?\d*)\s*%', re.I),
+        # "Niacinamide 10%" / "Retinol 0.5%" -- single word BEFORE number
         re.compile(r'\b([A-Za-z][A-Za-z0-9\-]{3,30})\s+(\d+\.?\d*)\s*%', re.I),
     ]
 
     for pat in patterns:
-        for m in pat.finditer(product_name):
+        for m in pat.finditer(name_clean):
             g = m.groups()
             try:
                 if g[0][0].isdigit():
                     pct, raw_name = float(g[0]), g[1].strip().lower()
                 else:
                     raw_name, pct = g[0].strip().lower(), float(g[1])
-                if not (0 < pct <= 100 and len(raw_name) > 2):
+                if not (0 < pct <= 100 and len(raw_name) > 1):
                     continue
                 # Strip leading/trailing stop and brand words
                 name_parts = raw_name.split()
@@ -262,13 +278,21 @@ def _parse_concentrations_from_name(product_name):
                     name_parts = name_parts[1:]
                 while name_parts and name_parts[-1] in STOP_WORDS | BRAND_WORDS:
                     name_parts = name_parts[:-1]
+                # Remove any mid-list stopwords for 3-word captures
+                name_parts = [p for p in name_parts if p not in STOP_WORDS | BRAND_WORDS or len(name_parts) == 1]
                 clean_name = ' '.join(name_parts).strip()
-                if len(clean_name) > 2 and clean_name not in known:
-                    known[clean_name] = pct
+                if len(clean_name) < 2:
+                    continue
+                # Resolve marketing shorthand → canonical name
+                canonical = VITAMIN_ALIASES.get(clean_name, clean_name)
+                if canonical not in known:
+                    known[canonical] = pct
+                    # Also keep original alias so DB lookup finds it either way
+                    if canonical != clean_name and clean_name not in known:
+                        known[clean_name] = pct
             except (ValueError, IndexError):
                 pass
     return known
-
 def _parse_min_effective(raw):
     """Parse Min_Effective_% which can be a range string like '2.0-10.0%' or a plain number."""
     if raw is None or (isinstance(raw, float) and math.isnan(raw)):
@@ -397,7 +421,9 @@ def get_evidence_label(eq_factor):
 
 # --- Red Flag Detection ---
 
-FILLER_INGREDIENTS = {
+# FILLER_INGREDIENTS_FALLBACK: minimal emergency fallback only.
+# Real filler detection uses data_loader.role_sets['filler'] (DB-driven, 50+ ingredients).
+FILLER_INGREDIENTS_FALLBACK = {
     'aqua', 'water', 'glycerin', 'dimethicone', 'cyclomethicone',
     'cyclopentasiloxane', 'dimethiconol', 'butylene glycol',
     'propylene glycol', 'pentylene glycol', 'silicone', 'isododecane',
@@ -626,7 +652,10 @@ def detect_red_flags(ingredient_list, concentrations, category):
     total = len(ingredient_list)
 
     # 1. Filler-to-Active Ratio
-    filler_count = sum(1 for i in ing_lower_list if any(f in i for f in FILLER_INGREDIENTS))
+    _filler_set = data_loader.role_sets.get('filler', FILLER_INGREDIENTS_FALLBACK)
+    filler_count = sum(1 for i in ing_lower_list
+                       if any(f == i or f in i for f in _filler_set)
+                       or i in ('aqua', 'water'))
     active_count = 0
     has_delivery = False
     for ing in ingredient_list:
@@ -641,11 +670,29 @@ def detect_red_flags(ingredient_list, concentrations, category):
         penalty -= 5
 
     # 2. Stability Conflict
-    has_ph_active = any(any(pa in i for pa in PH_DEPENDENT_ACTIVES) for i in ing_lower_list)
-    has_alkaline = any(any(ab in i for ab in ALKALINE_BASES) for i in ing_lower_list)
-    if has_ph_active and has_alkaline:
-        flags.append("Stability conflict: pH-dependent actives formulated with alkaline base ingredients - may neutralize effectiveness")
+    # Only fire if alkaline base is present WITHOUT a pH buffer/acid to counteract it.
+    # NaOH + citric acid = deliberate pH adjustment (every Vitamin C serum does this).
+    # Only flag if a strong alkaline base is present and there is no acid buffer to neutralise it.
+    # pH buffers/adjusters that intentionally lower pH — NOT pH-sensitive actives.
+    # lactic acid, glycolic acid removed — they are actives, not just buffers.
+    PH_BUFFERS = {'citric acid', 'malic acid', 'tartaric acid', 'acetic acid',
+                  'sodium citrate', 'ammonium citrate', 'glucono delta lactone',
+                  'gluconolactone', 'sodium bicarbonate', 'triethanolamine citrate'}
+    has_ph_active  = any(any(pa in i for pa in PH_DEPENDENT_ACTIVES) for i in ing_lower_list)
+    has_alkaline   = any(any(ab in i for ab in ALKALINE_BASES) for i in ing_lower_list)
+    has_ph_buffer  = any(any(buf in i for buf in PH_BUFFERS) for i in ing_lower_list)
+    # Sodium hydroxide/potassium hydroxide are routinely used as pH adjusters.
+    # Only flag if it's a strong alkaline surfactant base (SLS, soap) with no buffer.
+    _strong_alkaline_surfactants = {'sodium lauryl sulfate', 'sodium laureth sulfate',
+                                    'soap', 'cocamidopropyl betaine'}
+    has_strong_alkaline = any(any(ab in i for ab in _strong_alkaline_surfactants) for i in ing_lower_list)
+    if has_ph_active and has_alkaline and not has_ph_buffer and has_strong_alkaline:
+        flags.append("Stability conflict: pH-dependent actives formulated with alkaline surfactant base — effectiveness may be reduced")
         penalty -= 5
+    elif has_ph_active and has_alkaline and not has_ph_buffer:
+        # NaOH alone without any acid buffer — could be a real conflict
+        flags.append("Minor pH concern: alkaline adjuster present with pH-sensitive actives — check final formula pH")
+        penalty -= 2
 
     # 3. Marketing Inflation
     preservative_idx = None
@@ -702,7 +749,11 @@ def detect_formulation_notes(ingredient_list):
         if data:
             irritation = str(data.get('Irritation_Risk', 'Low')).lower()
             if irritation == 'high':
-                notes.append(f"{ing} — high irritation potential; patch test recommended.")
+                if ing.lower().strip() in {'sodium hydroxide', 'potassium hydroxide',
+                                           'triethanolamine', 'ammonium hydroxide'}:
+                    notes.append(f"{ing} — pH adjuster, trace amount; not a primary irritant in this formula.")
+                else:
+                    notes.append(f"{ing} — high irritation potential; patch test recommended.")
             elif irritation == 'medium' and i < 10:
                 notes.append(f"{ing} — moderate irritation risk in sensitive individuals.")
 
@@ -829,8 +880,10 @@ def _cleanser_score(ingredient_list, price, size_ml, country, known_concentratio
     ing_lower_list = [i.strip().lower() for i in ingredient_list]
 
     _PH_FRIENDLY = {'citric acid','lactic acid','sodium citrate','sodium pca','glucono-delta-lactone'}
-    _SUPPORTING   = {'glycerin','panthenol','allantoin','sodium pca','betaine','aloe vera','centella asiatica',
-                     'ceramide','niacinamide','bisabolol','chamomile','hyaluronic','sodium hyaluronate'}
+    # DB-driven supporting ingredients — humectant + soothing + barrier from DB
+    _SUPPORTING = (data_loader.role_sets.get('humectant', set())
+                   | data_loader.role_sets.get('soothing', set())
+                   | data_loader.role_sets.get('barrier', set()))
 
     for i, ing in enumerate(ingredient_list):
         surf_data = data_loader.get_surfactant_data(ing)
@@ -847,7 +900,10 @@ def _cleanser_score(ingredient_list, price, size_ml, country, known_concentratio
         ing_l = ing.strip().lower()
         if any(ph in ing_l for ph in _PH_FRIENDLY):
             has_ph_adjuster = True
-        if any(sup in ing_l for sup in _SUPPORTING):
+        if (ing_l in _SUPPORTING
+                or any(kw in ing_l for kw in ['centella', 'allantoin', 'panthenol',
+                                               'glycerin', 'ceramide', 'niacinamide',
+                                               'bisabolol', 'hyaluronic', 'aloe'])):
             supporting_count += 1
 
     # Surfactant safety (40)
@@ -883,18 +939,23 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
       Irritation     10
       Price fairness 20
     """
-    _DRY_OILS   = {'squalane','jojoba','rosehip','marula','sea buckthorn','bakuchiol',
-                   'argan','hemp seed','pomegranate seed','sea buckthorn'}
-    _HEAVY_OILS = {'coconut oil','cocos nucifera','mineral oil','petrolatum','shea','castor',
-                   'isopropyl myristate','lanolin'}
-    _ANTIOXIDANTS = {'tocopherol','ascorbic acid','vitamin c','ferulic acid','resveratrol',
-                     'green tea','coenzyme q10','ubiquinone','astaxanthin'}
+    # DB-driven sets — replaces hardcoded keyword lists
+    _DRY_OILS     = data_loader.role_sets.get('dry_oil', set())
+    _ANTIOXIDANTS = data_loader.role_sets.get('antioxidant', set())
+    # Heavy oils use DB occlusive set plus known problematic oils
+    _OCCLUSIVE_DB = data_loader.role_sets.get('occlusive', set())
+    _HEAVY_OILS   = _OCCLUSIVE_DB | {'coconut oil','cocos nucifera','mineral oil',
+                                      'petrolatum','castor','isopropyl myristate','lanolin'}
 
     ing_lower_list = [i.strip().lower() for i in ingredient_list]
     ing_str = ' '.join(ing_lower_list)
 
     # Oil quality (35)
-    dry_count   = sum(1 for kw in _DRY_OILS   if kw in ing_str)
+    dry_count   = sum(1 for ing in ingredient_list
+                      if ing.lower().strip() in _DRY_OILS
+                      or any(kw in ing.lower() for kw in ['squalane','jojoba','rosehip',
+                             'marula','argan','hemp seed','tamanu','sea buckthorn',
+                             'chia seed','pomegranate seed','bakuchiol']))
     heavy_count = sum(1 for kw in _HEAVY_OILS if kw in ing_str)
     oil_quality = min(35, dry_count * 8) - (heavy_count * 5)
     oil_quality = max(0, oil_quality)
@@ -902,7 +963,10 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
         oil_quality = 15  # no identifiable oils = neutral
 
     # Antioxidants (20)
-    aox_count  = sum(1 for kw in _ANTIOXIDANTS if kw in ing_str)
+    aox_count  = sum(1 for ing in ingredient_list
+                     if ing.lower().strip() in _ANTIOXIDANTS
+                     or any(kw in ing.lower() for kw in ['tocopherol','ferulic','resveratrol',
+                            'astaxanthin','green tea','coenzyme q10','ubiquinone','quercetin']))
     aox_pts    = min(20, aox_count * 7)
 
     # Actives (15) — use impact scores
@@ -1063,12 +1127,20 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                                          if str(d.get('Ingredient_Class','')).lower() == 'active'))
         evidence_score = min(20, (ev_sum / active_count_for_ev / 8) * 20)
 
-        has_humectant = any('humectant' in str(d.get('Functional_Category','')).lower() or
-                            str(d.get('Ingredient_Class','')).lower() == 'humectant'
-                            for _, _, _, d in all_impact)
-        has_preservative = any('preserv' in str(d.get('Functional_Category','')).lower() or
-                                str(d.get('Ingredient_Class','')).lower() == 'preservative'
-                                for _, _, _, d in all_impact)
+        _humectant_set   = data_loader.role_sets.get('humectant', set())
+        _preservative_set = data_loader.role_sets.get('preservative', set())
+        has_humectant = any(
+            'humectant' in str(d.get('Functional_Category','')).lower()
+            or str(d.get('Ingredient_Class','')).lower() == 'humectant'
+            or ing.lower().strip() in _humectant_set
+            for ing, _, _, d in all_impact
+        )
+        has_preservative = any(
+            'preserv' in str(d.get('Functional_Category','')).lower()
+            or str(d.get('Ingredient_Class','')).lower() == 'preservative'
+            or ing.lower().strip() in _preservative_set
+            for ing, _, _, d in all_impact
+        )
         balance_score = 7
         if has_humectant:   balance_score += 4
         if has_preservative: balance_score += 4
@@ -1086,18 +1158,24 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
 
     elif cat_lower in ('moisturizer', 'cream', 'lotion', 'gel'):
         # Barrier 35, humectants 25, active support 15, texture 10, price handled separately
-        _BARRIER   = {'ceramide','cholesterol','fatty acid','phytosphingosine','sphingosine',
-                      'stearic acid','palmitic acid','linoleic','linolenic','squalane',
-                      'shea butter','lanolin','petrolatum'}
-        _HUMECTANTS = {'glycerin','sodium hyaluronate','hyaluronic','panthenol','propanediol',
-                       'butylene glycol','sorbitol','urea','sodium pca','beta-glucan',
-                       'polyglutamic','tremella'}
-        _OCCLUSIVES = {'petrolatum','dimethicone','beeswax','lanolin','zinc oxide','shea',
-                       'mineral oil','vaseline'}
+        # Use DB-driven role sets — covers all 45+ barrier, 30+ humectant, 7+ occlusive
+        # ingredients in the database, not just the ~12 hardcoded keywords
+        _BARRIER    = data_loader.role_sets.get('barrier', set())
+        _HUMECTANTS = data_loader.role_sets.get('humectant', set())
+        _OCCLUSIVES = data_loader.role_sets.get('occlusive', set())
 
-        barrier_count   = sum(1 for kw in _BARRIER   if kw in ing_str)
-        humectant_count = sum(1 for kw in _HUMECTANTS if kw in ing_str)
-        occlusive_count = sum(1 for kw in _OCCLUSIVES if kw in ing_str)
+        barrier_count   = sum(1 for ing in ingredient_list
+                              if ing.lower().strip() in _BARRIER
+                              or any(kw in ing.lower() for kw in ['ceramide','cholesterol',
+                                     'phytosphingosine','sphingosine','linoleic','linolenic']))
+        humectant_count = sum(1 for ing in ingredient_list
+                              if ing.lower().strip() in _HUMECTANTS
+                              or any(kw in ing.lower() for kw in ['hyaluronic','polyglutamic',
+                                     'beta-glucan','tremella']))
+        occlusive_count = sum(1 for ing in ingredient_list
+                              if ing.lower().strip() in _OCCLUSIVES
+                              or any(kw in ing.lower() for kw in ['petrolatum','beeswax',
+                                     'lanolin','mineral oil','vaseline']))
 
         barrier_pts   = min(35, barrier_count * 8 + occlusive_count * 4)
         humectant_pts = min(25, humectant_count * 6)
@@ -1141,12 +1219,16 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
 
     elif cat_lower in ('toner', 'mist'):
         # Humectants 30, soothing 25, actives 20, irritation 10
-        _HUMECTANTS = {'glycerin','sodium hyaluronate','hyaluronic','panthenol','propanediol',
-                       'butylene glycol','beta-glucan','polyglutamic','sodium pca'}
-        _SOOTHING   = {'centella','allantoin','panthenol','bisabolol','aloe','chamomile',
-                       'licorice','madecassoside','asiaticoside','niacinamide','cica'}
-        humectant_count = sum(1 for kw in _HUMECTANTS if kw in ing_str)
-        soothing_count  = sum(1 for kw in _SOOTHING   if kw in ing_str)
+        _HUMECTANTS = data_loader.role_sets.get('humectant', set())
+        _SOOTHING   = data_loader.role_sets.get('soothing', set())
+        humectant_count = sum(1 for ing in ingredient_list
+                              if ing.lower().strip() in _HUMECTANTS
+                              or any(kw in ing.lower() for kw in ['hyaluronic','polyglutamic',
+                                     'beta-glucan','sodium pca']))
+        soothing_count  = sum(1 for ing in ingredient_list
+                              if ing.lower().strip() in _SOOTHING
+                              or any(kw in ing.lower() for kw in ['centella','allantoin',
+                                     'bisabolol','madecassoside','cica','licorice']))
         humectant_pts   = min(30, humectant_count * 8)
         soothing_pts    = min(25, soothing_count  * 7)
 
@@ -1179,11 +1261,58 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                              all_impact, ingredient_list, price, size_ml, category, country,
                              ratio, value_tier, multipliers_applied, concentrations, known_concentrations)
 
-    else:
-        # Generic fallback — active-weighted scoring
+    elif cat_lower in ('eye cream', 'eye gel', 'eye serum'):
+        # Eye cream: serum-style active scoring + peptide bonus
+        _ACTIVE_CLASSES = ('active', 'peptide', 'retinoid', 'brightening active')
+        one_pct_idx = next(
+            (i for i, (ing, pos, _, _) in enumerate(all_impact)
+             if any(m.lower() in ing.lower() for m in CONCENTRATION_THRESHOLDS)),
+            len(all_impact)
+        )
+        above_impact = sum(
+            s for i, (_, pos, s, d) in enumerate(all_impact)
+            if i < one_pct_idx and str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES
+        )
+        below_evidence = sum(
+            _get_evidence_weight(d.get('Evidence_Strength', '')) * 0.6
+            for i, (_, pos, s, d) in enumerate(all_impact)
+            if i >= one_pct_idx and str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES
+        )
+        active_potency = min(40, above_impact / 50 + below_evidence)
+        ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength', ''))
+                     for _, _, _, d in all_impact
+                     if str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES)
+        active_count_ev = max(1, sum(1 for _, _, _, d in all_impact
+                                      if str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES))
+        evidence_score = min(20, (ev_sum / active_count_ev / 8) * 20)
+        irr_penalty = sum(3 for ing in ingredient_list[:10]
+                          if any(k in ing.lower() for k in ('fragrance', 'parfum', 'alcohol denat')))
+        irr_score = max(0, 10 - irr_penalty)
+        formula_quality = active_potency + evidence_score + 15 + irr_score  # 15 = formula balance baseline
+        component_details['A'].append(f"Eye cream: active potency {active_potency:.1f}/40, evidence {evidence_score:.1f}/20")
+        component_details['B'].append(f"Irritation score: {irr_score}/10")
+
+    elif cat_lower in ('mask', 'sheet mask', 'sleeping mask', 'wash-off mask'):
+        # Mask: moisturizer-style (barrier + humectant) weighted with active bonus
+        _humectant_set = data_loader.role_sets.get('humectant', set())
+        _barrier_set   = data_loader.role_sets.get('barrier', set())
+        hum_count = sum(1 for ing in ingredient_list
+                        if ing.lower().strip() in _humectant_set
+                        or any(kw in ing.lower() for kw in ['hyaluronic', 'glycerin', 'panthenol']))
+        bar_count = sum(1 for ing in ingredient_list
+                        if ing.lower().strip() in _barrier_set
+                        or any(kw in ing.lower() for kw in ['ceramide', 'cholesterol', 'squalane']))
         active_impact = sum(s for _, _, s, d in all_impact
-                            if str(d.get('Ingredient_Class','')).lower() in
-                            ('active','peptide','retinoid','brightening active'))
+                            if str(d.get('Ingredient_Class', '')).lower() in
+                            ('active', 'peptide', 'retinoid', 'brightening active'))
+        formula_quality = min(85, min(30, hum_count * 8) + min(25, bar_count * 7) + min(30, active_impact / 60))
+        component_details['A'].append(f"Mask: humectants {min(30,hum_count*8):.0f}/30, barrier {min(25,bar_count*7):.0f}/25, actives {min(30,active_impact/60):.0f}/30")
+
+    else:
+        # Generic fallback — active-weighted scoring (ampoule, treatment, essence etc.)
+        active_impact = sum(s for _, _, s, d in all_impact
+                            if str(d.get('Ingredient_Class', '')).lower() in
+                            ('active', 'peptide', 'retinoid', 'brightening active'))
         formula_quality = min(85, active_impact / 20)
         component_details['A'].append("General scoring: active ingredient impact")
 
@@ -1217,7 +1346,11 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             irr = str(data.get('Irritation_Risk','')).lower()
             if irr == 'high' and _irr_ded < 3:
                 d = min(3.0 - _irr_ded, 3.0); safety_score -= d; _irr_ded += d
-                safety_details.append(f"{ing} — high irritation risk")
+                if ing.lower().strip() in {'sodium hydroxide', 'potassium hydroxide',
+                                               'triethanolamine', 'ammonium hydroxide'}:
+                    safety_details.append(f"{ing} — used as pH adjuster; safe at trace concentrations typical in cosmetics")
+                else:
+                    safety_details.append(f"{ing} — high irritation risk; patch test recommended")
             elif irr in ('medium','moderate'):
                 safety_score -= 0.5
             preg = str(data.get('Pregnancy_Safety','')).lower()
@@ -1671,12 +1804,10 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
         form_pts += 3
     if any(b.lower() in resolved_lower for b in _SPF_BOOSTERS):
         form_pts += 2
-    _ANTIOXIDANTS_FORM = [
-        'Tocopherol', 'Ferulic Acid', 'Ascorbic Acid', 'Resveratrol', 'Astaxanthin',
-        'Coenzyme Q10', 'Green Tea Extract', 'EGCG', 'Ergothioneine',
-        'Polypodium Leucotomos Extract',
-    ]
-    aox_count = sum(1 for a in _ANTIOXIDANTS_FORM if a.lower() in resolved_lower)
+    # DB-driven antioxidant check for sunscreen formulation score
+    # Uses all 80 antioxidants from database instead of 10 hardcoded names
+    _ANTIOXIDANTS_FORM = data_loader.role_sets.get('antioxidant', set())
+    aox_count = sum(1 for ing in ingredient_list if ing.lower().strip() in _ANTIOXIDANTS_FORM)
     if   aox_count >= 2: form_pts += 3
     elif aox_count == 1: form_pts += 2
     if any(d.lower() in resolved_lower for d in ('photolyase', 'endonuclease')):
@@ -2108,9 +2239,15 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                 has_barrier = True
             # Also check ingredient names for common soothing/barrier agents
             inci_lower = inci.lower()
-            if any(kw in inci_lower for kw in ['centella', 'allantoin', 'panthenol', 'bisabolol', 'madecass']):
+            # DB-driven soothing/anti-inflammatory check via role_sets
+            if (inci_lower in data_loader.role_sets.get('soothing', set())
+                    or any(kw in inci_lower for kw in ['centella', 'allantoin', 'panthenol',
+                                                        'bisabolol', 'madecass', 'cica'])):
                 has_anti_inflammatory = True
-            if any(kw in inci_lower for kw in ['ceramide', 'cholesterol', 'squalane', 'fatty acid']):
+            # DB-driven barrier check via role_sets
+            if (inci_lower in data_loader.role_sets.get('barrier', set())
+                    or any(kw in inci_lower for kw in ['ceramide', 'cholesterol', 'squalane',
+                                                        'phytosphingosine', 'fatty acid', 'linoleic'])):
                 has_barrier = True
 
         support_flags = sum([has_barrier, has_anti_inflammatory, has_humectant, has_antioxidant])
@@ -2326,6 +2463,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
 
         if skin_type == 'oily':
             if data:
+                # DB-driven comedogenicity (always from database)
                 try:
                     comedogenicity = float(data.get('Comedogenicity_0_5', 0) or 0)
                     if comedogenicity >= 4 and i < 10:
@@ -2338,94 +2476,148 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                         why_bullets.append(f"Warning: {ing} moderately comedogenic")
                 except (ValueError, TypeError):
                     pass
-            if 'cocos nucifera' in ing_lower or 'coconut oil' in ing_lower or 'shea butter' in ing_lower:
-                score -= 10
-                penalty.append(f"{ing} (Heavy oil)")
-                why_bullets.append(f"Warning: {ing} is too heavy for oily skin")
-            if 'niacinamide' in ing_lower:
-                score += 5
-                bonus.append(f"{ing} (Sebum regulation)")
-                why_bullets.append("Niacinamide helps control sebum")
-                helpful_ingredients.append(f"{ing} (sebum regulation)")
-            if 'zinc pca' in ing_lower or 'salicylic' in ing_lower:
-                score += 5
-                bonus.append(f"{ing} (Oil control)")
-                why_bullets.append(f"{ing} helps with oil control")
-                helpful_ingredients.append(f"{ing} (oil control)")
+                # DB-driven occlusive/heavy oil penalty via role_sets
+                if ing_lower in data_loader.role_sets.get('occlusive', set()):
+                    score -= 10
+                    penalty.append(f"{ing} (Occlusive — may clog pores)")
+                    why_bullets.append(f"Warning: {ing} is occlusive and may not suit oily skin")
+                # DB-driven bonus — anti-acne / sebum control ingredients
+                func_cat_d = str(data.get('Functional_Category', '')).lower()
+                pb_d = str(data.get('Primary_Benefits', '')).lower()
+                if (ing_lower in data_loader.role_sets.get('anti_acne', set())
+                        or 'anti-acne' in func_cat_d or 'sebum' in pb_d or 'oil control' in pb_d):
+                    score += 5
+                    label_d = str(data.get('Primary_Benefits', 'Oil control')).split(';')[0].strip()
+                    bonus.append(f"{ing} ({label_d})")
+                    why_bullets.append(f"{ing} supports oil control")
+                    helpful_ingredients.append(f"{ing} ({label_d.lower()})")
+            else:
+                # No DB match — fall back to known names only
+                if 'cocos nucifera' in ing_lower or 'coconut oil' in ing_lower:
+                    score -= 10
+                    penalty.append(f"{ing} (Heavy oil)")
+                    why_bullets.append(f"Warning: {ing} is too heavy for oily skin")
 
             look_for_suggestions = ["Products with Zinc PCA, Salicylic Acid, or mattifying agents may work better for excess sebum control."]
 
         elif skin_type == 'dry':
-            if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower:
+            # Always penalise drying alcohols regardless of DB
+            if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower or 'isopropyl alcohol' in ing_lower:
                 score -= 20
-                penalty.append(f"{ing} (Drying)")
+                penalty.append(f"{ing} (Drying alcohol)")
                 why_bullets.append(f"Warning: {ing} strips moisture from dry skin")
-            if 'glycerin' in ing_lower or 'ceramide' in ing_lower or 'hyaluronic' in ing_lower:
-                score += 5
-                bonus.append(f"{ing} (Hydrating)")
-                why_bullets.append(f"{ing} provides hydration")
-                helpful_ingredients.append(f"{ing} (hydrating)")
-            if 'shea butter' in ing_lower or 'squalane' in ing_lower:
-                score += 5
-                bonus.append(f"{ing} (Moisturizing)")
-                helpful_ingredients.append(f"{ing} (moisturizing)")
+            if data:
+                func_cat_d = str(data.get('Functional_Category', '')).lower()
+                pb_d = str(data.get('Primary_Benefits', '')).lower()
+                # DB-driven humectant bonus
+                if (ing_lower in data_loader.role_sets.get('humectant', set())
+                        or 'humectant' in func_cat_d or 'water-bind' in pb_d
+                        or 'hygroscopic' in pb_d):
+                    score += 5
+                    label_d = str(data.get('Primary_Benefits', 'Hydrating')).split(';')[0].strip()
+                    bonus.append(f"{ing} (Humectant)")
+                    why_bullets.append(f"{ing} provides hydration")
+                    helpful_ingredients.append(f"{ing} ({label_d.lower()})")
+                # DB-driven barrier/emollient bonus
+                elif (ing_lower in data_loader.role_sets.get('barrier', set())
+                        or ing_lower in data_loader.role_sets.get('emollient', set())
+                        or ing_lower in data_loader.role_sets.get('occlusive', set())
+                        or 'barrier' in func_cat_d or 'emollient' in func_cat_d or 'occlusive' in func_cat_d):
+                    score += 5
+                    bonus.append(f"{ing} (Moisturizing)")
+                    helpful_ingredients.append(f"{ing} (moisturizing)")
+            else:
+                # No DB match — keep known names as fallback
+                if any(kw in ing_lower for kw in ['hyaluronic', 'ceramide', 'glycerin', 'squalane', 'shea']):
+                    score += 5
+                    bonus.append(f"{ing} (Hydrating)")
+                    helpful_ingredients.append(f"{ing} (hydrating)")
 
             look_for_suggestions = ["Look for products with Ceramides, Squalane, or Hyaluronic Acid for better moisture retention."]
 
         elif skin_type == 'sensitive':
+            # Always penalise known irritants — universal signals regardless of DB
             if 'fragrance' in ing_lower or 'parfum' in ing_lower:
                 score -= 20
                 penalty.append(f"{ing} (Fragrance)")
                 why_bullets.append(f"Warning: {ing} is a common irritant for sensitive skin")
-            if 'limonene' in ing_lower or 'linalool' in ing_lower:
+            if 'limonene' in ing_lower or 'linalool' in ing_lower or 'citronellol' in ing_lower:
                 score -= 15
                 penalty.append(f"{ing} (Allergen)")
-                why_bullets.append(f"Warning: {ing} is a known allergen")
+                why_bullets.append(f"Warning: {ing} is a known EU fragrance allergen")
             if 'essential oil' in ing_lower:
                 score -= 15
                 penalty.append(f"{ing} (Essential oil)")
                 why_bullets.append("Warning: Essential oils can irritate sensitive skin")
-            if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower:
+            if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower or 'isopropyl alcohol' in ing_lower:
                 score -= 15
-                penalty.append(f"{ing} (Denatured alcohol)")
+                penalty.append(f"{ing} (Drying alcohol)")
+                why_bullets.append(f"Warning: {ing} is drying and may irritate sensitive skin")
             if data:
+                # DB-driven irritation risk
                 irritation = str(data.get('Irritation_Risk', 'Low')).lower()
-                if 'high' in irritation:
+                sensitive_risk = str(data.get('Sensitive_Skin_Risk', 'Low')).lower()
+                if 'high' in irritation or 'high' in sensitive_risk:
                     score -= 15
                     penalty.append(f"{ing} (High irritation risk)")
                     why_bullets.append(f"Warning: {ing} has high irritation potential")
-                elif 'moderate' in irritation or 'medium' in irritation:
+                elif 'moderate' in irritation or 'medium' in irritation or 'moderate' in sensitive_risk:
                     score -= 5
-            if 'centella' in ing_lower or 'allantoin' in ing_lower or 'panthenol' in ing_lower:
-                score += 5
-                bonus.append(f"{ing} (Soothing)")
-                why_bullets.append(f"{ing} provides soothing benefits")
-                helpful_ingredients.append(f"{ing} (soothing)")
+                # DB-driven soothing bonus — covers all 97 soothing ingredients in DB
+                func_cat_d = str(data.get('Functional_Category', '')).lower()
+                pb_d = str(data.get('Primary_Benefits', '')).lower()
+                if (ing_lower in data_loader.role_sets.get('soothing', set())
+                        or 'soothing' in func_cat_d or 'anti-inflammatory' in func_cat_d
+                        or 'calming' in func_cat_d or 'sooth' in pb_d or 'calm' in pb_d):
+                    score += 5
+                    label_d = str(data.get('Primary_Benefits', 'Soothing')).split(';')[0].strip()
+                    bonus.append(f"{ing} (Soothing)")
+                    why_bullets.append(f"{ing} provides soothing/calming benefits")
+                    helpful_ingredients.append(f"{ing} ({label_d.lower()})")
+            else:
+                # No DB match — fallback to known names
+                if any(kw in ing_lower for kw in ['centella', 'allantoin', 'panthenol',
+                                                    'bisabolol', 'madecassoside', 'aloe']):
+                    score += 5
+                    bonus.append(f"{ing} (Soothing)")
+                    helpful_ingredients.append(f"{ing} (soothing)")
 
             look_for_suggestions = ["Look for products with Centella Asiatica, Allantoin, or fragrance-free formulas."]
 
         elif skin_type == 'combination':
-            if 'cocos nucifera' in ing_lower or 'coconut oil' in ing_lower or 'shea butter' in ing_lower:
-                score -= 8
-                penalty.append(f"{ing} (Heavy oil - may clog T-zone)")
-            if 'niacinamide' in ing_lower or 'zinc pca' in ing_lower:
-                score += 4
-                bonus.append(f"{ing} (Balancing)")
-                helpful_ingredients.append(f"{ing} (balancing)")
+            # Always penalise drying/occlusive universals
             if 'fragrance' in ing_lower or 'parfum' in ing_lower:
                 score -= 10
                 penalty.append(f"{ing} (Fragrance)")
-            if 'glycerin' in ing_lower or 'sodium hyaluronate' in ing_lower:
-                score += 3
-                bonus.append(f"{ing} (Hydrating)")
-                helpful_ingredients.append(f"{ing} (hydrating)")
-            if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower:
+            if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower or 'isopropyl alcohol' in ing_lower:
                 score -= 15
                 penalty.append(f"{ing} (Drying)")
+            if data:
+                func_cat_d = str(data.get('Functional_Category', '')).lower()
+                pb_d = str(data.get('Primary_Benefits', '')).lower()
+                # DB-driven occlusive penalty (heavy oils that clog T-zone)
+                if ing_lower in data_loader.role_sets.get('occlusive', set()):
+                    score -= 8
+                    penalty.append(f"{ing} (Occlusive — may clog T-zone)")
+                # DB-driven balancing/sebum-control bonus
+                if (ing_lower in data_loader.role_sets.get('anti_acne', set())
+                        or 'anti-acne' in func_cat_d or 'sebum' in pb_d or 'balancing' in pb_d):
+                    score += 4
+                    bonus.append(f"{ing} (Balancing)")
+                    helpful_ingredients.append(f"{ing} (balancing)")
+                # DB-driven humectant bonus (lightweight hydration for combination)
+                elif (ing_lower in data_loader.role_sets.get('humectant', set())
+                        or 'humectant' in func_cat_d):
+                    score += 3
+                    bonus.append(f"{ing} (Hydrating)")
+                    helpful_ingredients.append(f"{ing} (hydrating)")
+            else:
+                # Fallback for unrecognised ingredients
+                if any(kw in ing_lower for kw in ['cocos nucifera', 'coconut oil']):
+                    score -= 8
+                    penalty.append(f"{ing} (Heavy oil)")
 
-            # NOTE: has_oil_ctrl / has_hydrating intentionally checked per-ingredient
-            # but appended only via post-loop flag (see after loop) to avoid compounding
-
+            # NOTE: has_oil_ctrl / has_hydrating appended post-loop to avoid compounding
             look_for_suggestions = ["Look for lightweight formulas with Niacinamide + Hyaluronic Acid for balanced care."]
 
         elif skin_type == 'normal':
@@ -2440,8 +2632,15 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
 
     # Post-loop: combination skin balanced formula bonus — applied ONCE
     if skin_type == 'combination':
-        _has_oil_ctrl = any(x in ing_str for x in ['niacinamide', 'zinc pca', 'salicylic'])
-        _has_hydrating = any(x in ing_str for x in ['glycerin', 'sodium hyaluronate', 'hyaluronic'])
+        # DB-driven post-loop balance check — uses role_sets for all DB ingredients
+        _anti_acne_set = data_loader.role_sets.get('anti_acne', set())
+        _humectant_set = data_loader.role_sets.get('humectant', set())
+        _has_oil_ctrl  = any(i.lower().strip() in _anti_acne_set
+                             or any(kw in i.lower() for kw in ['salicylic', 'zinc pca', 'niacinamide'])
+                             for i in ingredient_list)
+        _has_hydrating = any(i.lower().strip() in _humectant_set
+                             or any(kw in i.lower() for kw in ['hyaluronic', 'polyglutamic', 'sodium pca'])
+                             for i in ingredient_list)
         if _has_oil_ctrl and _has_hydrating:
             score = min(100, int(score * 1.1))
             bonus.append("Balanced formula (oil control + hydration)")
