@@ -827,11 +827,10 @@ def _get_role_weight(ingredient_data):
 
 def _calc_impact_score(ingredient_name, position, ingredient_list, known_concentrations=None):
     """
-    impact_score = estimated_concentration * evidence_weight * role_weight * synergy_mult
+    impact_score = estimated_concentration * tier_weight * evidence_weight * role_weight * synergy_mult
 
-    Concentration: 15 * exp(-0.20 * position), clamped [0.1, 20]
-    Water at pos 0 always = 60 (constant solvent, not counted in active scoring)
-    Synergy: *1.10 if any partner present in ingredient_list (max 1.15)
+    Activity_Tier_Weight (new in fixed3): 1.0 Tier1 / 0.8 Tier2 / 0.5 Tier3 / 0.1 Tier4
+    This ensures Tier 1 Primary Actives dominate scores over Tier 4 fillers.
     """
     data = data_loader.get_ingredient_data(ingredient_name)
     if not data:
@@ -845,6 +844,9 @@ def _calc_impact_score(ingredient_name, position, ingredient_list, known_concent
     else:
         conc = max(0.1, min(20.0, 15.0 * math.exp(-0.20 * position)))
 
+    # Activity_Tier_Weight from new DB column (0.1–1.0)
+    tier_weight = data_loader.get_activity_tier_weight(data)
+
     ev_weight   = _get_evidence_weight(data.get('Evidence_Strength', ''))
     role_weight = _get_role_weight(data)
 
@@ -854,7 +856,7 @@ def _calc_impact_score(ingredient_name, position, ingredient_list, known_concent
     synergy_mult = 1.10 if partners & product_inci_lower - {ing_lower} else 1.0
     synergy_mult = min(1.15, synergy_mult)
 
-    score = conc * ev_weight * role_weight * synergy_mult
+    score = conc * tier_weight * ev_weight * role_weight * synergy_mult
     return score, data
 
 
@@ -1072,6 +1074,21 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         _kc = known_concentrations or {}
         _conc_is_known = ing_lower in _kc
 
+        # MoA: only expose for Tier 1/2 (Activity_Tier_Weight >= 0.8)
+        tier_weight = data_loader.get_activity_tier_weight(data)
+        moa_text = data_loader.get_moa(data) if tier_weight >= 0.8 else None
+
+        # MW depth label: penetration hint where MW data is available
+        mw = data_loader.get_mw_daltons(data)
+        mw_depth = None
+        if mw is not None:
+            if mw < 500:
+                mw_depth = f"Low MW ({mw:.0f} Da) — can penetrate to deeper skin layers"
+            elif mw < 1000:
+                mw_depth = f"Medium MW ({mw:.0f} Da) — surface to mid-layer delivery"
+            else:
+                mw_depth = f"High MW ({mw:.0f} Da) — primarily surface-level action"
+
         identified_actives.append({
             'name': ing,
             'position': pos + 1,
@@ -1093,33 +1110,48 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             'functional_category': (None if not data.get('Functional_Category') or
                                     str(data.get('Functional_Category','')).lower() in ('nan','none','')
                                     else str(data['Functional_Category']).strip()),
+            'mechanism_of_action': moa_text,
+            'mw_depth': mw_depth,
+            'activity_tier': data_loader.get_activity_tier_label(data),
         })
 
     # ── CATEGORY-SPECIFIC FORMULA QUALITY ─────────────────────────────────────
     ing_str = ' '.join(i.strip().lower() for i in ingredient_list)
 
     if cat_lower in ('serum', 'treatment', 'essence', 'ampoule'):
-        # Active potency 40, evidence 20, formula balance 15, irritation 10
-        # Actives above 1% line → full positional impact score
-        # Actives below 1% line → flat evidence credit (presence × evidence quality)
-        # This prevents near-zero scores when a well-formulated product puts
-        # all actives below the 1% threshold (common in ceramide/HA serums).
         _ACTIVE_CLASSES = ('active','peptide','retinoid','brightening active')
-        one_pct_idx = next(
-            (i for i, (ing, pos, _, _) in enumerate(all_impact)
+        # BUG FIX: search ingredient_list (not all_impact) so marker is found even if
+        # the threshold ingredient (e.g. Phenoxyethanol) has no DB entry
+        _one_pct_pos = next(
+            (i for i, ing in enumerate(ingredient_list)
              if any(m.lower() in ing.lower() for m in CONCENTRATION_THRESHOLDS)),
-            len(all_impact)
+            len(ingredient_list)
         )
         above_impact = sum(
-            s for i, (_, pos, s, d) in enumerate(all_impact)
-            if i < one_pct_idx and str(d.get('Ingredient_Class','')).lower() in _ACTIVE_CLASSES
+            s for _, pos, s, d in all_impact
+            if pos < _one_pct_pos and str(d.get('Ingredient_Class','')).lower() in _ACTIVE_CLASSES
         )
+        # Trace Active Floor (Rule 3): flat credit 0.6 × Evidence_Weight for Tier 1/2 ONLY.
+        # Tier 3/4 actives below the 1% line get zero floor credit — their low dosage
+        # is meaningful (e.g. 0.1% Retinal still works, but 0.01% random botanical does not).
+        # Divisor recalibrated: 50 → 40 to compensate for Activity_Tier_Weight reducing
+        # Tier 2 contribution by 20% (tier_weight=0.8 × old score = 0.8× → 50/0.8 ≈ 40).
+        _tier12_below = [
+            (ing, pos, s, d) for ing, pos, s, d in all_impact
+            if pos >= _one_pct_pos
+            and str(d.get('Ingredient_Class','')).lower() in _ACTIVE_CLASSES
+            and data_loader.get_activity_tier_weight(d) >= 0.8  # Tier 1 or Tier 2 only
+        ]
         below_evidence = sum(
             _get_evidence_weight(d.get('Evidence_Strength','')) * 0.6
-            for i, (_, pos, s, d) in enumerate(all_impact)
-            if i >= one_pct_idx and str(d.get('Ingredient_Class','')).lower() in _ACTIVE_CLASSES
+            for _, pos, s, d in _tier12_below
         )
-        active_potency = min(40, above_impact / 50 + below_evidence)
+        active_potency = min(40, above_impact / 40 + below_evidence)
+
+        if _tier12_below:
+            component_details['A'].append(
+                f"Trace floor credit applied: {len(_tier12_below)} Tier 1/2 active(s) below 1% threshold"
+            )
 
         ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength','')) for _, _, _, d in all_impact
                      if str(d.get('Ingredient_Class','')).lower() == 'active')
@@ -1264,21 +1296,28 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     elif cat_lower in ('eye cream', 'eye gel', 'eye serum'):
         # Eye cream: serum-style active scoring + peptide bonus
         _ACTIVE_CLASSES = ('active', 'peptide', 'retinoid', 'brightening active')
-        one_pct_idx = next(
-            (i for i, (ing, pos, _, _) in enumerate(all_impact)
+        # BUG FIX: search ingredient_list not all_impact
+        _one_pct_pos = next(
+            (i for i, ing in enumerate(ingredient_list)
              if any(m.lower() in ing.lower() for m in CONCENTRATION_THRESHOLDS)),
-            len(all_impact)
+            len(ingredient_list)
         )
         above_impact = sum(
-            s for i, (_, pos, s, d) in enumerate(all_impact)
-            if i < one_pct_idx and str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES
+            s for _, pos, s, d in all_impact
+            if pos < _one_pct_pos and str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES
         )
+        # Trace Active Floor: Tier 1/2 only below 1% line. Divisor 40 (recalibrated).
+        _tier12_below_ec = [
+            (ing, pos, s, d) for ing, pos, s, d in all_impact
+            if pos >= _one_pct_pos
+            and str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES
+            and data_loader.get_activity_tier_weight(d) >= 0.8
+        ]
         below_evidence = sum(
             _get_evidence_weight(d.get('Evidence_Strength', '')) * 0.6
-            for i, (_, pos, s, d) in enumerate(all_impact)
-            if i >= one_pct_idx and str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES
+            for _, pos, s, d in _tier12_below_ec
         )
-        active_potency = min(40, above_impact / 50 + below_evidence)
+        active_potency = min(40, above_impact / 40 + below_evidence)
         ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength', ''))
                      for _, _, _, d in all_impact
                      if str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES)
@@ -1316,6 +1355,23 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         formula_quality = min(85, active_impact / 20)
         component_details['A'].append("General scoring: active ingredient impact")
 
+    # ── TREATMENT SAFETY BYPASS (Rule 1) ──────────────────────────────────────
+    # If category is 'treatment' and a Tier 1 high-intensity active is detected,
+    # skip the safety deduction for that active and show a 'High Intensity Formula' badge.
+    _HIGH_INTENSITY_ACTIVES = {
+        'benzoyl peroxide', 'glycolic acid', 'salicylic acid', 'lactic acid',
+        'mandelic acid', 'trichloroacetic acid', 'resorcinol', 'tretinoin',
+        'adapalene', 'azelaic acid',
+    }
+    is_high_intensity_treatment = False
+    high_intensity_actives_found = []
+    if cat_lower == 'treatment':
+        for ing, pos, imp_score, data in all_impact:
+            tier_w = data_loader.get_activity_tier_weight(data)
+            if tier_w >= 1.0 and ing.strip().lower() in _HIGH_INTENSITY_ACTIVES:
+                is_high_intensity_treatment = True
+                high_intensity_actives_found.append(ing)
+
     # ── PRICE FAIRNESS ─────────────────────────────────────────────────────────
     price_score = _price_pts(price, size_ml, category, country)
     price_component = (price_score / 10) * 15  # 15% weight
@@ -1327,9 +1383,15 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     total_score = min(100, max(0, round((0.75 * formula_pct + 0.25 * price_pct) * 100)))
 
     # Safety deductions (Component D)
+    # TREATMENT SAFETY BYPASS (Rule 1): If this is a high-intensity treatment formula,
+    # skip drying/irritation penalties for ingredients that are the therapeutic actives
+    # themselves (e.g. high-strength acids, benzoyl peroxide). Still flag fragrances.
     safety_score = 10.0
     _frag_ded = _alc_ded = _irr_ded = _preg_ded = _allergen_ded = 0.0
     safety_details = []
+    _bypass_irritation = is_high_intensity_treatment  # skip irr penalty for treatment actives
+    _high_intensity_set = {ing.lower() for ing in high_intensity_actives_found}
+
     for i, ing in enumerate(ingredient_list):
         il = ing.strip().lower()
         data = data_loader.get_ingredient_data(ing)
@@ -1337,26 +1399,32 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             d = min(4.0 - _frag_ded, 4.0); safety_score -= d; _frag_ded += d
             safety_details.append(f"Contains fragrance ({ing})")
         if ('alcohol denat' in il or 'sd alcohol' in il) and i < 10 and _alc_ded < 3:
-            d = min(3.0 - _alc_ded, 3.0); safety_score -= d; _alc_ded += d
-            safety_details.append(f"Contains denatured alcohol ({ing})")
+            # Bypass drying-alcohol penalty if it's part of the delivery vehicle for
+            # a high-intensity treatment active (e.g. BPO or retinoid formulations)
+            if not _bypass_irritation:
+                d = min(3.0 - _alc_ded, 3.0); safety_score -= d; _alc_ded += d
+                safety_details.append(f"Contains denatured alcohol ({ing})")
         if ('essential oil' in il or 'limonene' in il or 'linalool' in il) and _allergen_ded < 4:
             d = min(2.0, 4.0 - _allergen_ded); safety_score -= d; _allergen_ded += d
             safety_details.append(f"Contains potential allergen ({ing})")
         if data:
             irr = str(data.get('Irritation_Risk','')).lower()
             if irr == 'high' and _irr_ded < 3:
-                d = min(3.0 - _irr_ded, 3.0); safety_score -= d; _irr_ded += d
-                if ing.lower().strip() in {'sodium hydroxide', 'potassium hydroxide',
-                                               'triethanolamine', 'ammonium hydroxide'}:
-                    safety_details.append(f"{ing} — used as pH adjuster; safe at trace concentrations typical in cosmetics")
+                # Bypass high-irritation penalty if this IS the high-intensity therapeutic active
+                if _bypass_irritation and il in _high_intensity_set:
+                    safety_details.append(f"{ing} — high-intensity active; irritation expected and intentional")
                 else:
-                    safety_details.append(f"{ing} — high irritation risk; patch test recommended")
+                    d = min(3.0 - _irr_ded, 3.0); safety_score -= d; _irr_ded += d
+                    if ing.lower().strip() in {'sodium hydroxide', 'potassium hydroxide',
+                                               'triethanolamine', 'ammonium hydroxide'}:
+                        safety_details.append(f"{ing} — used as pH adjuster; safe at trace concentrations typical in cosmetics")
+                    else:
+                        safety_details.append(f"{ing} — high irritation risk; patch test recommended")
             elif irr in ('medium','moderate'):
                 safety_score -= 0.5
             preg = str(data.get('Pregnancy_Safety','')).lower()
             if ('avoid' in preg or 'restrict' in preg) and _preg_ded < 4:
-                # Note only — not everyone is pregnant. Flag for info but don't penalise score.
-                _preg_ded += 1  # track so we cap at a few notes
+                _preg_ded += 1
                 safety_details.append(f"{ing} — caution if pregnant (check with your doctor)")
     safety_score = round(max(0, min(10, safety_score)), 1)
 
@@ -1404,7 +1472,9 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     return _build_result(total_score, score_breakdown, component_details, identified_actives,
                          all_impact, ingredient_list, price, size_ml, category, country,
                          ratio, value_tier, multipliers_applied, concentrations, known_concentrations,
-                         price_note=price_note, red_flags=red_flags)
+                         price_note=price_note, red_flags=red_flags,
+                         is_high_intensity=is_high_intensity_treatment,
+                         high_intensity_actives=high_intensity_actives_found)
 
 
 def _get_avg_price(price, size_ml, category, country):
@@ -1425,7 +1495,8 @@ def _ratio_to_tier(ratio):
 def _build_result(total_score, score_breakdown, component_details, identified_actives,
                   all_impact, ingredient_list, price, size_ml, category, country,
                   ratio, value_tier, multipliers_applied, concentrations, known_concentrations,
-                  price_note=None, red_flags=None):
+                  price_note=None, red_flags=None,
+                  is_high_intensity=False, high_intensity_actives=None):
     """Assemble final return dict (same schema as before for frontend compatibility)."""
     red_flags = red_flags or []
     price_per_ml = round(price / size_ml, 2) if size_ml and size_ml > 0 and price else 0
@@ -1487,6 +1558,8 @@ def _build_result(total_score, score_breakdown, component_details, identified_ac
         'multipliers_applied': multipliers_applied,
         'price_note': price_note,
         'red_flags': red_flags,
+        'is_high_intensity': is_high_intensity,
+        'high_intensity_actives': high_intensity_actives or [],
     }
 
 
@@ -2876,6 +2949,8 @@ def analyze_product(product_data):
         "allergen_warnings": skin_compat.get('allergen_warnings', []),
         "upgrade_suggestions": upgrade_suggestions,
         "ingredient_count": len(ingredient_list),
+        "is_high_intensity": main_score.get('is_high_intensity', False),
+        "high_intensity_actives": main_score.get('high_intensity_actives', []),
         "disclaimer": "Science-based estimates. Not medical advice.",
         "one_percent_marker": one_percent_marker,
         "ingredient_conflicts": ingredient_conflicts,

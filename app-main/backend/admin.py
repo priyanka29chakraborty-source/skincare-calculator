@@ -204,7 +204,7 @@ async def health_check(request: Request):
     t0 = time.time()
     try:
         from duckduckgo_search import DDGS
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         def _ddg_test():
             with DDGS() as ddgs:
                 return list(ddgs.text("skincare test", max_results=1))

@@ -42,15 +42,15 @@ if _USE_PG:
         import psycopg
         from psycopg.types.json import Jsonb
 
-        _pg_lock = threading.Lock()
-        _pg_conn = None
+        # Thread-safe: each thread gets its own connection (same pattern as SQLite fallback)
+        _pg_local = threading.local()
 
         def _get_pg_conn():
-            global _pg_conn
-            with _pg_lock:
-                if _pg_conn is None or _pg_conn.closed:
-                    _pg_conn = psycopg.connect(conninfo=AIVEN_PG_URL)
-                return _pg_conn
+            """Return a per-thread psycopg3 connection, reconnecting if closed."""
+            conn = getattr(_pg_local, 'conn', None)
+            if conn is None or conn.closed:
+                _pg_local.conn = psycopg.connect(conninfo=AIVEN_PG_URL)
+            return _pg_local.conn
 
         def _pg_exec(query, params=None, fetch=False):
             conn = _get_pg_conn()
@@ -67,8 +67,8 @@ if _USE_PG:
                     conn.rollback()
                 except Exception:
                     pass
-                global _pg_conn
-                _pg_conn = None
+                # Force reconnect on next call for this thread
+                _pg_local.conn = None
                 logger.error(f"PG query error: {e}")
                 raise
 
@@ -411,7 +411,7 @@ if _USE_PG:
 
         def get_flagged_analyses(limit=100, include_resolved=False):
             try:
-                where = "" if include_resolved else "WHERE is_flagged = TRUE AND flag_reason IS NOT NULL AND (resolved IS NULL OR resolved = FALSE)"
+                where = "" if include_resolved else "WHERE is_flagged = TRUE AND flag_reason IS NOT NULL"
                 rows = _pg_exec(f"""
                     SELECT id, timestamp, product_name, brand, price, product_category,
                            skin_type, main_worth_score, fetch_type, country,

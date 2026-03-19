@@ -95,11 +95,16 @@ function App() {
     try {
       let sizeMl = parseFloat(size) || 30;
       if (sizeUnit === "oz" || sizeUnit === "fl oz") sizeMl = sizeMl * 29.5735;
+      const isUrlFetch = fetchInput.trim().startsWith('http');
+      const isBarcodeInput = /^\d{8,14}$/.test(fetchInput.trim());
+      const fetchTypeValue = isUrlFetch ? 'url' : isBarcodeInput ? 'barcode' : 'manual';
       const { data } = await axios.post(`${API}/analyze`, {
         ingredients, price: parseFloat(price) || 0, size_ml: sizeMl,
         category, skin_concerns: concerns, skin_type: skinType.toLowerCase(), country, currency,
-        url_provided: fetchInput.trim().startsWith('http'),
+        url_provided: isUrlFetch,
+        fetch_type: fetchTypeValue,
         product_name: productName || '',
+        brand: brand || '',
         active_concentrations: activeConcentrations || {}
       });
       setResult(data);
@@ -227,6 +232,7 @@ function App() {
               alternatives={alternatives} altLoading={altLoading}
               bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
               fetchInput={fetchInput}
+              category={category}
             />
           </section>
         )}

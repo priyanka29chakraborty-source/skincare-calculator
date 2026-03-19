@@ -8,7 +8,7 @@ CATEGORY_AVERAGES = {
         'eye cream':   {'avg_price_per_ml': 40.00, 'avg_active_count': 2.5},
         'mask':        {'avg_price_per_ml': 25.00, 'avg_active_count': 1.5},
         'treatment':   {'avg_price_per_ml': 30.00, 'avg_active_count': 2.5},
-        'facial oil':  {'avg_price_per_ml': 25.00, 'avg_active_count': 1.5},
+        'oil':         {'avg_price_per_ml': 25.00, 'avg_active_count': 1.5},
     },
     'USA': {
         'serum':       {'avg_price_per_ml': 0.85, 'avg_active_count': 3.5},
