@@ -471,22 +471,47 @@ function MoisturizerHeadlineStats({ result }) {
 }
 
 function FacialOilHeadlineStats({ result }) {
-  // Fatty acid profile balance: from dry_oil antioxidant actives
-  const antioxActives = result.active_classes?.antioxidants || [];
-  const aoxLoad = antioxActives.length >= 3 ? 'High' : antioxActives.length >= 1 ? 'Medium' : 'Low';
-  const aoxColor = antioxActives.length >= 3 ? '#267C36' : antioxActives.length >= 1 ? '#C9A96E' : '#D06030';
-  // Fatty acid balance: approximate from active_count
-  const activeCount = result.price_analysis?.active_count ?? 0;
-  const fattyAcidLabel = activeCount >= 4 ? 'Diverse' : activeCount >= 2 ? 'Balanced' : 'Limited';
+  const meta = result.oil_metadata || {};
+  const oilDiversity   = meta.oil_diversity   ?? result.price_analysis?.active_count ?? 0;
+  const aoxCount       = meta.antioxidant_count ?? 0;
+  const faScore        = meta.fa_score   ?? 0;
+  const linoleic       = meta.linoleic_count ?? 0;
+  const oleic          = meta.oleic_count    ?? 0;
+
+  // Fatty acid balance label
+  const faLabel = linoleic > oleic ? 'Linoleic-rich' : oleic > linoleic ? 'Oleic-rich' : 'Balanced';
+  const faColor = faScore >= 35 ? '#267C36' : faScore >= 20 ? '#C9A96E' : '#D06030';
+
+  // Antioxidant shield label
+  const aoxLabel = aoxCount >= 5 ? 'High' : aoxCount >= 3 ? 'Medium' : aoxCount >= 1 ? 'Low' : 'None';
+  const aoxColor = aoxCount >= 5 ? '#267C36' : aoxCount >= 3 ? '#C9A96E' : aoxCount >= 1 ? '#E6A817' : '#D06030';
 
   return (
     <div className="price-grid-sep" data-testid="facialoil-headline-stats">
-      <div className="pg-box"><div className="pg-val" style={{ fontSize: '0.8rem' }}>{fattyAcidLabel}</div><div className="pg-lbl">fatty acid profile</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ color: aoxColor, fontSize: '0.8rem' }}>{aoxLoad}</div><div className="pg-lbl">antioxidant load</div></div>
-      <div className="pg-box"><div className="pg-val">{antioxActives.length}</div><div className="pg-lbl">antioxidants</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.price_per_ml}</div><div className="pg-lbl">per ml</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div><div className="pg-lbl">vs average</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.component_scores?.D?.toFixed(1)}/10</div><div className="pg-lbl">safety score</div></div>
+      <div className="pg-box">
+        <div className="pg-val" style={{ fontSize: '0.8rem' }}>{oilDiversity}</div>
+        <div className="pg-lbl">oil diversity</div>
+      </div>
+      <div className="pg-box">
+        <div className="pg-val" style={{ color: aoxColor }}>{aoxCount}</div>
+        <div className="pg-lbl">oxidative shield</div>
+      </div>
+      <div className="pg-box">
+        <div className="pg-val" style={{ color: faColor, fontSize: '0.75rem' }}>{faLabel}</div>
+        <div className="pg-lbl">fatty acid type</div>
+      </div>
+      <div className="pg-box pg-bot">
+        <div className="pg-val">{result.price_analysis?.price_per_ml}</div>
+        <div className="pg-lbl">per ml</div>
+      </div>
+      <div className="pg-box pg-bot">
+        <div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div>
+        <div className="pg-lbl">value index</div>
+      </div>
+      <div className="pg-box pg-bot">
+        <div className="pg-val" style={{ color: aoxColor, fontSize: '0.75rem' }}>{aoxLabel}</div>
+        <div className="pg-lbl">antioxidant load</div>
+      </div>
     </div>
   );
 }
@@ -550,7 +575,13 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
     <>
       {/* CARD 1: MAIN WORTH SCORE */}
       <div className="sc-card result-card card-1" data-testid="card-main-worth" style={{ "--anim-delay": "0s" }}>
-        <h2 className="card-title"><i className="fa-solid fa-chart-line"></i> Main Worth Score</h2>
+        <h2 className="card-title">
+          <i className={`fa-solid ${isFacialOil ? 'fa-droplet' : isCleanser ? 'fa-soap' : isMoisturizer ? 'fa-shield-halved' : 'fa-chart-line'}`}></i>
+          {isFacialOil ? ' Lipid Excellence Index'
+            : isCleanser ? ' Barrier Preservation Score'
+            : isMoisturizer ? ' Barrier Recovery Index'
+            : ' Main Worth Score'}
+        </h2>
 
         <div className="score-header">
           <ScoreCircle score={result.main_worth_score} />
@@ -574,14 +605,25 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
               </div>
             )}
             <p className="score-title-text">{result.score_title}</p>
-            {/* Score confidence badge — hidden for facial oils (no 1% rule applies) */}
-            {result.score_confidence && !isFacialOil && (
+            {/* Score confidence badge — replaced for facial oils with lipid-phase note */}
+            {isFacialOil ? (
+              <div style={{ fontSize: '0.68rem', marginTop: '6px', padding: '4px 9px',
+                borderRadius: '8px', background: '#f5f5f0',
+                border: '1px solid #d0c8b0', color: '#7A7168',
+                display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
+                <i className="fa-solid fa-circle-info fa-xs" style={{ flexShrink: 0 }}></i>
+                <span style={{ lineHeight: '1.3' }}>
+                  Positional concentration estimated via Lipid-Phase Decay
+                </span>
+              </div>
+            ) : result.score_confidence && (
               <div style={{ fontSize: '0.68rem', marginTop: '6px', padding: '4px 9px', borderRadius: '8px',
                 background: result.score_confidence_level === 'medium' ? '#f0faf2' : '#faf8f3',
                 border: `1px solid ${result.score_confidence_level === 'medium' ? '#a8dab5' : 'var(--border)'}`,
                 color: result.score_confidence_level === 'medium' ? '#1a5c2a' : '#7A7168',
                 display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
-                <i className={`fa-solid ${result.score_confidence_level === 'medium' ? 'fa-circle-check' : 'fa-circle-info'} fa-xs`} style={{ flexShrink: 0 }}></i>
+                <i className={`fa-solid ${result.score_confidence_level === 'medium' ? 'fa-circle-check' : 'fa-circle-info'} fa-xs`}
+                  style={{ flexShrink: 0 }}></i>
                 <span style={{ lineHeight: '1.3' }}>{result.score_confidence}</span>
               </div>
             )}

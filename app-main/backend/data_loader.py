@@ -143,10 +143,10 @@ class DataLoader:
         self.load_data()
 
     def load_data(self):
-        # ── ingredient_database_fixed3.csv — new database with Activity_Tier_Weight,
-        # Mechanism_of_Action, MW_Daltons, Synergistic_Ingredients, Aliases ────
+        # ── ingredient_database_fixed4.csv — latest database with Activity_Tier_Weight,
+        # Mechanism_of_Action, MW_Daltons, Synergistic_Ingredients, Aliases, Ayurvedic oils ────
         try:
-            db_path = os.path.join(self.database_path, 'ingredient_database_fixed3.csv')
+            db_path = os.path.join(self.database_path, 'ingredient_database_fixed4.csv')
             db = pd.read_csv(db_path, encoding='utf-8-sig')
             db.columns = db.columns.str.strip()
             self.ingredient_master = db
@@ -198,7 +198,7 @@ class DataLoader:
                         if alias and alias.lower() not in self.ingredient_lookup:
                             self.ingredient_lookup[alias.lower()] = row_dict
 
-            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed3.csv")
+            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed4.csv")
 
             # Load aliases.json extra mappings
             try:

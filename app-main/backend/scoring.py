@@ -120,7 +120,8 @@ def parse_ingredients(ingredient_list_str):
         for ing in sub_parts:
             ing = ing.strip()
 
-            # Remove parenthetical descriptors: "(Vitamin B3)", "(Provitamin B5)", etc.
+            # Remove parenthetical descriptors: "(Vitamin B3)", "(Provitamin B5)", "(Kumkuma)", etc.
+            # CRITICAL: strip BEFORE dedup key so "Saffron (Kumkuma)" → "Saffron" matches DB
             ing = re.sub(r'\([^)]*\)', '', ing).strip()
             # Collapse multiple spaces left by parenthetical removal
             ing = re.sub(r'\s{2,}', ' ', ing).strip()
@@ -932,67 +933,143 @@ def _cleanser_score(ingredient_list, price, size_ml, country, known_concentratio
     return min(100, max(0, raw))
 
 
-def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrations=None):
+def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrations=None, skin_type='normal'):
     """
-    Facial Oil scoring:
-      Oil quality    35
-      Antioxidants   20
-      Actives        15
-      Irritation     10
-      Price fairness 20
+    Facial Oil 'Lipid Matrix' Scoring Engine — 85 quality points max.
+    Component weights (per spec):
+      Fatty Acid Profile   50 pts — skin-type-aware Linoleic vs Oleic pivot
+      Antioxidant Load     25 pts — any ingredient with 'Antioxidant'/'Soothing' in FC
+      Botanical Infusion   10 pts — hero Ayurvedic/botanical oils in top 10 positions
+    Also returns metadata: oil_diversity, antioxidant_count for Card 1 bubbles.
     """
-    # DB-driven sets — replaces hardcoded keyword lists
-    _DRY_OILS     = data_loader.role_sets.get('dry_oil', set())
-    _ANTIOXIDANTS = data_loader.role_sets.get('antioxidant', set())
-    # Heavy oils use DB occlusive set plus known problematic oils
-    _OCCLUSIVE_DB = data_loader.role_sets.get('occlusive', set())
-    _HEAVY_OILS   = _OCCLUSIVE_DB | {'coconut oil','cocos nucifera','mineral oil',
-                                      'petrolatum','castor','isopropyl myristate','lanolin'}
+    skin_type_lower = (skin_type or 'normal').lower()
+
+    # ── CLASSIFICATION SETS ────────────────────────────────────────────────────
+    # Linoleic-rich (high linoleic acid content) — good for oily/acne-prone skin
+    LINOLEIC_OILS = {
+        'rosehip seed oil', 'rosehip oil', 'safflower oil', 'safflower seed oil',
+        'hemp seed oil', 'evening primrose oil', 'sea buckthorn oil',
+        'grapeseed oil', 'grape seed oil', 'sunflower seed oil', 'sunflower oil',
+        'squalane',  # technically not a fatty acid but great for oily skin
+        'nigella sativa seed oil', 'salvia hispanica seed oil', 'camelina sativa seed oil',
+        'punica granatum seed oil',
+    }
+    # Oleic-rich (high oleic acid content) — good for dry/mature skin
+    OLEIC_OILS = {
+        'avocado oil', 'avocado ferment', 'macadamia seed oil', 'macadamia nut oil',
+        'sweet almond oil', 'almond oil', 'argan oil', 'marula oil',
+        'olive oil', 'apricot kernel oil', 'peach kernel oil',
+        'camellia oil', 'camellia sinensis seed oil',
+        'moringa seed oil', 'moringa oil',
+    }
+    # Comedogenic oils — penalised for all skin types (especially oily)
+    COMEDOGENIC_OILS = {
+        'cocos nucifera oil', 'coconut oil', 'cocoa butter',
+        'theobroma cacao seed butter', 'wheat germ oil',
+        'palm oil', 'palm kernel oil',
+    }
+    # Hero/luxury Ayurvedic and specialty botanical oils — Botanical Infusion credit
+    HERO_BOTANICALS = {
+        'crocus sativus flower extract',  # Saffron (Kumkuma)
+        'rubia cordifolia root extract',  # Manjistha
+        'pterocarpus santalinus wood extract',  # Red Sandalwood
+        'argan oil', 'marula oil', 'sea buckthorn oil', 'sea buckthorn water',
+        'rosehip seed oil', 'rosehip oil', 'bakuchiol',
+        'tamanu oil', 'calophyllum inophyllum seed oil',
+        'pomegranate seed oil', 'punica granatum seed oil',
+        'turmeric root extract', 'curcuma longa root extract',
+        'sandalwood', 'santalum album', 'boswellia serrata',
+        'neem oil', 'azadirachta indica seed oil',
+        'kalonji oil', 'nigella sativa seed oil',
+    }
 
     ing_lower_list = [i.strip().lower() for i in ingredient_list]
-    ing_str = ' '.join(ing_lower_list)
 
-    # Oil quality (35)
-    dry_count   = sum(1 for ing in ingredient_list
-                      if ing.lower().strip() in _DRY_OILS
-                      or any(kw in ing.lower() for kw in ['squalane','jojoba','rosehip',
-                             'marula','argan','hemp seed','tamanu','sea buckthorn',
-                             'chia seed','pomegranate seed','bakuchiol']))
-    heavy_count = sum(1 for kw in _HEAVY_OILS if kw in ing_str)
-    oil_quality = min(35, dry_count * 8) - (heavy_count * 5)
-    oil_quality = max(0, oil_quality)
-    if dry_count == 0 and heavy_count == 0:
-        oil_quality = 15  # no identifiable oils = neutral
+    # ── FATTY ACID PROFILE (50 pts) ────────────────────────────────────────────
+    linoleic_count  = sum(1 for i in ing_lower_list if i in LINOLEIC_OILS or
+                          any(kw in i for kw in ['rosehip','safflower','hemp','primrose','squalane','grapeseed','grape seed']))
+    oleic_count     = sum(1 for i in ing_lower_list if i in OLEIC_OILS or
+                          any(kw in i for kw in ['avocado','macadamia','almond','argan','marula','olive','apricot','moringa']))
+    comedogenic_penalty = sum(1 for i in ing_lower_list if i in COMEDOGENIC_OILS or
+                              any(kw in i for kw in ['cocos nucifera','coconut oil','cocoa butter','theobroma cacao']))
 
-    # Antioxidants (20)
-    aox_count  = sum(1 for ing in ingredient_list
-                     if ing.lower().strip() in _ANTIOXIDANTS
-                     or any(kw in ing.lower() for kw in ['tocopherol','ferulic','resveratrol',
-                            'astaxanthin','green tea','coenzyme q10','ubiquinone','quercetin']))
-    aox_pts    = min(20, aox_count * 7)
+    # Skin-type pivot: award points for the right fatty acid profile
+    if skin_type_lower in ('oily', 'combination', 'acne-prone'):
+        fa_score = min(50, linoleic_count * 14)   # linoleic oils = good
+        fa_score -= comedogenic_penalty * 25        # comedogenic = very bad
+        fa_score = max(0, fa_score)
+        if oleic_count > linoleic_count:            # wrong type dominant
+            fa_score = max(0, fa_score - 10)
+    elif skin_type_lower == 'dry':
+        fa_score = min(50, oleic_count * 14)        # oleic oils = good for dry
+        fa_score += min(10, linoleic_count * 4)     # linoleic still ok in blend
+        fa_score -= comedogenic_penalty * 10         # less penalty for dry skin
+        fa_score = max(0, fa_score)
+    elif skin_type_lower == 'sensitive':
+        fa_score = min(50, (linoleic_count + oleic_count) * 10)
+        fa_score -= comedogenic_penalty * 15
+        fa_score = max(0, fa_score)
+    else:  # normal / default
+        fa_score = min(50, (linoleic_count + oleic_count) * 12)
+        fa_score -= comedogenic_penalty * 15
+        fa_score = max(0, fa_score)
 
-    # Actives (15) — use impact scores
-    active_pts = 0
-    for i, ing in enumerate(ingredient_list[:15]):
-        score, data = _calc_impact_score(ing, i, ingredient_list, known_concentrations)
-        if data and str(data.get('Ingredient_Class','')).lower() == 'active':
-            active_pts += score
-    active_pts = min(15, active_pts / 5)  # normalise: typical active ~50-80 impact → 10-15 pts
+    if linoleic_count == 0 and oleic_count == 0:
+        fa_score = 15   # neutral floor — at least some oil base detected
 
-    # Irritation (10) — deduct for fragrance/essential oils in top 10
-    irr_pts = 10
-    for ing in ingredient_list[:10]:
-        il = ing.strip().lower()
-        if 'fragrance' in il or 'parfum' in il or 'essential oil' in il:
-            irr_pts -= 4
-    irr_pts = max(0, irr_pts)
+    # Track oil diversity for Card 1 bubble
+    oil_diversity = linoleic_count + oleic_count + comedogenic_penalty
 
-    # Price fairness (20)
-    price_pts = _price_pts(price, size_ml, 'Facial Oil', country)
-    price_component = int(price_pts / 10 * 20)
+    # ── ANTIOXIDANT LOAD (25 pts) ──────────────────────────────────────────────
+    # THE FIX: count ANY ingredient where Functional_Category includes
+    # "Antioxidant" OR "Soothing" — this catches Turmeric, Licorice, Argan, etc.
+    aox_count = 0
+    for ing in ingredient_list:
+        data = data_loader.get_ingredient_data(ing)
+        if data:
+            fc = str(data.get('Functional_Category', '') or '').lower()
+            if 'antioxidant' in fc or 'soothing' in fc:
+                aox_count += 1
+        else:
+            # Fallback keyword check for unrecognised names
+            ing_l = ing.strip().lower()
+            if any(kw in ing_l for kw in ['tocopherol','vitamin e','ferulic','turmeric',
+                                           'licorice','rosemary','green tea','resveratrol',
+                                           'astaxanthin','ubiquinone','coenzyme q','saffron',
+                                           'pomegranate','sea buckthorn','curcuma']):
+                aox_count += 1
+    aox_score = min(25, aox_count * 5)
 
-    raw = oil_quality + aox_pts + active_pts + irr_pts + price_component
-    return min(100, max(0, raw))
+    # ── BOTANICAL INFUSION (10 pts) ────────────────────────────────────────────
+    # Hero botanicals in the top 10 positions
+    botanical_count = sum(
+        1 for i, ing in enumerate(ingredient_list[:10])
+        if ing.strip().lower() in HERO_BOTANICALS
+        or any(kw in ing.strip().lower() for kw in [
+            'saffron', 'crocus sativus', 'kumkuma',
+            'manjistha', 'rubia cordifolia',
+            'sandalwood', 'pterocarpus', 'santalum',
+            'tamanu', 'calophyllum',
+            'bakuchiol', 'sea buckthorn', 'argan',
+            'turmeric', 'curcuma', 'kalonji', 'nigella',
+            'boswellia', 'frankincense',
+        ])
+    )
+    botanical_score = min(10, botanical_count * 4)
+
+    raw = fa_score + aox_score + botanical_score
+
+    return {
+        'score': min(85, max(0, raw)),
+        'fa_score': round(fa_score, 1),
+        'aox_score': round(aox_score, 1),
+        'botanical_score': round(botanical_score, 1),
+        'oil_diversity': oil_diversity,
+        'antioxidant_count': aox_count,
+        'linoleic_count': linoleic_count,
+        'oleic_count': oleic_count,
+        'comedogenic_penalty': comedogenic_penalty,
+    }
 
 
 def _price_pts(price, size_ml, category, country):
@@ -1017,7 +1094,7 @@ def _price_pts(price, size_ml, category, country):
     return 2
 
 
-def calculate_main_worth_score(ingredient_list, price, size_ml, category, country='India', known_concentrations=None):
+def calculate_main_worth_score(ingredient_list, price, size_ml, category, country='India', known_concentrations=None, skin_type='normal'):
     """
     Category-specific scoring engine.
 
@@ -1247,7 +1324,9 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         value_tier = _ratio_to_tier(ratio)
         return _build_result(total_score, score_breakdown, component_details, identified_actives,
                              all_impact, ingredient_list, price, size_ml, category, country,
-                             ratio, value_tier, multipliers_applied, concentrations, known_concentrations)
+                             ratio, value_tier, multipliers_applied, concentrations, known_concentrations,
+                             is_high_intensity=is_high_intensity_treatment,
+                             high_intensity_actives=high_intensity_actives_found)
 
     elif cat_lower in ('toner', 'mist'):
         # Humectants 30, soothing 25, actives 20, irritation 10
@@ -1277,21 +1356,57 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         component_details['B'].append(f"Actives: {active_pts:.1f}/20, Irritation: {irr_score}/10")
 
     elif cat_lower in ('facial oil', 'oil'):
-        formula_quality = _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrations)
-        component_details['A'].append("Facial oil scored on oil quality + antioxidants + actives + irritation")
-        total_score = min(100, max(0, formula_quality))
+        oil_result = _facial_oil_score(
+            ingredient_list, price, size_ml, country, known_concentrations,
+            skin_type=skin_type
+        )
+        formula_quality = oil_result['score']
+        component_details['A'].append(
+            f"Fatty Acid Profile: {oil_result['fa_score']:.0f}/50 "
+            f"({'Linoleic-rich' if oil_result['linoleic_count'] >= oil_result['oleic_count'] else 'Oleic-rich'})"
+        )
+        component_details['A'].append(
+            f"Antioxidant Load: {oil_result['aox_score']:.0f}/25 "
+            f"({oil_result['antioxidant_count']} antioxidant/soothing ingredients)"
+        )
+        component_details['B'].append(
+            f"Botanical Infusion: {oil_result['botanical_score']:.0f}/10"
+        )
+        if oil_result['comedogenic_penalty'] > 0:
+            component_details['D'].append(
+                f"⚠ {oil_result['comedogenic_penalty']} comedogenic oil(s) detected — "
+                "may clog pores in oily/acne-prone skin"
+            )
         price_score = _price_pts(price, size_ml, category, country)
         score_breakdown['price_rationality'] = float(price_score)
         score_breakdown['active_value'] = round(min(45, formula_quality * 0.45), 1)
         score_breakdown['formula_quality'] = round(min(20, formula_quality * 0.20), 1)
         score_breakdown['safety'] = round(min(10, formula_quality * 0.10), 1)
         score_breakdown['claim_accuracy'] = 15
+        total_score = min(100, max(0, round(
+            (0.75 * formula_quality / 85 + 0.25 * price_score / 10) * 100
+        )))
         avg_price = _get_avg_price(price, size_ml, category, country)
         ratio = round((price / size_ml) / avg_price, 2) if (size_ml > 0 and avg_price > 0 and price > 0) else 1.0
         value_tier = _ratio_to_tier(ratio)
-        return _build_result(total_score, score_breakdown, component_details, identified_actives,
-                             all_impact, ingredient_list, price, size_ml, category, country,
-                             ratio, value_tier, multipliers_applied, concentrations, known_concentrations)
+        result = _build_result(
+            total_score, score_breakdown, component_details, identified_actives,
+            all_impact, ingredient_list, price, size_ml, category, country,
+            ratio, value_tier, multipliers_applied, concentrations, known_concentrations,
+            is_high_intensity=is_high_intensity_treatment,
+            high_intensity_actives=high_intensity_actives_found
+        )
+        # Attach oil metadata for Card 1 bubbles
+        result['oil_metadata'] = {
+            'oil_diversity': oil_result['oil_diversity'],
+            'antioxidant_count': oil_result['antioxidant_count'],
+            'linoleic_count': oil_result['linoleic_count'],
+            'oleic_count': oil_result['oleic_count'],
+            'fa_score': oil_result['fa_score'],
+            'aox_score': oil_result['aox_score'],
+            'botanical_score': oil_result['botanical_score'],
+        }
+        return result
 
     elif cat_lower in ('eye cream', 'eye gel', 'eye serum'):
         # Eye cream: serum-style active scoring + peptide bonus
@@ -1544,8 +1659,8 @@ def _build_result(total_score, score_breakdown, component_details, identified_ac
             'active_ratio': round(active_ratio, 1),
             'price_per_active': round(price / active_count, 2) if active_count and price else price or 0,
         },
-        'tier_badge': get_tier_badge(total_score, value_tier),
-        'score_title': get_score_title(total_score, value_tier),
+        'tier_badge': get_tier_badge(total_score, value_tier, category=category),
+        'score_title': get_score_title(total_score, value_tier, category=category),
         'value_tier': value_tier,
         'ratio': ratio,
         'identified_actives': identified_actives,
@@ -1563,37 +1678,128 @@ def _build_result(total_score, score_breakdown, component_details, identified_ac
     }
 
 
-def get_tier_badge(score, value_tier=None):
-    if score >= 90:
-        return "Exceptional Formula"
+def get_tier_badge(score, value_tier=None, category=None):
+    cat = (category or '').lower()
+    is_oil = cat in ('facial oil', 'oil')
+    is_cleanser = cat == 'cleanser'
+    is_sunscreen = cat == 'sunscreen'
+
+    if is_oil:
+        if score >= 90: return "Premium Lipid Formula"
+        if score >= 75: return "Excellent Lipid Profile" if value_tier not in {"overpriced","slightly_overpriced"} else "Great Formula, Pricey"
+        if score >= 60: return "Good Botanical Blend"
+        if score >= 40: return "Basic Oil Formula"
+        return "Limited Lipid Value"
+
+    if is_cleanser:
+        if score >= 90: return "Exceptionally Gentle"
+        if score >= 75: return "Gentle & Effective" if value_tier not in {"overpriced","slightly_overpriced"} else "Gentle but Pricey"
+        if score >= 60: return "Reasonably Gentle"
+        if score >= 40: return "Moderately Harsh"
+        return "High Strip Risk"
+
+    if is_sunscreen:
+        if score >= 90: return "Elite UV Protection"
+        if score >= 75: return "Strong UV Protection"
+        if score >= 60: return "Adequate UV Protection"
+        if score >= 40: return "Weak UV Protection"
+        return "Insufficient Protection"
+
+    # Default
+    if score >= 90: return "Exceptional Formula"
     if score >= 75:
-        if value_tier in {"overpriced", "slightly_overpriced"}:
-            return "Worth Buying but Pricey"
-        return "Worth Buying"
+        return "Worth Buying but Pricey" if value_tier in {"overpriced","slightly_overpriced"} else "Worth Buying"
     if score >= 60:
-        if value_tier in {"fair", "underpriced"}:
-            return "Acceptable & Fairly Priced"
-        return "Acceptable but Overpriced"
-    if score >= 40:
-        return "Below Average Value"
+        return "Acceptable & Fairly Priced" if value_tier in {"fair","underpriced"} else "Acceptable but Overpriced"
+    if score >= 40: return "Below Average Value"
     return "Mostly Marketing"
 
 
-def get_score_title(score, value_tier=None):
-    if score >= 90:
-        return "Outstanding formulation with strong actives"
+def get_score_title(score, value_tier=None, category=None):
+    cat = (category or '').lower()
+    is_oil = cat in ('facial oil', 'oil')
+    is_cleanser = cat == 'cleanser'
+    is_moisturizer = cat in ('moisturizer', 'cream', 'lotion', 'gel')
+    is_toner = cat in ('toner', 'mist')
+    is_eye = cat in ('eye cream', 'eye gel', 'eye serum')
+    is_mask = cat in ('mask', 'sheet mask', 'sleeping mask', 'wash-off mask')
+    is_treatment = cat == 'treatment'
+    is_sunscreen = cat == 'sunscreen'
+
+    if is_oil:
+        if score >= 90: return "Exceptional lipid profile — rich in skin-matching fatty acids"
+        if score >= 75:
+            return ("Balanced fatty acid profile for the price" if value_tier in {"underpriced","fair"}
+                    else "Rich in traditional lipids — paying a quality premium")
+        if score >= 60:
+            return ("Good botanical blend at fair value" if value_tier in {"fair","underpriced"}
+                    else "Good oil blend, slightly pricey")
+        if score >= 40: return "Limited fatty acid diversity relative to price"
+        return "Basic carrier oil — minimal therapeutic lipid value"
+
+    if is_cleanser:
+        if score >= 90: return "Exceptionally gentle — preserves skin barrier while cleansing"
+        if score >= 75:
+            return ("Gentle surfactant profile at great value" if value_tier in {"underpriced","fair"}
+                    else "Gentle formula — paying a slight premium")
+        if score >= 60: return "Reasonably gentle — minor barrier disruption risk"
+        if score >= 40: return "Moderate harshness — may strip sensitive skin"
+        return "High surfactant harshness — barrier damage risk"
+
+    if is_moisturizer:
+        if score >= 90: return "Excellent barrier recovery — complete lipid matrix"
+        if score >= 75:
+            return ("Strong barrier formula at fair value" if value_tier in {"underpriced","fair"}
+                    else "Strong hydration formula — at a brand premium")
+        if score >= 60: return "Good barrier support at acceptable value"
+        if score >= 40: return "Partial barrier support — missing key lipids"
+        return "Minimal barrier ingredients for the price"
+
+    if is_sunscreen:
+        if score >= 90: return "Broad-spectrum excellence — elite photostable protection"
+        if score >= 75: return "Strong broad-spectrum protection"
+        if score >= 60: return "Adequate UV coverage — some gaps in spectrum"
+        if score >= 40: return "Partial UV protection — missing UVA or UVB filters"
+        return "Insufficient UV protection — not a reliable sunscreen"
+
+    if is_eye:
+        if score >= 90: return "Exceptional periorbital formula — vascular + collagen support"
+        if score >= 75: return "Strong corrective eye formula"
+        if score >= 60: return "Decent eye formula — some actives present"
+        if score >= 40: return "Basic hydration only — limited corrective action"
+        return "Minimal periorbital actives"
+
+    if is_mask:
+        if score >= 90: return "Intensive treatment — high-potency actives above threshold"
+        if score >= 75: return "Strong treatment mask"
+        if score >= 60: return "Moderate treatment intensity"
+        if score >= 40: return "Low treatment intensity"
+        return "Primarily occlusive — minimal actives"
+
+    if is_treatment:
+        if score >= 90: return "Professional-grade high-intensity corrective"
+        if score >= 75: return "Strong high-intensity treatment"
+        if score >= 60: return "Effective treatment formula"
+        if score >= 40: return "Moderate treatment strength"
+        return "Low active concentration for a treatment"
+
+    if is_toner:
+        if score >= 90: return "Exceptional hydration density — multi-humectant formula"
+        if score >= 75: return "Strong hydration and soothing profile"
+        if score >= 60: return "Good refresh and prep formula"
+        if score >= 40: return "Basic toning — limited hydration depth"
+        return "Primarily pH adjustment — minimal active value"
+
+    # Default serum/general
+    if score >= 90: return "Outstanding formulation with strong actives"
     if score >= 75:
-        if value_tier == "underpriced":
-            return "Excellent actives for the price"
-        if value_tier == "fair":
-            return "Strong formula at reasonable price"
-        return "Strong formula, paying brand premium"
+        return ("Excellent actives for the price" if value_tier == "underpriced"
+                else "Strong formula at reasonable price" if value_tier == "fair"
+                else "Strong formula, paying brand premium")
     if score >= 60:
-        if value_tier in {"fair", "underpriced"}:
-            return "Good formula at acceptable value"
-        return "Good formula, on the pricey side"
-    if score >= 40:
-        return "Few key actives relative to price"
+        return ("Good formula at acceptable value" if value_tier in {"fair","underpriced"}
+                else "Good formula, on the pricey side")
+    if score >= 40: return "Few key actives relative to price"
     return "Mostly marketing, minimal substance"
 
 
@@ -2158,17 +2364,121 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
             'advisory': '', 'synergy_bonus': 0,
         }
 
-def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=None):
+def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
+    """
+    Botanical-first concern fit for facial oils.
+    Replaces serum active lookups with lipid/botanical mappings so that
+    oils aren't penalised for 'missing Niacinamide/HA'.
+    """
+    results = {}
+
+    # Botanical hero mapping: concern → what to look for in an oil formula
+    OIL_CONCERN_MAP = {
+        'Hydration':       ['squalane', 'jojoba', 'sesame', 'almond', 'avocado', 'ceramide',
+                            'hyaluronic', 'glycerin', 'panthenol'],
+        'Barrier Repair':  ['squalane', 'ceramide', 'cholesterol', 'rosehip', 'evening primrose',
+                            'hemp seed', 'linoleic', 'fatty acid', 'tamanu'],
+        'Dullness':        ['saffron', 'crocus sativus', 'kumkuma', 'turmeric', 'curcuma',
+                            'licorice', 'rosehip', 'sea buckthorn', 'vitamin c', 'ascorbic',
+                            'rubia cordifolia', 'manjistha', 'pterocarpus'],
+        'Pigmentation':    ['saffron', 'crocus sativus', 'turmeric', 'curcuma', 'licorice',
+                            'kojic', 'arbutin', 'rubia cordifolia', 'sandalwood', 'pterocarpus',
+                            'ellagic', 'pomegranate'],
+        'Aging & Fine Lines': ['bakuchiol', 'rosehip', 'sea buckthorn', 'argan', 'marula',
+                               'ferulic', 'tocopherol', 'vitamin e', 'coenzyme q', 'ubiquinone',
+                               'squalane', 'retinol', 'retinal'],
+        'Sensitive Skin':  ['tamanu', 'calophyllum', 'chamomile', 'calendula', 'allantoin',
+                            'bisabolol', 'centella', 'madecassoside', 'aloe', 'squalane',
+                            'jojoba', 'sea buckthorn'],
+        'Acne & Oily Skin': ['squalane', 'jojoba', 'hemp seed', 'rosehip', 'safflower',
+                              'tea tree', 'neem', 'salicylic', 'kalonji', 'nigella'],
+        'Uneven Texture':  ['rosehip', 'sea buckthorn', 'bakuchiol', 'turmeric', 'curcuma',
+                            'ellagic', 'pomegranate', 'ferulic'],
+        'UV Damage':       ['turmeric', 'curcuma', 'ferulic', 'tocopherol', 'vitamin e',
+                            'sea buckthorn', 'astaxanthin', 'resveratrol', 'green tea'],
+        'Large Pores':     ['jojoba', 'squalane', 'hemp seed', 'tea tree', 'neem',
+                            'rosehip', 'vitamin c'],
+    }
+
+    # Ayurvedic hero indicator
+    AYURVEDIC_HEROES = ['saffron', 'crocus sativus', 'manjistha', 'rubia cordifolia',
+                        'sandalwood', 'pterocarpus', 'turmeric', 'curcuma', 'kalonji',
+                        'nigella', 'neem', 'azadirachta', 'boswellia', 'ashwagandha',
+                        'amla', 'bhringraj', 'brahmi', 'kumkuma']
+
+    ayurvedic_count = sum(1 for kw in AYURVEDIC_HEROES if kw in ing_str)
+    has_ayurvedic_potency = ayurvedic_count >= 2
+
+    for concern in concerns:
+        keywords = OIL_CONCERN_MAP.get(concern, [])
+        if not keywords:
+            # Generic fallback: any antioxidant/soothing ingredient
+            keywords = ['tocopherol', 'ferulic', 'squalane', 'jojoba', 'rosehip']
+
+        # Count matches
+        matched = [kw for kw in keywords if kw in ing_str]
+        match_count = len(matched)
+
+        # Score: 15 pts per match, max 75. Floor at 30 if oil has any botanical present.
+        raw_score = min(75, match_count * 15)
+        if raw_score == 0 and any(k in ing_str for k in ['oil', 'extract', 'butter', 'seed']):
+            raw_score = 20  # generic botanical floor
+
+        final = max(0, min(100, raw_score))
+
+        # Build explanation
+        explanation = []
+        if matched:
+            if has_ayurvedic_potency and concern in ('Dullness', 'Pigmentation', 'Aging & Fine Lines'):
+                explanation.append("Ayurvedic Potency: High (Botanical-First Formula)")
+            explanation.append(f"Active botanicals: {', '.join(matched[:3])}")
+        else:
+            explanation.append(f"No targeted lipids/botanicals found for {concern.lower()}")
+
+        if has_ayurvedic_potency:
+            explanation.append(f"{ayurvedic_count} Ayurvedic hero ingredient(s) detected")
+
+        missing = [kw for kw in keywords[:3] if kw not in ing_str]
+
+        results[concern] = {
+            'score': final,
+            'present_actives': matched[:4],
+            'missing_actives': missing[:2],
+            'supporting_ingredients': [],
+            'explanation': explanation[:3],
+            'advisory': (
+                f"Ayurvedic Potency: High — botanical-first formula for {concern.lower()}."
+                if has_ayurvedic_potency
+                else f"Add {', '.join(missing[:2])} for stronger {concern.lower()} targeting."
+                if missing
+                else f"Good lipid coverage for {concern.lower()}."
+            ),
+            'synergy_bonus': 0,
+        }
+
+    return results
+
+
+def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=None, category='serum'):
     """Skin Concern Fit: 4-component intelligent scoring model.
     A (50%): Evidence × Concentration × Synergy per active
     B (20%): Support system quality (barrier/anti-inflammatory/hydration)
     C (10%): Clinical synergy bonus from registry
     D (-30%): Worsening ingredient penalty
+
+    For facial oils: bypasses serum-active lookups, uses botanical/lipid scoring.
     """
     results = {}
     am_pm = "Suitable for: AM & PM"
     ing_str = " ".join(ingredient_list).lower()
     concentrations = estimate_concentration(ingredient_list, known_concentrations=known_concentrations)
+    cat_lower = (category or 'serum').lower()
+    is_oil = cat_lower in ('facial oil', 'oil')
+
+    # Facial Oil concern fit — botanical-first, not serum-active first
+    if is_oil:
+        results = _facial_oil_concern_fit(ingredient_list, concerns, ing_str)
+        return {'concerns': results, 'am_pm': 'Suitable for: PM (locks in moisture)'}
 
     # Pre-lookup all product ingredients once
     product_inci_map = {}
@@ -2855,13 +3165,15 @@ def analyze_product(product_data):
         product_data.get("size_ml", 30),
         product_data.get("category", "Serum"),
         product_data.get("country", "India"),
-        known_concentrations=known_concentrations
+        known_concentrations=known_concentrations,
+        skin_type=product_data.get("skin_type", "normal")
     )
 
     concern_fit = calculate_skin_concern_fit(
         ingredient_list,
         product_data.get("concerns", []),
-        known_concentrations=known_concentrations
+        known_concentrations=known_concentrations,
+        category=product_data.get("category", "serum")
     )
 
     skin_compat = calculate_skin_type_compatibility(
@@ -2951,6 +3263,7 @@ def analyze_product(product_data):
         "ingredient_count": len(ingredient_list),
         "is_high_intensity": main_score.get('is_high_intensity', False),
         "high_intensity_actives": main_score.get('high_intensity_actives', []),
+        "oil_metadata": main_score.get('oil_metadata', None),
         "disclaimer": "Science-based estimates. Not medical advice.",
         "one_percent_marker": one_percent_marker,
         "ingredient_conflicts": ingredient_conflicts,

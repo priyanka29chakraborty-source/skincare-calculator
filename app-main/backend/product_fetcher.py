@@ -1278,6 +1278,46 @@ def _extract_metadata(html, url):
     # --- Category ---
     category = _detect_category(product_name or '') or _detect_category(text[:500])
 
+    # ── Regex fallback: if size or price still missing, scan raw HTML text ──
+    # This handles cases where Shopify JSON failed or page structure was non-standard.
+    if not size_ml:
+        # Scan broader page text for any "NNml" or "NN ml" pattern
+        _size_fallback = re.search(
+            r'\b(\d{2,4})\s*(?:ml|mL|ML)\b',
+            text[:10000]
+        )
+        if _size_fallback:
+            val = float(_size_fallback.group(1))
+            if 5 <= val <= 1000:
+                size_ml = val
+                size_unit = 'ml'
+                logger.info(f"Size fallback regex: found {size_ml}ml in page text")
+
+    if not price and currency:
+        # Scan page text for currency symbol followed by number (or number followed by symbol)
+        _CURRENCY_PATTERNS = {
+            'INR': [r'₹\s*(\d[\d,]*\.?\d*)', r'Rs\.?\s*(\d[\d,]*\.?\d*)', r'INR\s*(\d[\d,]*\.?\d*)'],
+            'USD': [r'\$\s*(\d[\d,]*\.?\d*)', r'USD\s*(\d[\d,]*\.?\d*)'],
+            'GBP': [r'£\s*(\d[\d,]*\.?\d*)', r'GBP\s*(\d[\d,]*\.?\d*)'],
+            'EUR': [r'€\s*(\d[\d,]*\.?\d*)', r'EUR\s*(\d[\d,]*\.?\d*)'],
+            'AED': [r'AED\s*(\d[\d,]*\.?\d*)', r'د\.إ\s*(\d[\d,]*\.?\d*)'],
+        }
+        patterns = _CURRENCY_PATTERNS.get(currency, [r'(\d[\d,]{1,5}\.?\d{0,2})'])
+        scan_text = text[:8000]
+        for pat in patterns:
+            _price_fallback = re.search(pat, scan_text)
+            if _price_fallback:
+                try:
+                    p_val = float(_price_fallback.group(1).replace(',', ''))
+                    # Sanity check: must be plausible product price
+                    if 10 <= p_val <= 100000:
+                        price = p_val
+                        price_confidence = 'low'
+                        logger.info(f"Price fallback regex: found {currency} {price} in page text")
+                        break
+                except (ValueError, AttributeError):
+                    pass
+
     return {
         'product_name': product_name,
         'brand': brand,
