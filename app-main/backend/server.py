@@ -17,7 +17,7 @@ from data_loader import data_loader
 from admin import admin_router
 from admin_db import log_fetch, log_analysis, increment_credits
 from bs4 import BeautifulSoup
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
