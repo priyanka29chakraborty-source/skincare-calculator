@@ -1195,6 +1195,11 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     # ── CATEGORY-SPECIFIC FORMULA QUALITY ─────────────────────────────────────
     ing_str = ' '.join(i.strip().lower() for i in ingredient_list)
 
+    # Declare treatment bypass vars here so ALL category branches can reference them
+    # (they are populated later in the Treatment section below)
+    is_high_intensity_treatment = False
+    high_intensity_actives_found = []
+
     if cat_lower in ('serum', 'treatment', 'essence', 'ampoule'):
         _ACTIVE_CLASSES = ('active','peptide','retinoid','brightening active')
         # BUG FIX: search ingredient_list (not all_impact) so marker is found even if
