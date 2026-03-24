@@ -734,7 +734,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       </div>
 
       {/* CARD 4A: ALTERNATIVES */}
-      <AlternativesCard result={result} concerns={concerns} alternatives={alternatives} altLoading={altLoading} currency={currency} />
+      <AlternativesCard result={result} concerns={concerns} alternatives={alternatives} altLoading={altLoading} currency={currency} category={category} />
 
       {/* CARD 4B: BEST PRICE */}
       <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading} currency={currency} fetchInput={fetchInput} />

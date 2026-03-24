@@ -947,20 +947,47 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
     # ── CLASSIFICATION SETS ────────────────────────────────────────────────────
     # Linoleic-rich (high linoleic acid content) — good for oily/acne-prone skin
     LINOLEIC_OILS = {
+        # Common names
         'rosehip seed oil', 'rosehip oil', 'safflower oil', 'safflower seed oil',
         'hemp seed oil', 'evening primrose oil', 'sea buckthorn oil',
         'grapeseed oil', 'grape seed oil', 'sunflower seed oil', 'sunflower oil',
-        'squalane',  # technically not a fatty acid but great for oily skin
+        'squalane',
         'nigella sativa seed oil', 'salvia hispanica seed oil', 'camelina sativa seed oil',
-        'punica granatum seed oil',
+        'punica granatum seed oil', 'passion fruit seed oil', 'passiflora edulis seed oil',
+        'walnut oil', 'juglans regia seed oil',
+        # INCI botanical names (parentheses stripped by parse_ingredients)
+        'rosa canina oil', 'rosa canina seed oil',        # Rosehip
+        'passiflora edulis oil',                           # Passion fruit
+        'juglans regia oil',                               # Walnut
+        'ribes nigrum seed oil',                           # Blackcurrant
+        'oenothera biennis oil',                           # Evening primrose
+        'vitis vinifera seed oil',                         # Grapeseed
+        'helianthus annuus seed oil',                      # Sunflower
     }
     # Oleic-rich (high oleic acid content) — good for dry/mature skin
     OLEIC_OILS = {
+        # Common names
         'avocado oil', 'avocado ferment', 'macadamia seed oil', 'macadamia nut oil',
         'sweet almond oil', 'almond oil', 'argan oil', 'marula oil',
         'olive oil', 'apricot kernel oil', 'peach kernel oil',
         'camellia oil', 'camellia sinensis seed oil',
-        'moringa seed oil', 'moringa oil',
+        'moringa seed oil', 'moringa oil', 'jojoba oil', 'jojoba seed oil',
+        # INCI botanical names
+        'argania spinosa kernel oil',                      # Argan
+        'simmondsia chinensis seed oil',                   # Jojoba
+        'olea europaea fruit oil',                         # Olive
+        'olea europaea oil',                               # Olive
+        'persea gratissima oil',                           # Avocado
+        'prunus amygdalus dulcis oil',                     # Sweet Almond
+        'macadamia integrifolia seed oil',                 # Macadamia
+        'sclerocarya birrea seed oil',                     # Marula
+        'prunus armeniaca kernel oil',                     # Apricot
+    }
+    # Carrier/emollient base oils — count toward oil diversity
+    CARRIER_OILS = {
+        'caprylic capric triglyceride', 'cct', 'fractionated coconut oil',
+        'c8-10 triglycerides', 'c8-c10 triglycerides',
+        'isopropyl myristate', 'cetyl ethylhexanoate',
     }
     # Comedogenic oils — penalised for all skin types (especially oily)
     COMEDOGENIC_OILS = {
@@ -970,28 +997,48 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
     }
     # Hero/luxury Ayurvedic and specialty botanical oils — Botanical Infusion credit
     HERO_BOTANICALS = {
-        'crocus sativus flower extract',  # Saffron (Kumkuma)
+        'crocus sativus flower extract', 'crocus sativus oil',  # Saffron
         'rubia cordifolia root extract',  # Manjistha
         'pterocarpus santalinus wood extract',  # Red Sandalwood
-        'argan oil', 'marula oil', 'sea buckthorn oil', 'sea buckthorn water',
-        'rosehip seed oil', 'rosehip oil', 'bakuchiol',
+        'argan oil', 'argania spinosa kernel oil',
+        'marula oil', 'sclerocarya birrea seed oil',
+        'sea buckthorn oil', 'sea buckthorn water', 'hippophae rhamnoides',
+        'rosehip seed oil', 'rosehip oil', 'rosa canina oil',
+        'bakuchiol',
         'tamanu oil', 'calophyllum inophyllum seed oil',
         'pomegranate seed oil', 'punica granatum seed oil',
         'turmeric root extract', 'curcuma longa root extract',
-        'sandalwood', 'santalum album', 'boswellia serrata',
+        'sandalwood', 'santalum album', 'sandalwood oil',
+        'boswellia serrata',
         'neem oil', 'azadirachta indica seed oil',
         'kalonji oil', 'nigella sativa seed oil',
+        # Additional Ayurvedic hero botanicals
+        'carrot seed oil', 'carota sativa seed oil', 'daucus carota seed oil',
+        'neroli oil', 'aurantium amara flower oil',  # Neroli — luxury botanical
+        'jasmine oil', 'jasminum officinale',
+        'frankincense', 'boswellia carterii',
+        'gold leaf', 'colloidal gold',
     }
 
     ing_lower_list = [i.strip().lower() for i in ingredient_list]
 
     # ── FATTY ACID PROFILE (50 pts) ────────────────────────────────────────────
-    linoleic_count  = sum(1 for i in ing_lower_list if i in LINOLEIC_OILS or
-                          any(kw in i for kw in ['rosehip','safflower','hemp','primrose','squalane','grapeseed','grape seed']))
-    oleic_count     = sum(1 for i in ing_lower_list if i in OLEIC_OILS or
-                          any(kw in i for kw in ['avocado','macadamia','almond','argan','marula','olive','apricot','moringa']))
+    linoleic_count = sum(1 for i in ing_lower_list if i in LINOLEIC_OILS or
+                         any(kw in i for kw in ['rosehip','safflower','hemp','primrose',
+                             'squalane','grapeseed','grape seed','passion fruit',
+                             'passiflora','rosa canina','juglans','walnut',
+                             'oenothera','ribes nigrum','vitis vinifera seed']))
+    oleic_count = sum(1 for i in ing_lower_list if i in OLEIC_OILS or
+                      any(kw in i for kw in ['avocado','macadamia','almond','argan',
+                          'marula','olive','apricot','moringa','jojoba',
+                          'argania','simmondsia','olea europaea','persea',
+                          'prunus amygdalus','sclerocarya']))
     comedogenic_penalty = sum(1 for i in ing_lower_list if i in COMEDOGENIC_OILS or
-                              any(kw in i for kw in ['cocos nucifera','coconut oil','cocoa butter','theobroma cacao']))
+                               any(kw in i for kw in ['cocos nucifera','coconut oil',
+                                   'cocoa butter','theobroma cacao']))
+    # Carrier oils count toward oil diversity but not fatty acid scoring
+    carrier_count = sum(1 for i in ing_lower_list if i in CARRIER_OILS or
+                        'caprylic capric' in i or 'triglyceride' in i)
 
     # Skin-type pivot: award points for the right fatty acid profile
     if skin_type_lower in ('oily', 'combination', 'acne-prone'):
@@ -1017,8 +1064,8 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
     if linoleic_count == 0 and oleic_count == 0:
         fa_score = 15   # neutral floor — at least some oil base detected
 
-    # Track oil diversity for Card 1 bubble
-    oil_diversity = linoleic_count + oleic_count + comedogenic_penalty
+    # Track oil diversity for Card 1 bubble (includes carriers)
+    oil_diversity = linoleic_count + oleic_count + carrier_count
 
     # ── ANTIOXIDANT LOAD (25 pts) ──────────────────────────────────────────────
     # THE FIX: count ANY ingredient where Functional_Category includes
@@ -1031,12 +1078,21 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
             if 'antioxidant' in fc or 'soothing' in fc:
                 aox_count += 1
         else:
-            # Fallback keyword check for unrecognised names
+            # Extended fallback: covers INCI botanical names not in DB
             ing_l = ing.strip().lower()
-            if any(kw in ing_l for kw in ['tocopherol','vitamin e','ferulic','turmeric',
-                                           'licorice','rosemary','green tea','resveratrol',
-                                           'astaxanthin','ubiquinone','coenzyme q','saffron',
-                                           'pomegranate','sea buckthorn','curcuma']):
+            if any(kw in ing_l for kw in [
+                'tocopherol','vitamin e','ferulic','turmeric','curcuma',
+                'licorice','rosemary','green tea','resveratrol',
+                'astaxanthin','ubiquinone','coenzyme q','saffron',
+                'pomegranate','sea buckthorn','curcuma',
+                'carota','carrot','daucus',           # Carrot — beta-carotene
+                'argan','argania',                     # Argan — tocopherols
+                'rosa canina','rosehip',               # Rosehip — Vit C, carotenoids
+                'santalum','sandalwood',               # Sandalwood — antioxidant
+                'neroli','aurantium amara',            # Neroli — antioxidant
+                'gold leaf','colloidal gold',          # Gold — antioxidant properties
+                'beta-carotene','carotenoid',
+            ]):
                 aox_count += 1
     aox_score = min(25, aox_count * 5)
 
@@ -2379,30 +2435,102 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
 
     # Botanical hero mapping: concern → what to look for in an oil formula
     OIL_CONCERN_MAP = {
-        'Hydration':       ['squalane', 'jojoba', 'sesame', 'almond', 'avocado', 'ceramide',
-                            'hyaluronic', 'glycerin', 'panthenol'],
-        'Barrier Repair':  ['squalane', 'ceramide', 'cholesterol', 'rosehip', 'evening primrose',
-                            'hemp seed', 'linoleic', 'fatty acid', 'tamanu'],
-        'Dullness':        ['saffron', 'crocus sativus', 'kumkuma', 'turmeric', 'curcuma',
-                            'licorice', 'rosehip', 'sea buckthorn', 'vitamin c', 'ascorbic',
-                            'rubia cordifolia', 'manjistha', 'pterocarpus'],
-        'Pigmentation':    ['saffron', 'crocus sativus', 'turmeric', 'curcuma', 'licorice',
-                            'kojic', 'arbutin', 'rubia cordifolia', 'sandalwood', 'pterocarpus',
-                            'ellagic', 'pomegranate'],
-        'Aging & Fine Lines': ['bakuchiol', 'rosehip', 'sea buckthorn', 'argan', 'marula',
-                               'ferulic', 'tocopherol', 'vitamin e', 'coenzyme q', 'ubiquinone',
-                               'squalane', 'retinol', 'retinal'],
-        'Sensitive Skin':  ['tamanu', 'calophyllum', 'chamomile', 'calendula', 'allantoin',
-                            'bisabolol', 'centella', 'madecassoside', 'aloe', 'squalane',
-                            'jojoba', 'sea buckthorn'],
-        'Acne & Oily Skin': ['squalane', 'jojoba', 'hemp seed', 'rosehip', 'safflower',
-                              'tea tree', 'neem', 'salicylic', 'kalonji', 'nigella'],
-        'Uneven Texture':  ['rosehip', 'sea buckthorn', 'bakuchiol', 'turmeric', 'curcuma',
-                            'ellagic', 'pomegranate', 'ferulic'],
-        'UV Damage':       ['turmeric', 'curcuma', 'ferulic', 'tocopherol', 'vitamin e',
-                            'sea buckthorn', 'astaxanthin', 'resveratrol', 'green tea'],
-        'Large Pores':     ['jojoba', 'squalane', 'hemp seed', 'tea tree', 'neem',
-                            'rosehip', 'vitamin c'],
+        'Hydration': [
+            # Common names
+            'squalane', 'jojoba', 'sesame', 'almond', 'avocado', 'ceramide',
+            'hyaluronic', 'glycerin', 'panthenol', 'olive', 'argan',
+            # INCI botanical names
+            'caprylic capric', 'triglyceride',     # CCT is a great emollient
+            'argania spinosa',                      # Argan INCI
+            'simmondsia chinensis',                 # Jojoba INCI
+            'olea europaea',                        # Olive INCI
+            'rosa canina', 'rosehip',               # Rosehip — hydrating
+            'passiflora edulis',                    # Passion fruit
+            'juglans regia',                        # Walnut
+        ],
+        'Barrier Repair': [
+            'squalane', 'ceramide', 'cholesterol', 'rosehip', 'evening primrose',
+            'hemp seed', 'linoleic', 'fatty acid', 'tamanu', 'argan', 'olive',
+            'caprylic capric', 'triglyceride',
+            'rosa canina', 'passiflora edulis', 'juglans regia',
+        ],
+        'Dullness': [
+            # Common + INCI names for brightening botanicals
+            'saffron', 'crocus sativus', 'kumkuma',
+            'turmeric', 'curcuma',
+            'licorice', 'glycyrrhiza',
+            'rosehip', 'rosa canina',               # Rosehip — Vit C brightening
+            'sea buckthorn', 'hippophae',
+            'vitamin c', 'ascorbic',
+            'carrot', 'carota sativa', 'daucus',    # Carrot — brightening
+            'sandalwood', 'santalum',
+            'rubia cordifolia',                     # Manjistha
+            'pterocarpus',                          # Red Sandalwood
+            'gold leaf', 'colloidal gold',
+            'neroli', 'aurantium amara',
+        ],
+        'Pigmentation': [
+            'saffron', 'crocus sativus', 'turmeric', 'curcuma',
+            'licorice', 'glycyrrhiza',
+            'kojic', 'arbutin',
+            'rubia cordifolia', 'manjistha',
+            'sandalwood', 'pterocarpus', 'santalum',
+            'ellagic', 'pomegranate', 'punica',
+            'rosehip', 'rosa canina',               # Rosehip — skin tone
+            'carrot', 'carota sativa',              # Beta-carotene
+            'gold leaf',
+        ],
+        'Aging & Fine Lines': [
+            'bakuchiol', 'rosehip', 'rosa canina',
+            'sea buckthorn', 'hippophae',
+            'argan', 'argania', 'marula', 'sclerocarya',
+            'ferulic', 'tocopherol', 'vitamin e',
+            'coenzyme q', 'ubiquinone',
+            'squalane', 'retinol', 'retinal',
+            'neroli', 'aurantium amara',            # Neroli — anti-aging
+            'gold leaf',                            # Gold — anti-aging claims
+        ],
+        'Sensitive Skin': [
+            'tamanu', 'calophyllum', 'chamomile', 'calendula',
+            'allantoin', 'bisabolol', 'centella', 'madecassoside',
+            'aloe', 'squalane', 'jojoba', 'sea buckthorn',
+            'simmondsia chinensis', 'argania spinosa',
+            'carota sativa',                        # Carrot — soothing
+        ],
+        'Acne & Oily Skin': [
+            'squalane', 'jojoba', 'simmondsia chinensis',
+            'hemp seed', 'rosehip', 'rosa canina', 'safflower',
+            'tea tree', 'neem', 'salicylic',
+            'kalonji', 'nigella', 'passiflora edulis',
+        ],
+        'Uneven Texture': [
+            'rosehip', 'rosa canina', 'sea buckthorn',
+            'bakuchiol', 'turmeric', 'curcuma',
+            'ellagic', 'pomegranate', 'ferulic',
+            'carrot', 'carota sativa',
+        ],
+        'UV Damage': [
+            'turmeric', 'curcuma', 'ferulic', 'tocopherol', 'vitamin e',
+            'sea buckthorn', 'astaxanthin', 'resveratrol', 'green tea',
+            'carrot', 'carota sativa',              # Beta-carotene photoprotection
+        ],
+        'Large Pores': [
+            'jojoba', 'simmondsia chinensis', 'squalane',
+            'hemp seed', 'rosehip', 'rosa canina',
+            'tea tree', 'neem', 'vitamin c', 'ascorbic',
+        ],
+        'Dry Skin': [
+            # Rich, occlusive and deeply nourishing oils
+            'squalane', 'argan', 'argania', 'marula', 'sclerocarya',
+            'avocado', 'persea', 'sweet almond', 'prunus amygdalus',
+            'macadamia', 'olive', 'olea europaea',
+            'shea', 'butyrospermum', 'rosehip', 'rosa canina',
+            'sea buckthorn', 'hippophae',
+            'sesame', 'sesamum indicum',
+            'caprylic capric', 'triglyceride',
+            'ceramide', 'cholesterol', 'linoleic', 'palmitic', 'stearic',
+            'tocopherol', 'panthenol',
+        ],
     }
 
     # Ayurvedic hero indicator
@@ -2543,7 +2671,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         ]
 
         # Is this a hydration-type concern? Used for floor + comp_b boost + messaging.
-        is_hydration = concern.lower() in {"hydration", "barrier repair", "dryness"}
+        is_hydration = concern.lower() in {"hydration", "barrier repair", "dryness", "dry skin"}
 
         # --- Component A: Effective Active Strength (0-50%) ---
         # For each relevant active: Evidence_Factor × Concentration_Factor × Synergy_Factor
@@ -2779,7 +2907,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
     return {'concerns': results, 'am_pm': am_pm}
 
 
-def calculate_skin_type_compatibility(ingredient_list, skin_type):
+def calculate_skin_type_compatibility(ingredient_list, skin_type, category='serum'):
     skin_type = skin_type.lower()
     base_score = 100  # All skin types start at 100 per spec
     score = base_score
@@ -2977,9 +3105,20 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
             if 'fragrance' in ing_lower or 'parfum' in ing_lower:
                 score -= 10
                 penalty.append(f"{ing} (Fragrance)")
+                why_bullets.append(f"Warning: {ing} may irritate sensitive T-zone areas")
             if 'alcohol denat' in ing_lower or 'sd alcohol' in ing_lower or 'isopropyl alcohol' in ing_lower:
                 score -= 15
                 penalty.append(f"{ing} (Drying)")
+                why_bullets.append(f"Warning: {ing} can dry out already-dry cheek areas")
+            # Essential oils — mild penalty for combination skin (can sensitise T-zone)
+            if ('essential oil' in ing_lower or 'orange peel' in ing_lower
+                    or 'lemon peel' in ing_lower or 'lime peel' in ing_lower
+                    or 'neroli oil' in ing_lower or 'aurantium amara flower oil' in ing_lower
+                    or ('oil' in ing_lower and any(k in ing_lower for k in
+                        ['peel','zest','rind','citrus','bergamot','eucalyptus','peppermint']))):
+                score -= 3
+                penalty.append(f"{ing} (Essential oil — mild sensitisation risk)")
+                why_bullets.append(f"{ing} — essential oils can sensitise reactive skin zones")
             if data:
                 func_cat_d = str(data.get('Functional_Category', '')).lower()
                 pb_d = str(data.get('Primary_Benefits', '')).lower()
@@ -2987,6 +3126,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                 if ing_lower in data_loader.role_sets.get('occlusive', set()):
                     score -= 8
                     penalty.append(f"{ing} (Occlusive — may clog T-zone)")
+                    why_bullets.append(f"Warning: {ing} is occlusive and may clog pores in the T-zone")
                 # DB-driven balancing/sebum-control bonus
                 if (ing_lower in data_loader.role_sets.get('anti_acne', set())
                         or 'anti-acne' in func_cat_d or 'sebum' in pb_d or 'balancing' in pb_d):
@@ -3004,6 +3144,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
                 if any(kw in ing_lower for kw in ['cocos nucifera', 'coconut oil']):
                     score -= 8
                     penalty.append(f"{ing} (Heavy oil)")
+                    why_bullets.append(f"Warning: {ing} may clog pores in the T-zone")
 
             # NOTE: has_oil_ctrl / has_hydrating appended post-loop to avoid compounding
             look_for_suggestions = ["Look for lightweight formulas with Niacinamide + Hyaluronic Acid for balanced care."]
@@ -3035,6 +3176,36 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type):
             why_bullets.append("Good balance of oil control and hydration")
 
     score = max(0, min(97, score))  # Cap at 97 — 100% is never scientifically credible
+
+    # ── Category-aware look_for override ─────────────────────────────────────
+    # Replace generic serum/moisturizer advice with relevant tip for the product type
+    cat_lower_compat = (category or 'serum').lower()
+    if cat_lower_compat in ('facial oil', 'oil'):
+        if skin_type == 'oily':
+            look_for_suggestions = [
+                "For oily skin, choose oils high in Linoleic Acid (Rosehip, Jojoba, Squalane) "
+                "which regulate sebum. Avoid Coconut or Cocoa Butter. Layer under moisturiser at night."
+            ]
+        elif skin_type == 'dry':
+            look_for_suggestions = [
+                "For dry skin, choose oils rich in Oleic Acid (Argan, Marula, Avocado) for deep nourishment. "
+                "Apply to damp skin before moisturiser to lock in hydration."
+            ]
+        elif skin_type == 'sensitive':
+            look_for_suggestions = [
+                "For sensitive skin, choose fragrance-free, cold-pressed oils (Squalane, Jojoba, Rosehip). "
+                "Avoid essential oils and citrus oils which can cause photosensitisation."
+            ]
+        elif skin_type == 'combination':
+            look_for_suggestions = [
+                "For combination skin, use lightweight, non-comedogenic oils (Jojoba, Squalane, Rosehip). "
+                "Apply only to dry zones or use as a booster mixed into moisturiser."
+            ]
+        else:
+            look_for_suggestions = [
+                "Facial oils work best applied after water-based products (toner/serum) and before sunscreen. "
+                "For AM use, choose lightweight oils like Squalane or Jojoba."
+            ]
 
     # Compute net penalty for risk_level
     net_penalty = base_score - score
@@ -3118,6 +3289,8 @@ def get_upgrade_suggestions(ingredient_list, concerns):
             'barrier': [{'upgrade': 'Ceramide + Cholesterol Moisturizer', 'reason': 'Mimics skin lipid structure for optimal barrier restoration', 'active': 'Ceramides'}],
             'sensitive': [{'upgrade': 'Centella Asiatica Serum', 'reason': 'Clinically proven to calm inflammation and strengthen skin', 'active': 'Centella Asiatica'}],
             'hydration': [{'upgrade': 'Multi-weight Hyaluronic Acid Serum', 'reason': 'Multiple molecular weights for deep and surface hydration', 'active': 'Hyaluronic Acid'}],
+            'dry skin': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'active': 'Ceramides + Petrolatum'}],
+            'dry': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'active': 'Ceramides + Petrolatum'}],
             'pores': [{'upgrade': 'Niacinamide 10% + Zinc PCA', 'reason': 'Tightens pores and regulates sebum production', 'active': 'Niacinamide'}],
             'dullness': [{'upgrade': 'Vitamin C 15% Serum', 'reason': 'Potent antioxidant that boosts radiance and evens skin tone', 'active': 'Vitamin C'}],
             'texture': [{'upgrade': 'AHA/BHA Chemical Exfoliant', 'reason': 'Removes dead cells and promotes smooth, refined texture', 'active': 'Glycolic Acid'}],
@@ -3183,7 +3356,8 @@ def analyze_product(product_data):
 
     skin_compat = calculate_skin_type_compatibility(
         ingredient_list,
-        product_data.get("skin_type", "normal")
+        product_data.get("skin_type", "normal"),
+        category=product_data.get("category", "serum")
     )
 
     upgrade_suggestions = get_upgrade_suggestions(

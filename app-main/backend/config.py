@@ -202,6 +202,9 @@ WORSENING_INGREDIENTS = {
     'Barrier Repair':   [('sodium lauryl sulfate', -10), ('alcohol denat', -10), ('fragrance', -8), ('parfum', -8)],
     'Pigmentation':     [('limonene', -5), ('linalool', -5), ('fragrance', -5), ('bergamot', -8)],
     'Hydration':        [('alcohol denat', -10), ('sd alcohol', -10), ('isopropyl alcohol', -8)],
+    'Dry Skin':         [('alcohol denat', -15), ('sd alcohol', -15), ('isopropyl alcohol', -12),
+                         ('sodium lauryl sulfate', -10), ('sodium laureth sulfate', -8),
+                         ('fragrance', -5), ('parfum', -5), ('salicylic acid', -5)],
     # Previously missing - now added
     'Aging & Fine Lines': [('fragrance', -8), ('parfum', -8), ('alcohol denat', -8), ('sd alcohol', -8), ('limonene', -5), ('linalool', -5)],
     'Large Pores':        [('isopropyl myristate', -10), ('coconut oil', -8), ('cocos nucifera', -8), ('fragrance', -5)],

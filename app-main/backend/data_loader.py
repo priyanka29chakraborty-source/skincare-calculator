@@ -14,6 +14,7 @@ CONCERN_TAG_MAP = {
     'Barrier Repair': ['barrier', 'impaired skin barrier', 'barrier damage', 'barrier weakness'],
     'Sensitive Skin': ['sensitive', 'redness', 'rosacea', 'irritation', 'soothing', 'irritated skin'],
     'Hydration': ['dehydration', 'dehydrated skin', 'hydration', 'dryness', 'dry skin', 'dry', 'severely dry skin'],
+    'Dry Skin': ['dry skin', 'dryness', 'severely dry skin', 'xerosis', 'flaking', 'flakiness', 'tight skin', 'rough skin', 'dry', 'dehydrated'],
     'Large Pores': ['enlarged pores', 'oily skin'],
     'Dullness': ['dullness', 'dull skin', 'radiance'],
     'Uneven Texture': ['texture', 'exfoliation', 'kp', 'texture improvement'],
@@ -49,6 +50,17 @@ CONCERNS_MAP = {
         'Panthenol', 'Allantoin', 'Ceramide NP', 'Ceramide AP', 'Ceramides',
     ],
     'Hydration':         ['Sodium Hyaluronate', 'Glycerin', 'Panthenol', 'Sodium PCA', 'Urea'],
+    'Dry Skin': [
+        # Occlusive sealants — lock in moisture
+        'Petrolatum', 'Shea Butter', 'Dimethicone', 'Beeswax',
+        # Emollients — soften and smooth
+        'Squalane', 'Caprylic/Capric Triglyceride', 'Cetearyl Alcohol', 'Glyceryl Stearate',
+        # Humectants — draw water into skin
+        'Sodium Hyaluronate', 'Glycerin', 'Urea', 'Sodium PCA', 'Panthenol',
+        # Barrier lipids — replenish skin's lipid matrix
+        'Ceramide NP', 'Ceramide AP', 'Ceramide EOP', 'Cholesterol', 'Linoleic Acid',
+        'Palmitic Acid', 'Stearic Acid',
+    ],
     'Large Pores':       ['Niacinamide', 'Salicylic Acid', 'Retinol', 'Glycolic Acid'],
     'Dullness':          [
         'Ascorbic Acid', 'Niacinamide', 'Glycolic Acid',
@@ -74,6 +86,7 @@ CONCERN_INCI_PREFIXES = {
     'Sensitive Skin':     ['Ceramide', 'Centella Asiatica', 'Madecass'],
     'Dark Circles':       ['Palmitoyl', 'Acetyl Tetrapeptide'],
     'Puffiness':          ['Acetyl Tetrapeptide', 'Centella Asiatica'],
+    'Dry Skin':           ['Ceramide'],
 }
 
 _INGREDIENT_ALIASES = {
@@ -143,10 +156,10 @@ class DataLoader:
         self.load_data()
 
     def load_data(self):
-        # ── ingredient_database_fixed4.csv — latest database with Activity_Tier_Weight,
+        # ── ingredient_database_fixed5.csv — latest database with Activity_Tier_Weight,
         # Mechanism_of_Action, MW_Daltons, Synergistic_Ingredients, Aliases, Ayurvedic oils ────
         try:
-            db_path = os.path.join(self.database_path, 'ingredient_database_fixed4.csv')
+            db_path = os.path.join(self.database_path, 'ingredient_database_fixed5.csv')
             db = pd.read_csv(db_path, encoding='utf-8-sig')
             db.columns = db.columns.str.strip()
             self.ingredient_master = db
@@ -198,7 +211,7 @@ class DataLoader:
                         if alias and alias.lower() not in self.ingredient_lookup:
                             self.ingredient_lookup[alias.lower()] = row_dict
 
-            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed4.csv")
+            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed5.csv")
 
             # Load aliases.json extra mappings
             try:

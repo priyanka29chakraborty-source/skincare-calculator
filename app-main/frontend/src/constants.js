@@ -6,6 +6,7 @@ export const CONCERNS_LIST = [
   { key: "Pigmentation", desc: "Dark spots, tone", icon: "fa-solid fa-circle-half-stroke" },
   { key: "Aging & Fine Lines", desc: "Wrinkles, firmness", icon: "fa-solid fa-hourglass-half" },
   { key: "Barrier Repair", desc: "Dryness, flakiness", icon: "fa-solid fa-shield-halved" },
+  { key: "Dry Skin", desc: "Tight, rough, flaky", icon: "fa-solid fa-droplet-slash" },
   { key: "Sensitive Skin", desc: "Redness, reactive", icon: "fa-solid fa-hand-holding-heart" },
   { key: "Hydration", desc: "Tightness, dull", icon: "fa-solid fa-tint" },
   { key: "Large Pores", desc: "Visible, texture", icon: "fa-solid fa-magnifying-glass" },
