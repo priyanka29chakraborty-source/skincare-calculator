@@ -33,7 +33,7 @@ function MoATooltip({ text }) {
         <span style={{
           position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)',
           background: '#1e1a2e', color: '#e8e0ff', fontSize: '0.7rem', borderRadius: '8px',
-          padding: '6px 10px', whiteSpace: 'nowrap', maxWidth: '220px', whiteSpace: 'normal',
+          padding: '6px 10px', maxWidth: '220px', whiteSpace: 'normal',
           zIndex: 100, lineHeight: '1.4', boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           pointerEvents: 'none',
         }}>

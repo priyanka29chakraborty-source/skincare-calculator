@@ -64,6 +64,7 @@ CONCERNS_MAP = {
     'Large Pores':       ['Niacinamide', 'Salicylic Acid', 'Retinol', 'Glycolic Acid'],
     'Dullness':          [
         'Ascorbic Acid', 'Niacinamide', 'Glycolic Acid',
+        'Glutathione', 'Galactomyces Ferment Filtrate',
         'Glycyrrhiza Glabra Root Extract', 'Dipotassium Glycyrrhizate',
         'Glycyrrhiza Inflata Root Extract', 'Licorice Root', 'Licorice Extract',
     ],
@@ -338,7 +339,7 @@ class DataLoader:
             for name in top_db_names:
                 if name not in merged:
                     merged.append(name)
-            self.concern_actives[concern] = merged[:8]
+            self.concern_actives[concern] = merged[:10]
             extra_actives = [name for name, _ in db_actives[8:]]
             self.concern_supporters[concern] = list(set(supporters + extra_actives))
             logger.info(f"  {concern}: {len(self.concern_actives[concern])} ideal actives")

@@ -20,10 +20,6 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
 
   // ── Upgrade suggestion label: oils get "Complement" not "Add-On" ────────────
   const upgradeLabel = isFacialOil ? 'Pair With:' : 'Add-On:';
-  const upgradeNote = isFacialOil
-    ? 'Use this alongside your facial oil in your routine for targeted results.'
-    : 'Consider as an add-on serum for {concern}, not a replacement for your current product.';
-
   if (!hasWeakConcerns) return (
     <div className="sc-card result-card card-4" data-testid="card-alternatives-great" style={{ "--anim-delay": "0.45s" }}>
       <h2 className="card-title"><i className={cardIcon}></i> {cardTitle}</h2>

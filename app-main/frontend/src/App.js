@@ -105,7 +105,8 @@ function App() {
         fetch_type: fetchTypeValue,
         product_name: productName || '',
         brand: brand || '',
-        active_concentrations: activeConcentrations || {}
+        active_concentrations: activeConcentrations || {},
+        size_defaulted: !size.trim()
       });
       setResult(data);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
@@ -117,7 +118,7 @@ function App() {
     } catch (e) { setError(e.response?.data?.error || "Analysis failed"); }
     finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, activeConcentrations, fetchAlts, fetchBestPrice]);
+ }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, brand, activeConcentrations, fetchAlts, fetchBestPrice]);
 
   // Input debouncing - clear error after typing
   useEffect(() => {

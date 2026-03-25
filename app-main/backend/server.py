@@ -45,11 +45,11 @@ _CACHE_TTL = 3600  # 1 hour
 def _make_cache_key(data: dict) -> str:
     """Create a stable cache key from request fields."""
     key_str = "|".join([
-        str(data.get('url', '')),
         str(data.get('ingredients', ''))[:200],
         str(data.get('product_name', '')),
         str(data.get('price', '')),
         str(data.get('size_ml', '')),
+        str(data.get('category', '')),
         ",".join(sorted(data.get('concerns', []))),
         str(data.get('skin_type', '')),
         str(data.get('country', '')),
@@ -65,10 +65,11 @@ def _cache_get(key: str):
     return None
 
 def _cache_set(key: str, data: dict):
-    # Evict oldest if cache too large
+    # Evict oldest 50 entries if cache too large
     if len(_CACHE) > 500:
-        oldest = min(_CACHE.items(), key=lambda x: x[1]['ts'])
-        del _CACHE[oldest[0]]
+        sorted_keys = sorted(_CACHE.items(), key=lambda x: x[1]['ts'])
+        for old_key, _ in sorted_keys[:50]:
+            del _CACHE[old_key]
     _CACHE[key] = {'data': data, 'ts': time.time()}
 
 
@@ -116,6 +117,7 @@ class AnalyzeRequest(BaseModel):
     url_provided: Optional[bool] = False
     fetch_type: Optional[str] = None  # "url" | "barcode" | "manual" — set by frontend
     active_concentrations: Optional[dict] = None  # scraped from product page
+    size_defaulted: Optional[bool] = False  # True when frontend had no size and assumed 30ml
 
 
 class FetchProductRequest(BaseModel):
@@ -177,7 +179,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
         import time as _time
         t0 = _time.time()
         size_ml = req.size_ml if req.size_ml is not None else req.size
-        concerns = req.skin_concerns if req.skin_concerns else (req.concerns or [])
+        concerns = req.skin_concerns if req.skin_concerns is not None else (req.concerns or [])
         product_data = {
             'ingredients': ingredients,
             'price': req.price,
@@ -200,6 +202,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
         result = analyze_product(product_data)
         elapsed = round((_time.time() - t0) * 1000)
+
 
         # Determine fetch_type: explicit value from request takes priority, then
         # infer from url_provided. Default is 'manual'.
@@ -241,8 +244,15 @@ async def analyze(req: AnalyzeRequest, request: Request):
                      is_flagged=is_flagged,
                      flag_reason=flag_reason)
 
-        # Store in cache
+        # Store in cache (always store clean result without per-request notes)
         _cache_set(cache_key, result)
+
+        # Inject size_defaulted note AFTER caching so it never contaminates cached result
+        if req.size_defaulted and not result.get('price_analysis', {}).get('price_note'):
+            result['price_analysis']['price_note'] = (
+                'Size not entered — price per ml estimated using 30ml default. '
+                'Enter the actual size for accurate value analysis.'
+            )
         return result
     except Exception as e:
         import traceback
@@ -787,11 +797,15 @@ def _is_same_product(result_title, brand, product_name, size_ml):
             return False
 
     # Size match within 5ml/g tolerance
+    # Also handles oz and fl oz by converting to ml (1 oz ≈ 29.5735 ml)
     if size_ml:
-        size_matches = re.findall(r'(\d+\.?\d*)\s*(ml|g)', title_lower)
+        size_matches = re.findall(r'(\d+\.?\d*)\s*(fl\.?\s*oz|oz|ml|g)\b', title_lower)
         if size_matches:
             for val_str, unit in size_matches:
                 val = float(val_str)
+                unit_clean = re.sub(r'\s+', '', unit)  # "fl oz" → "floz"
+                if unit_clean in ('oz', 'floz', 'fl.oz'):
+                    val = val * 29.5735  # convert to ml
                 if abs(val - size_ml) <= 5:
                     return True
             return False  # sizes present but none matched
@@ -848,7 +862,17 @@ async def best_price(req: BestPriceRequest, request: Request):
         if serp_key:
             serp_query = f"{query} {size_query}"
             serp_results = _serp_shopping_search(serp_query, req.country, serp_key, num=12)
-            seen_sources = {v['source'].lower() for v in validated}
+            # Normalize DDG domains and SerpAPI brand names to a bare keyword for comparison
+            # e.g. "amazon.in"→"amazon", "amazon.co.uk"→"amazon", "Amazon"→"amazon"
+            def _source_key(s):
+                s = s.lower().strip()
+                if '.' not in s:
+                    return s  # plain brand name like "Amazon", "Nykaa"
+                parts = s.split('.')
+                if parts[0] == 'www' and len(parts) > 1:
+                    parts = parts[1:]
+                return parts[0]  # "amazon" from "amazon.co.uk" or "amazon.com"
+            seen_source_keys = {_source_key(v['source']) for v in validated}
             for item in serp_results:
                 if len(validated) >= 3:
                     break
@@ -856,12 +880,12 @@ async def best_price(req: BestPriceRequest, request: Request):
                 if not extracted_price or not isinstance(extracted_price, (int, float)):
                     continue
                 source = item.get('source', '')
-                if source.lower() in seen_sources:
+                if _source_key(source) in seen_source_keys:
                     continue
                 title = item.get('name', '')
                 if not _is_same_product(title, req.brand, req.product_name, req.size_ml):
                     continue
-                seen_sources.add(source.lower())
+                seen_source_keys.add(_source_key(source))
                 validated.append({
                     'name': title,
                     'price': extracted_price,
@@ -895,9 +919,10 @@ async def best_price(req: BestPriceRequest, request: Request):
     cheapest = validated[0]
     cheapest_price = float(cheapest['price'])
 
-    # Annotate savings per item vs user price
+    # Annotate savings per item vs user price, and clean up float prices (1899.0 → 1899)
     for item in validated:
         item_price = float(item['price'])
+        item['price'] = int(item_price) if item_price == int(item_price) else round(item_price, 2)
         item['savings'] = round(user_price - item_price, 2) if user_price > 0 else 0
 
     if user_price > 0 and user_price <= cheapest_price:

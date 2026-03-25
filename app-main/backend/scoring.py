@@ -89,7 +89,9 @@ def parse_ingredients(ingredient_list_str):
     seen = set()
 
     _UI_TAILS = re.compile(
-        r'\s*(read\s*more|show\s*more|view\s*more|see\s*more|load\s*more)\s*$',
+        r'\s*(read\s*more|show\s*more|view\s*more|see\s*more|load\s*more'  # noqa: E501
+        r'|info\s+importer|manufactured\s+by|distributed\s+by|marketed\s+by|imported\s+by)'
+        r'.*$',
         re.IGNORECASE
     )
     _MARKETING_VERBS = re.compile(
@@ -2883,7 +2885,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         else:
             explanation.append("Contains ingredients that may worsen condition")
         if missing_actives:
-            explanation.append(f"Missing: {', '.join(missing_actives[:2])}")
+            explanation.append(f"Key actives not found: {', '.join(missing_actives[:2])}")
 
         # Supporting ingredient display
         present_supporters = [info['inci'] for ing, info in product_inci_map.items()
@@ -2895,7 +2897,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             'missing_actives': missing_actives[:3],
             'supporting_ingredients': present_supporters[:4],
             'explanation': explanation[:4],
-            'advisory': f"Ingredients like {', '.join(missing_actives[:2])} may further improve {concern.lower()} targeting." if missing_actives else "Good active coverage for this concern",
+            'advisory': (f"Great formula. For even faster {concern.lower()} results, consider adding {missing_actives[0]}" + (f" or {missing_actives[1]}" if len(missing_actives) > 1 else "") + " to your routine.") if missing_actives else "Great active coverage for this concern.",
             'synergy_bonus': comp_c,
         }
 
@@ -3241,6 +3243,16 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
     # Generate formulation notes
     formulation_notes = detect_formulation_notes(ingredient_list)
 
+    # Deduplicate helpful_ingredients by ingredient name before returning
+    # so "Glycerin (hydration)" and "Glycerin (hydrating)" collapse to one entry
+    _seen_ing_names = set()
+    _deduped_helpful = []
+    for _h in helpful_ingredients:
+        _base = _h.split('(')[0].strip().lower()
+        if _base not in _seen_ing_names:
+            _seen_ing_names.add(_base)
+            _deduped_helpful.append(_h)
+
     return {
         'score': score,
         'base_texture_score': base_texture_score,
@@ -3251,7 +3263,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
         'comedogenic_warnings': list({w['name']: w for w in comedogenic_warnings}.values()),
         'allergen_warnings': list({w['name']: w for w in allergen_warnings}.values()),
         'why_bullets': list(dict.fromkeys(why_bullets))[:3],
-        'helpful_ingredients': helpful_ingredients[:4],
+        'helpful_ingredients': _deduped_helpful[:4],
         'look_for': look_for_suggestions,
         'formulation_notes': formulation_notes,
     }
