@@ -506,7 +506,7 @@ function FacialOilHeadlineStats({ result }) {
       </div>
       <div className="pg-box pg-bot">
         <div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div>
-        <div className="pg-lbl">value index</div>
+        <div className="pg-lbl">price premium</div>
       </div>
       <div className="pg-box pg-bot">
         <div className="pg-val" style={{ color: aoxColor, fontSize: '0.75rem' }}>{aoxLabel}</div>
@@ -568,6 +568,10 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
   const isMoisturizer = cat === 'moisturizer';
   const isFacialOil   = cat === 'facial oil' || cat === 'oil';
   const isTreatment   = cat === 'treatment';
+  const isSerum       = cat === 'serum';
+  const isToner       = cat === 'toner';
+  const isMask        = cat === 'mask';
+  const isEyeCream    = cat === 'eye cream';
 
   const valueChip = getValueChip(result.price_analysis?.value_tier, result.price_analysis?.ratio);
 
@@ -576,10 +580,27 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       {/* CARD 1: MAIN WORTH SCORE */}
       <div className="sc-card result-card card-1" data-testid="card-main-worth" style={{ "--anim-delay": "0s" }}>
         <h2 className="card-title">
-          <i className={`fa-solid ${isFacialOil ? 'fa-droplet' : isCleanser ? 'fa-soap' : isMoisturizer ? 'fa-shield-halved' : 'fa-chart-line'}`}></i>
-          {isFacialOil ? ' Lipid Excellence Index'
-            : isCleanser ? ' Barrier Preservation Score'
+          <i className={`fa-solid ${
+            isFacialOil   ? 'fa-droplet' :
+            isCleanser    ? 'fa-soap' :
+            isMoisturizer ? 'fa-shield-halved' :
+            isSunscreen   ? 'fa-sun' :
+            isTreatment   ? 'fa-flask-vial' :
+            isSerum       ? 'fa-chart-line' :
+            isToner       ? 'fa-tint' :
+            isMask        ? 'fa-spa' :
+            isEyeCream    ? 'fa-eye' :
+            'fa-chart-line'
+          }`}></i>
+          {isFacialOil  ? ' Lipid Excellence Index'
+            : isCleanser    ? ' Barrier Preservation Score'
             : isMoisturizer ? ' Barrier Recovery Index'
+            : isSunscreen   ? ' UV Protection Score'
+            : isTreatment   ? ' Treatment Potency Score'
+            : isSerum       ? ' Active Strength Index'
+            : isToner       ? ' Formula Function Score'
+            : isMask        ? ' Instant Effect Index'
+            : isEyeCream    ? ' Eye Care Score'
             : ' Main Worth Score'}
         </h2>
 
@@ -657,7 +678,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         <div className={"breakdown" + (showBreakdown ? " open" : "")} data-testid="breakdown-details">
           {/* Cleanser relabels first bar to "Skin Barrier Safety Score" */}
           <BreakdownRow icon="fa-solid fa-chart-bar"
-            label={isCleanser ? "Skin Barrier Safety Score" : "Active Ingredients (What's Inside)"}
+            label={isCleanser ? "Skin Barrier Safety Score" : isFacialOil ? "Botanical Actives (What's Inside)" : "Active Ingredients (What's Inside)"}
             score={result.component_scores?.A} max={45} details={result.component_details?.A} />
           <BreakdownRow icon="fa-solid fa-flask" label="Formula Quality (How Well Made)" score={result.component_scores?.B} max={20} details={result.component_details?.B} />
           <BreakdownRow icon="fa-solid fa-check-circle" label="Claims vs Reality (Honesty Score)" score={result.component_scores?.C} max={15} details={result.component_details?.C} />

@@ -1039,6 +1039,12 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
                              'helianthus annuus',      # Sunflower — linoleic-rich
                              'daucus carota',          # Carrot seed oil
                              'beta-carotene','carotene']))
+    # 3-layer lipid detection:
+    # Layer 1: exact DB match (OLEIC_OILS / LINOLEIC_OILS sets above)
+    # Layer 2: pattern-match — 'oil', 'taila' (Sanskrit for oil), 'thailam'
+    # Layer 3: botanical extracts with known lipid fraction (partial credit via carrier_count)
+    _OIL_PATTERNS = ['oil', 'taila', 'thailam', 'tailam', 'fat', 'butter', 'wax', 'ester', 'lipid']
+
     oleic_count = sum(1 for i in ing_lower_list if i in OLEIC_OILS or
                       any(kw in i for kw in ['avocado','macadamia','almond','argan',
                           'marula','olive','apricot','moringa','jojoba',
@@ -1050,13 +1056,21 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
                           'elettaria','cardamom',      # Cardamom seed oil
                           'zingiber','ginger',         # Ginger root oil
                           'citrus aurantium','bergamot',  # Bergamot
-                          'centella asiatica']))
+                          'centella asiatica',
+                          # Layer 2: taila/oil pattern (Ayurvedic naming)
+                          'taila','thailam','tailam']))
     comedogenic_penalty = sum(1 for i in ing_lower_list if i in COMEDOGENIC_OILS or
                                any(kw in i for kw in ['cocos nucifera','coconut oil',
                                    'cocoa butter','theobroma cacao']))
-    # Carrier oils count toward oil diversity but not fatty acid scoring
+    # Carrier oils + traditional oil bases (taila) count toward oil diversity
     carrier_count = sum(1 for i in ing_lower_list if i in CARRIER_OILS or
-                        'caprylic capric' in i or 'triglyceride' in i)
+                        'caprylic capric' in i or 'triglyceride' in i or
+                        # Layer 2: catch any unrecognised 'oil'/'taila' term
+                        any(kw in i for kw in _OIL_PATTERNS)
+                        if not any(kw in i for kw in ['avocado','macadamia','almond','argan',
+                                   'marula','olive','apricot','moringa','jojoba',
+                                   'sesamum','sesame','rosehip','safflower','sunflower',
+                                   'helianthus','daucus','glycine soja']))
 
     # Skin-type pivot: award points for the right fatty acid profile
     if skin_type_lower in ('oily', 'combination', 'acne-prone'):
@@ -1609,7 +1623,11 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 d = min(3.0 - _alc_ded, 3.0); safety_score -= d; _alc_ded += d
                 safety_details.append(f"Contains denatured alcohol ({ing})")
         if ('essential oil' in il or 'limonene' in il or 'linalool' in il) and _allergen_ded < 4:
-            d = min(2.0, 4.0 - _allergen_ded); safety_score -= d; _allergen_ded += d
+            # Contextual exposure: in a facial oil blend, essential oils are diluted in carrier
+            # Exposure factor 0.5 for facial oil — halves the penalty vs a serum/cream
+            _exposure_factor = 0.5 if cat_lower in ('facial oil', 'oil') else 1.0
+            d = min(2.0 * _exposure_factor, 4.0 - _allergen_ded)
+            safety_score -= d; _allergen_ded += d
             safety_details.append(f"Contains potential allergen ({ing})")
         if data:
             irr = str(data.get('Irritation_Risk','')).lower()
@@ -2517,6 +2535,12 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
             'squalane', 'retinol', 'retinal',
             'neroli', 'aurantium amara',            # Neroli — anti-aging
             'gold leaf',                            # Gold — anti-aging claims
+            # Ayurvedic dual-map: traditional anti-aging botanicals
+            'crocus sativus', 'saffron', 'kumkuma',  # Kesar — anti-aging + brightening
+            'nelumbo nucifera', 'padma', 'padmakesara',  # Lotus — skin renewal
+            'santalum', 'sandalwood', 'chandana',    # Sandalwood — anti-aging
+            'prunus cerasoides', 'padmaka',          # Wild Himalayan Cherry
+            'ficus bengalensis',                     # Banyan — firming
         ],
         'Sensitive Skin': [
             'tamanu', 'calophyllum', 'chamomile', 'calendula',
@@ -2541,6 +2565,23 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
             'turmeric', 'curcuma', 'ferulic', 'tocopherol', 'vitamin e',
             'sea buckthorn', 'astaxanthin', 'resveratrol', 'green tea',
             'carrot', 'carota sativa',              # Beta-carotene photoprotection
+        ],
+        'Tanning': [
+            # Modern brightening/de-pigmentation actives in oils
+            'saffron', 'crocus sativus', 'kumkuma',
+            'turmeric', 'curcuma',
+            'licorice', 'glycyrrhiza',
+            'rubia cordifolia', 'manjistha',
+            'sandalwood', 'santalum', 'pterocarpus',
+            'rosehip', 'rosa canina',
+            'carrot', 'carota sativa', 'daucus',
+            # Ayurvedic dual-map: traditional de-tan botanicals
+            'caesalpinia sappan', 'patanga',
+            'nelumbo nucifera', 'lotus',
+            'prunus cerasoides', 'padmaka',
+            'lacca laccifera', 'laksha',
+            'coscinium fenestratum', 'kaliya',
+            'monochoria vaginalis', 'neelopala',
         ],
         'Large Pores': [
             'jojoba', 'simmondsia chinensis', 'squalane',
@@ -2580,9 +2621,27 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
         matched = [kw for kw in keywords if kw in ing_str]
         match_count = len(matched)
 
-        # Score: 15 pts per match, max 75. Floor at 30 if oil has any botanical present.
-        raw_score = min(75, match_count * 15)
-        if raw_score == 0 and any(k in ing_str for k in ['oil', 'extract', 'butter', 'seed']):
+        # Dual-weighted scoring: clinical matches (weight 1.0) + Ayurvedic heroes (weight 0.65)
+        # This keeps clinical evidence primary while not zeroing out traditional formulas
+        AYURVEDIC_CONCERN_KEYWORDS = {
+            'Aging & Fine Lines': ['crocus sativus','saffron','nelumbo','santalum','sandalwood',
+                                    'prunus cerasoides','ficus bengalensis','kumkuma'],
+            'Tanning': ['rubia cordifolia','manjistha','caesalpinia','sappan','nelumbo',
+                        'lacca','laksha','coscinium','monochoria','prunus cerasoides'],
+            'Pigmentation': ['rubia cordifolia','crocus sativus','caesalpinia','santalum',
+                             'pterocarpus','nelumbo'],
+            'Dullness': ['crocus sativus','saffron','rubia cordifolia','santalum','sandalwood'],
+        }
+        ayurvedic_kws = AYURVEDIC_CONCERN_KEYWORDS.get(concern, [])
+        ayurvedic_matches = sum(1 for kw in ayurvedic_kws if kw in ing_str)
+
+        # Clinical score (full weight)
+        clinical_score = min(75, match_count * 15)
+        # Traditional score (0.65 weight — traditional use ≠ clinical proof)
+        traditional_score = min(40, ayurvedic_matches * 12) * 0.65
+        raw_score = min(75, clinical_score + traditional_score)
+
+        if raw_score == 0 and any(k in ing_str for k in ['oil', 'extract', 'butter', 'seed', 'taila']):
             raw_score = 20  # generic botanical floor
 
         final = max(0, min(100, raw_score))

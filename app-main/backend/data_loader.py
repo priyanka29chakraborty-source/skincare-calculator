@@ -1,8 +1,9 @@
-import pandas as pd
+import json
 import os
 import re
 import math
 import logging
+import pandas as pd
 from rapidfuzz import process, fuzz
 
 logger = logging.getLogger(__name__)
@@ -51,13 +52,9 @@ CONCERNS_MAP = {
     ],
     'Hydration':         ['Sodium Hyaluronate', 'Glycerin', 'Panthenol', 'Sodium PCA', 'Urea'],
     'Dry Skin': [
-        # Occlusive sealants — lock in moisture
         'Petrolatum', 'Shea Butter', 'Dimethicone', 'Beeswax',
-        # Emollients — soften and smooth
         'Squalane', 'Caprylic/Capric Triglyceride', 'Cetearyl Alcohol', 'Glyceryl Stearate',
-        # Humectants — draw water into skin
         'Sodium Hyaluronate', 'Glycerin', 'Urea', 'Sodium PCA', 'Panthenol',
-        # Barrier lipids — replenish skin's lipid matrix
         'Ceramide NP', 'Ceramide AP', 'Ceramide EOP', 'Cholesterol', 'Linoleic Acid',
         'Palmitic Acid', 'Stearic Acid',
     ],
@@ -130,9 +127,12 @@ _INGREDIENT_FAMILY_MAP = {
 
 
 def _parse_skin_concerns(raw):
+    """Parse Skin_Concerns from a JSON entry (already pre-parsed on load)."""
+    if isinstance(raw, list):
+        return raw
     if isinstance(raw, dict):
         return raw.get('_skin_concerns_parsed', [])
-    if pd.isna(raw) or not raw:
+    if not raw or str(raw).lower() in ('nan', 'none', ''):
         return []
     return [t.strip().lower() for t in str(raw).split(';') if t.strip()]
 
@@ -142,10 +142,13 @@ class DataLoader:
         if database_path is None:
             database_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database')
         self.database_path = database_path
+        # JSON-backed ingredient store — O(1) key lookup
+        self._json_db = {}          # inci_lower -> entry dict
+        self._json_aliases = {}     # alias_lower -> inci_lower
+        # Keep ingredient_master as None (no longer a DataFrame for main DB)
         self.ingredient_master = None
         self.active_upgrade_map = None
-        self.evidence_quality_map = None
-        self.ingredient_lookup = {}
+        self.ingredient_lookup = {}  # unified lookup: inci + aliases
         self.all_inci_names = []
         self.concern_actives = {}
         self.concern_supporters = {}
@@ -158,83 +161,13 @@ class DataLoader:
         self.load_data()
 
     def load_data(self):
-        # ── ingredient_database_fixed5.csv — latest database with Activity_Tier_Weight,
-        # Mechanism_of_Action, MW_Daltons, Synergistic_Ingredients, Aliases, Ayurvedic oils ────
-        try:
-            db_path = os.path.join(self.database_path, 'ingredient_database_fixed5.csv')
-            db = pd.read_csv(db_path, encoding='utf-8-sig')
-            db.columns = db.columns.str.strip()
-            self.ingredient_master = db
-
-            for _, row in db.iterrows():
-                inci = str(row.get('INCI_Name', '')).strip()
-                if not inci or inci == 'nan':
-                    continue
-                row_dict = row.to_dict()
-
-                # Pre-parse Skin_Concerns
-                raw_sc = row_dict.get('Skin_Concerns', '')
-                if pd.isna(raw_sc) or not raw_sc:
-                    row_dict['_skin_concerns_parsed'] = []
-                else:
-                    row_dict['_skin_concerns_parsed'] = [
-                        t.strip().lower() for t in str(raw_sc).split(';') if t.strip()
-                    ]
-
-                # Pre-parse Activity_Tier_Weight (new column: 1.0/0.8/0.5/0.1)
-                atw_raw = row_dict.get('Activity_Tier_Weight', '')
-                try:
-                    row_dict['_activity_tier_weight'] = float(atw_raw) if str(atw_raw).strip() not in ('', 'nan', 'None') else 0.5
-                except (ValueError, TypeError):
-                    row_dict['_activity_tier_weight'] = 0.5
-
-                # Pre-parse MW_Daltons as float where available
-                mw_raw = row_dict.get('MW_Daltons', '')
-                try:
-                    mw_val = float(mw_raw) if str(mw_raw).strip() not in ('', 'nan', 'None') else None
-                    row_dict['_mw_daltons'] = mw_val
-                except (ValueError, TypeError):
-                    row_dict['_mw_daltons'] = None
-
-                # Store MoA from Mechanism_of_Action; fallback to Biological_Action
-                moa = str(row_dict.get('Mechanism_of_Action', '') or '').strip()
-                if not moa or moa.lower() in ('nan', 'none', ''):
-                    moa = str(row_dict.get('Biological_Action', '') or '').strip()
-                row_dict['_moa'] = moa if moa and moa.lower() not in ('nan', 'none') else None
-
-                self.ingredient_lookup[inci.lower()] = row_dict
-                self.all_inci_names.append(inci)
-
-                # Register aliases from Aliases column (semicolon-separated)
-                aliases_col = str(row_dict.get('Aliases', ''))
-                if aliases_col and aliases_col not in ('nan', ''):
-                    for alias in aliases_col.split(';'):
-                        alias = alias.strip()
-                        if alias and alias.lower() not in self.ingredient_lookup:
-                            self.ingredient_lookup[alias.lower()] = row_dict
-
-            logger.info(f"Loaded {len(self.all_inci_names)} ingredients from ingredient_database_fixed5.csv")
-
-            # Load aliases.json extra mappings
-            try:
-                import json as _json
-                aliases_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliases.json')
-                if os.path.exists(aliases_path):
-                    with open(aliases_path, 'r') as f:
-                        extra_aliases = _json.load(f)
-                    added = 0
-                    for alias_key, target_inci in extra_aliases.items():
-                        alias_lower = alias_key.strip().lower()
-                        target_lower = target_inci.strip().lower()
-                        if target_lower in self.ingredient_lookup and alias_lower not in self.ingredient_lookup:
-                            self.ingredient_lookup[alias_lower] = self.ingredient_lookup[target_lower]
-                            added += 1
-                    logger.info(f"Loaded {added} extra aliases from aliases.json")
-            except Exception as e:
-                logger.warning(f"Could not load aliases.json: {e}")
-
-        except Exception as e:
-            logger.error(f"Error loading ingredient database: {e}")
+        # ── Load ingredients.json (replaces ingredient_database_fixed5.csv) ──
+        json_path = os.path.join(self.database_path, 'ingredients.json')
+        if os.path.exists(json_path):
+            self._load_json_db(json_path)
+        else:
+            # Fallback: try old CSV if JSON not present yet
+            self._load_csv_fallback()
 
         try:
             upgrade_path = os.path.join(self.database_path, 'active_upgrade_map.csv')
@@ -243,12 +176,103 @@ class DataLoader:
         except Exception as e:
             logger.error(f"Error loading upgrade map: {e}")
 
+        # Load extra aliases from aliases.json
+        try:
+            aliases_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliases.json')
+            if os.path.exists(aliases_path):
+                with open(aliases_path, 'r') as f:
+                    extra_aliases = json.load(f)
+                added = 0
+                for alias_key, target_inci in extra_aliases.items():
+                    alias_lower = alias_key.strip().lower()
+                    target_lower = target_inci.strip().lower()
+                    if target_lower in self.ingredient_lookup and alias_lower not in self.ingredient_lookup:
+                        self.ingredient_lookup[alias_lower] = self.ingredient_lookup[target_lower]
+                        added += 1
+                logger.info(f"Loaded {added} extra aliases from aliases.json")
+        except Exception as e:
+            logger.warning(f"Could not load aliases.json: {e}")
+
         self._build_concern_maps()
         self._load_synergy_registry()
         self._load_uv_sun_tanning_db()
         self._load_surfactant_db()
         self._load_role_weight_table()
         self._build_role_sets()
+
+    def _load_json_db(self, json_path):
+        """Load ingredients.json — main ingredient database."""
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            self._json_db = data.get('ingredients', {})
+            self._json_aliases = data.get('aliases', {})
+
+            # Populate ingredient_lookup (unified O(1) store)
+            for key, entry in self._json_db.items():
+                self.ingredient_lookup[key] = entry
+                inci_name = entry.get('INCI_Name', '')
+                if inci_name:
+                    self.all_inci_names.append(inci_name)
+
+            # Register aliases: alias_lower -> same entry as their canonical INCI
+            for alias_lower, inci_lower in self._json_aliases.items():
+                if inci_lower in self.ingredient_lookup and alias_lower not in self.ingredient_lookup:
+                    self.ingredient_lookup[alias_lower] = self.ingredient_lookup[inci_lower]
+
+            logger.info(f"Loaded {len(self._json_db)} ingredients from ingredients.json "
+                        f"({len(self._json_aliases)} aliases registered)")
+        except Exception as e:
+            logger.error(f"Error loading ingredients.json: {e}")
+
+    def _load_csv_fallback(self):
+        """Fallback loader for old CSV — used only if ingredients.json not found."""
+        import csv as _csv
+        csv_path = os.path.join(self.database_path, 'ingredient_database_fixed5.csv')
+        if not os.path.exists(csv_path):
+            logger.error("Neither ingredients.json nor ingredient_database_fixed5.csv found")
+            return
+        try:
+            with open(csv_path, encoding='utf-8-sig') as f:
+                reader = _csv.DictReader(f)
+                for row in reader:
+                    inci = row.get('INCI_Name', '').strip()
+                    if not inci or inci == 'nan':
+                        continue
+                    entry = dict(row)
+                    # Pre-compute same fields as JSON builder does
+                    atw = entry.get('Activity_Tier_Weight', '')
+                    try:
+                        entry['_activity_tier_weight'] = float(atw) if str(atw).strip() not in ('', 'nan') else 0.5
+                    except (ValueError, TypeError):
+                        entry['_activity_tier_weight'] = 0.5
+                    mw = entry.get('MW_Daltons', '')
+                    try:
+                        entry['_mw_daltons'] = float(mw) if str(mw).strip() not in ('', 'nan') else None
+                    except (ValueError, TypeError):
+                        entry['_mw_daltons'] = None
+                    moa = str(entry.get('Mechanism_of_Action', '') or '').strip()
+                    if not moa or moa.lower() in ('nan', 'none', ''):
+                        moa = str(entry.get('Biological_Action', '') or '').strip()
+                    entry['_moa'] = moa if moa and moa.lower() not in ('nan', 'none') else None
+                    sc_raw = entry.get('Skin_Concerns', '')
+                    entry['_skin_concerns_parsed'] = (
+                        [t.strip().lower() for t in str(sc_raw).split(';') if t.strip()]
+                        if sc_raw and str(sc_raw).lower() not in ('nan', '') else []
+                    )
+                    key = inci.lower()
+                    self.ingredient_lookup[key] = entry
+                    self.all_inci_names.append(inci)
+                    aliases_col = str(entry.get('Aliases', '') or '')
+                    if aliases_col and aliases_col not in ('nan', ''):
+                        for alias in aliases_col.split(';'):
+                            alias = alias.strip()
+                            if alias and alias.lower() not in self.ingredient_lookup:
+                                self.ingredient_lookup[alias.lower()] = entry
+            logger.info(f"Fallback: loaded {len(self.all_inci_names)} ingredients from CSV")
+        except Exception as e:
+            logger.error(f"CSV fallback failed: {e}")
 
     def _add_synergy_pair(self, ing1, ing2, seen_pairs, all_synergies):
         pair_key = tuple(sorted([ing1, ing2]))
@@ -268,13 +292,12 @@ class DataLoader:
         self.synergy_partners_map[ing2].add(ing1)
 
     def _load_synergy_registry(self):
-        """Load synergy pairs from ingredient_synergy_table.csv AND main DB's
-        Synergistic_Ingredients column. Both feed the same partners map."""
+        """Load synergy pairs from synergy table CSV AND main JSON DB's Synergistic_Ingredients."""
         try:
             seen_pairs = set()
             all_synergies = []
 
-            # Source 1: dedicated synergy table
+            # Source 1: dedicated synergy table CSV
             syn_path = os.path.join(self.database_path, 'ingredient_synergy_table.csv')
             if os.path.exists(syn_path):
                 df = pd.read_csv(syn_path)
@@ -286,15 +309,14 @@ class DataLoader:
                     for ing2 in [p.strip().lower() for p in partners_raw.split(';') if p.strip()]:
                         self._add_synergy_pair(ing1, ing2, seen_pairs, all_synergies)
 
-            # Source 2: main ingredient DB's Synergistic_Ingredients column (new in fixed3)
-            if self.ingredient_master is not None:
-                for _, row in self.ingredient_master.iterrows():
-                    ing1 = str(row.get('INCI_Name', '')).strip().lower()
-                    partners_raw = str(row.get('Synergistic_Ingredients', '') or '')
-                    if not ing1 or ing1 == 'nan' or partners_raw in ('nan', ''):
-                        continue
-                    for ing2 in [p.strip().lower() for p in partners_raw.split(';') if p.strip()]:
-                        self._add_synergy_pair(ing1, ing2, seen_pairs, all_synergies)
+            # Source 2: Synergistic_Ingredients column in JSON DB
+            for entry in self._json_db.values():
+                ing1 = str(entry.get('INCI_Name', '')).strip().lower()
+                partners_raw = str(entry.get('Synergistic_Ingredients', '') or '')
+                if not ing1 or ing1 == 'nan' or partners_raw in ('nan', ''):
+                    continue
+                for ing2 in [p.strip().lower() for p in partners_raw.split(';') if p.strip()]:
+                    self._add_synergy_pair(ing1, ing2, seen_pairs, all_synergies)
 
             self.synergy_registry['__all__'] = all_synergies
             logger.info(f"Loaded {len(all_synergies)} synergy pairs, {len(self.synergy_partners_map)} mapped ingredients")
@@ -302,33 +324,32 @@ class DataLoader:
             logger.error(f"Error loading synergy registry: {e}")
 
     def _build_concern_maps(self):
-        if self.ingredient_master is None:
+        """Build concern_actives and concern_supporters from JSON DB."""
+        if not self._json_db:
             return
         for concern, tags in CONCERN_TAG_MAP.items():
             db_actives = []
             supporters = []
-            for _, row in self.ingredient_master.iterrows():
-                inci = str(row.get('INCI_Name', '')).strip()
+            for entry in self._json_db.values():
+                inci = str(entry.get('INCI_Name', '')).strip()
                 if not inci or inci == 'nan':
                     continue
-                skin_concerns = _parse_skin_concerns(row.get('Skin_Concerns', ''))
+                skin_concerns = entry.get('_skin_concerns_parsed', [])
                 if any(tag in sc for tag in tags for sc in skin_concerns):
-                    ing_class = str(row.get('Ingredient_Class', '')).lower().strip()
+                    ing_class = str(entry.get('Ingredient_Class', '')).lower().strip()
                     if ing_class == 'active':
                         try:
-                            ef = float(row.get('Evidence_Factor', 0.4) or 0.4)
-                            esw_raw = row.get('Effect_Strength_Weight', '')
+                            ef = float(entry.get('Evidence_Factor', 0.4) or 0.4)
+                            esw_raw = entry.get('Effect_Strength_Weight', '')
                             if str(esw_raw).strip() in ('', 'nan', '0'):
-                                func_cat = str(row.get('Functional_Category', '')).lower()
+                                func_cat = str(entry.get('Functional_Category', '')).lower()
                                 esw = 1.0 if 'humectant' in func_cat else 0.5
                             else:
                                 esw = float(esw_raw)
                         except (ValueError, TypeError):
                             ef, esw = 0.4, 0.5
-                        if math.isnan(ef):
-                            ef = 0.4
-                        if math.isnan(esw):
-                            esw = 0.5
+                        if math.isnan(ef): ef = 0.4
+                        if math.isnan(esw): esw = 0.5
                         db_actives.append((inci, ef * esw))
                     elif ing_class in ('functional', 'functional support', 'antioxidant support'):
                         supporters.append(inci)
@@ -395,18 +416,15 @@ class DataLoader:
             'dry_oil': set(), 'brightening': set(), 'anti_acne': set(),
             'anti_aging': set(), 'uv_filter': set(), 'delivery': set(),
         }
-        if self.ingredient_master is None:
-            self.role_sets = sets
-            return
-        for _, row in self.ingredient_master.iterrows():
-            inci = str(row.get('INCI_Name', '')).strip()
+        for entry in self._json_db.values():
+            inci = str(entry.get('INCI_Name', '')).strip()
             if not inci or inci == 'nan':
                 continue
             key = inci.lower()
-            cls = str(row.get('Ingredient_Class', '')).lower().strip()
-            fc  = str(row.get('Functional_Category', '')).lower()
-            pb  = str(row.get('Primary_Benefits', '')).lower()
-            sc  = str(row.get('Skin_Concerns', '')).lower()
+            cls = str(entry.get('Ingredient_Class', '')).lower().strip()
+            fc  = str(entry.get('Functional_Category', '')).lower()
+            pb  = str(entry.get('Primary_Benefits', '')).lower()
+            sc  = str(entry.get('Skin_Concerns', '')).lower()
 
             if cls in active_classes or any(x in fc for x in ['active', 'antioxidant',
                'brightening', 'anti-acne', 'anti-aging', 'anti-wrinkle', 'peptide',
@@ -461,41 +479,34 @@ class DataLoader:
                 sets['delivery'].add(key)
         self.role_sets = sets
 
-    # ── New column accessors ─────────────────────────────────────────────────
+    # ── Column accessors (unchanged public API) ──────────────────────────────
 
     def get_activity_tier_weight(self, ingredient_data):
-        """Return Activity_Tier_Weight (0.1–1.0). Tier 1=1.0, Tier2=0.8, Tier3=0.5, Tier4=0.1."""
         if not ingredient_data:
             return 0.5
         return ingredient_data.get('_activity_tier_weight', 0.5)
 
     def get_mw_daltons(self, ingredient_data):
-        """Return MW_Daltons as float if available, else None."""
         if not ingredient_data:
             return None
         return ingredient_data.get('_mw_daltons', None)
 
     def get_moa(self, ingredient_data):
-        """Return Mechanism_of_Action string (for Tier 1/2 display in ingredient table)."""
         if not ingredient_data:
             return None
         return ingredient_data.get('_moa', None)
 
     def get_activity_tier_label(self, ingredient_data):
-        """Return Activity_Tier label string e.g. 'Tier 1: Primary Active'."""
         if not ingredient_data:
             return None
         tier = str(ingredient_data.get('Activity_Tier', '') or '').strip()
         return tier if tier and tier.lower() not in ('nan', 'none', '') else None
-
-    # ── Existing accessors ───────────────────────────────────────────────────
 
     def get_concern_actives(self, concern):
         return self.concern_actives.get(concern, [])
 
     def get_concern_supporters(self, concern):
         return self.concern_supporters.get(concern, [])
-
     def get_synergies(self, concern):
         return self.synergy_registry.get(concern, [])
 
@@ -528,6 +539,7 @@ class DataLoader:
         key = re.sub(r'\d+\.?\d*\s*%', '', key)
         key = re.sub(r'\s+', ' ', key).strip()
 
+        # O(1) JSON dict lookup
         if key in self.ingredient_lookup:
             return self.ingredient_lookup[key]
         aliased = _INGREDIENT_ALIASES.get(key)
@@ -549,6 +561,7 @@ class DataLoader:
         familied_norm = _INGREDIENT_FAMILY_MAP.get(normalized)
         if familied_norm and familied_norm in self.ingredient_lookup:
             return self.ingredient_lookup[familied_norm]
+        # Fuzzy fallback (same threshold as before)
         match = process.extractOne(
             normalized,
             list(self.ingredient_lookup.keys()),
