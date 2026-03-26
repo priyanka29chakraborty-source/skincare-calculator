@@ -770,7 +770,13 @@ def detect_formulation_notes(ingredient_list):
         elif 'essential oil' in ing_lower:
             notes.append(f"{ing} — Potential skin sensitizer in reactive skin types.")
         elif 'limonene' in ing_lower or 'linalool' in ing_lower:
-            notes.append(f"{ing} — Known fragrance allergen.")
+            # Only add generic note if DB hasn't already flagged it (avoids duplicate in UI)
+            if not (data and str(data.get('Red_Flag_Tags', '') or '') not in ('', 'nan')):
+                notes.append(f"{ing} — Known fragrance allergen.")
+        if 'shellac' in ing_lower:
+            notes.append(f"{ing} — Film-forming resin; may feel heavy or tacky on skin.")
+        if 'caprae lac' in ing_lower or ('lac' in ing_lower and 'caprae' in ing_lower):
+            notes.append("Caprae Lac (Goat Milk) — nutrient-dense emollient; lactic acid content is not meaningfully exfoliating in oil format.")
         elif 'methylparaben' in ing_lower or 'propylparaben' in ing_lower:
             notes.append(f"{ing} — Preservative; some ongoing discussion about long-term use.")
 
@@ -1029,12 +1035,22 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
                          any(kw in i for kw in ['rosehip','safflower','hemp','primrose',
                              'squalane','grapeseed','grape seed','passion fruit',
                              'passiflora','rosa canina','juglans','walnut',
-                             'oenothera','ribes nigrum','vitis vinifera seed']))
+                             'oenothera','ribes nigrum','vitis vinifera seed',
+                             'helianthus annuus',      # Sunflower — linoleic-rich
+                             'daucus carota',          # Carrot seed oil
+                             'beta-carotene','carotene']))
     oleic_count = sum(1 for i in ing_lower_list if i in OLEIC_OILS or
                       any(kw in i for kw in ['avocado','macadamia','almond','argan',
                           'marula','olive','apricot','moringa','jojoba',
                           'argania','simmondsia','olea europaea','persea',
-                          'prunus amygdalus','sclerocarya']))
+                          'prunus amygdalus','sclerocarya',
+                          'sesamum','sesame',          # Sesame oil — oleic-rich
+                          'glycine soja','soybean',    # Soybean oil
+                          'vetiveria','vetiver',       # Vetiver root oil
+                          'elettaria','cardamom',      # Cardamom seed oil
+                          'zingiber','ginger',         # Ginger root oil
+                          'citrus aurantium','bergamot',  # Bergamot
+                          'centella asiatica']))
     comedogenic_penalty = sum(1 for i in ing_lower_list if i in COMEDOGENIC_OILS or
                                any(kw in i for kw in ['cocos nucifera','coconut oil',
                                    'cocoa butter','theobroma cacao']))
@@ -1233,8 +1249,16 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             'concentration_known': _conc_is_known,
             'score_contribution': round(imp_score / 100, 2),
             'primary_benefits': (
-                (lambda v: str(v).strip() if v and str(v).lower() not in ('nan','none','') else None)
-                (data.get('Primary_Benefits',''))
+                # Clean truncated DB fragments: a segment is truncated if its last word
+                # is 1-2 chars and lowercase (e.g. 'it is used f', 'keeping skin m')
+                (lambda raw: '; '.join(
+                    s.strip() for s in str(raw).split(';')
+                    if s.strip() and len(s.strip()) > 2
+                    and not (len(s.strip().split()[-1].rstrip('.,;')) <= 2
+                             and s.strip().split()[-1].rstrip('.,;').islower())
+                ) or None
+                if raw and str(raw).lower() not in ('nan','none','') else None
+                )(data.get('Primary_Benefits',''))
                 or (lambda v: str(v).strip() if v and str(v).lower() not in ('nan','none','') else None)
                 (data.get('Functional_Category',''))
                 or (lambda v: str(v).split(';')[0].strip() if v and str(v).lower() not in ('nan','none','') else None)
@@ -1324,9 +1348,11 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         irr_score = max(0, 10 - irr_penalty)
 
         formula_quality = active_potency + evidence_score + balance_score + irr_score
+        _fq_display = round(min(20, formula_quality / 85 * 20), 1)
         component_details['A'].append(f"Active potency: {active_potency:.1f}/40")
         component_details['A'].append(f"Evidence strength: {evidence_score:.1f}/20")
         component_details['B'].append(f"Formula balance: {balance_score}/15, Irritation: {irr_score}/10")
+        component_details['B'].append(f"Formula quality score: {_fq_display}/20 (derived from all components above)")
 
     elif cat_lower in ('moisturizer', 'cream', 'lotion', 'gel'):
         # Barrier 35, humectants 25, active support 15, texture 10, price handled separately
@@ -1751,7 +1777,7 @@ def get_tier_badge(score, value_tier=None, category=None):
         if score >= 90: return "Premium Lipid Formula"
         if score >= 75: return "Excellent Lipid Profile" if value_tier not in {"overpriced","slightly_overpriced"} else "Great Formula, Pricey"
         if score >= 60: return "Good Botanical Blend"
-        if score >= 40: return "Basic Oil Formula"
+        if score >= 40: return "Traditional Botanical Blend" if value_tier in {"overpriced","slightly_overpriced"} else "Foundational Oil Formula"
         return "Limited Lipid Value"
 
     if is_cleanser:
@@ -3178,6 +3204,21 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
             why_bullets.append("Good balance of oil control and hydration")
 
     score = max(0, min(97, score))  # Cap at 97 — 100% is never scientifically credible
+
+    # Facial oil + oily skin cap: any base oil in top 5 with comedogenicity > 0
+    # prevents a dangerously high score for acne-prone users
+    _cat_compat = (category or '').lower()
+    if _cat_compat in ('facial oil', 'oil') and skin_type == 'oily':
+        _top5_lower = [i.lower() for i in ingredient_list[:5]]
+        _has_base_oil = any(
+            any(kw in i for kw in ['oil','seed','butter','lac','shellac',
+                                    'sesamum','glycine soja','helianthus'])
+            for i in _top5_lower
+        )
+        if _has_base_oil and score > 75:
+            score = 75
+            why_bullets.append("Score capped at 75% — oil base in top ingredients may not suit oily/acne-prone skin")
+
 
     # ── Category-aware look_for override ─────────────────────────────────────
     # Replace generic serum/moisturizer advice with relevant tip for the product type

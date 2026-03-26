@@ -343,6 +343,7 @@ async def fetch_from_url(url: str):
                 "message": "Some fields could not be fetched. Please fill in the missing fields manually." if not (result.get('product_name') and has_ingredients) else None,
                 "country_message": "Could not detect country automatically. Please select your country." if country_uncertain else None,
                 "active_concentrations": result.get('active_concentrations', {}),
+                "bundle_warning": result.get('bundle_warning', False),
             }
         return JSONResponse(status_code=502, content={
             "error": "Data fetching failed. Please paste ingredients manually.",

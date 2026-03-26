@@ -613,7 +613,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
                 display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
                 <i className="fa-solid fa-circle-info fa-xs" style={{ flexShrink: 0 }}></i>
                 <span style={{ lineHeight: '1.3' }}>
-                  Positional concentration estimated via Lipid-Phase Decay
+                  Concentration estimated via INCI rank & lipid-phase modeling
                 </span>
               </div>
             ) : result.score_confidence && (
@@ -720,13 +720,13 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         {result.skin_type_risk_level && (
           <div style={{ marginTop: "8px", marginBottom: "6px" }}>
             {result.skin_type_risk_level === "low" && (
-              <span style={{ fontSize: "0.78rem", background: "#D4EDDA", color: "#155724", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>✓ Low sensitivity risk overall.</span>
+              <span style={{ fontSize: "0.78rem", background: "#D4EDDA", color: "#155724", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>✓ Low irritation risk overall.</span>
             )}
             {result.skin_type_risk_level === "moderate" && (
               <span style={{ fontSize: "0.78rem", background: "#FFF3CD", color: "#856404", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Some ingredients may not suit acne-prone or sensitive areas.</span>
             )}
             {result.skin_type_risk_level === "high" && (
-              <span style={{ fontSize: "0.78rem", background: "#F8D7DA", color: "#721C24", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Important: multiple acne or sensitivity risks detected. See notes below.</span>
+              <span style={{ fontSize: "0.78rem", background: "#F8D7DA", color: "#721C24", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Important: multiple acne or irritation risks detected. See notes below.</span>
             )}
           </div>
         )}

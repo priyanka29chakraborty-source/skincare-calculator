@@ -2,6 +2,7 @@ import { CONCERNS_LIST, SKIN_TYPES, CATEGORIES, COUNTRIES, SIZE_UNITS, CURRENCY_
 
 export default function InputForm({
   fetchInput, setFetchInput, fetchLoading, fetchMsg, fetchStatus, fetchError, handleFetch,
+  fetchVerifyPending, onFetchVerifyDismiss,
   productName, setProductName, brand, setBrand, price, setPrice,
   size, setSize, sizeUnit, setSizeUnit, category, setCategory, country, setCountry,
   ingredients, setIngredients, skinType, setSkinType, concerns, toggleConcern,
@@ -11,6 +12,39 @@ export default function InputForm({
 
   return (
     <>
+      {/* Fetch verification popup */}
+      {fetchVerifyPending && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px"
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: "14px", padding: "28px 24px", maxWidth: "420px",
+            width: "100%", boxShadow: "0 8px 32px rgba(0,0,0,0.18)", textAlign: "center"
+          }}>
+            <i className="fa-solid fa-circle-exclamation" style={{ color: "#C9A96E", fontSize: "2rem", marginBottom: "12px", display: "block" }}></i>
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "10px", color: "#2C2420" }}>
+              Please verify the auto-filled details
+            </h3>
+            <p style={{ fontSize: "0.82rem", color: "#7A7168", lineHeight: 1.6, marginBottom: "18px" }}>
+              We fetched details from the product page. Please cross-check the <strong>Product Name</strong>,
+              <strong> Brand</strong>, <strong>Price</strong>, <strong>Size</strong>, and especially the
+              <strong> Ingredients (INCI) list</strong> before analysing — scraped data can sometimes be
+              incomplete or incorrect.
+            </p>
+            <button
+              onClick={onFetchVerifyDismiss}
+              style={{
+                background: "linear-gradient(135deg, #C9A96E, #b8904a)", color: "#fff",
+                border: "none", borderRadius: "8px", padding: "10px 28px",
+                fontSize: "0.88rem", fontWeight: 700, cursor: "pointer", width: "100%"
+              }}
+            >
+              Got it — I'll verify the details
+            </button>
+          </div>
+        </div>
+      )}
       <div className="card" data-testid="product-details-card">
         <div className="card-label">Product Details</div>
         <div className="url-row">

@@ -31,6 +31,7 @@ function App() {
   const [bestPriceLoading, setBestPriceLoading] = useState(false);
   const resultRef = useRef(null);
   const analyzeTimerRef = useRef(null);
+  const [fetchVerifyPending, setFetchVerifyPending] = useState(false);
 
   const currency = CURRENCY_MAP[country] || "INR";
 
@@ -174,18 +175,24 @@ function App() {
       if (data.product_name) setProductName(data.product_name);
       if (data.category) setCategory(data.category);
       if (data.active_concentrations) setActiveConcentrations(data.active_concentrations);
-      if (data.scrape_failed) {
+      if (data.bundle_warning) {
+        setFetchStatus("partial");
+        setFetchMsg("⚠️ This URL looks like a bundle/pack listing. Size and price may reflect the pack, not a single product. Please verify all fields manually.");
+        setFetchVerifyPending(true);
+      } else if (data.scrape_failed) {
         setFetchStatus("failed");
         setFetchError("⚠️ Could not fetch product details from this URL. Please fill in the fields manually.");
       } else if (data.message || data.partial) {
         setFetchStatus("partial");
         setFetchMsg(data.message || "Some fields could not be fetched. Please fill in the missing fields manually.");
+        setFetchVerifyPending(true);
       } else if (data.price_note && !data.partial) {
         setFetchStatus("partial");
         setFetchMsg(data.price_note);
       } else if (!data.partial && data.ingredients) {
         setFetchStatus("success");
         setFetchMsg("Product details fetched successfully!");
+        setFetchVerifyPending(true);
       }
     } catch (e) { setFetchError(e.response?.data?.error || "Failed to fetch. Please fill in manually."); }
     finally { setFetchLoading(false); }
@@ -212,6 +219,7 @@ function App() {
         <InputForm
           fetchInput={fetchInput} setFetchInput={setFetchInput}
           fetchLoading={fetchLoading} fetchMsg={fetchMsg} fetchStatus={fetchStatus} fetchError={fetchError} handleFetch={handleFetch}
+          fetchVerifyPending={fetchVerifyPending} onFetchVerifyDismiss={() => setFetchVerifyPending(false)}
           productName={productName} setProductName={setProductName}
           brand={brand} setBrand={setBrand}
           price={price} setPrice={setPrice}

@@ -65,6 +65,7 @@ CONCERNS_MAP = {
     'Dullness':          [
         'Ascorbic Acid', 'Niacinamide', 'Glycolic Acid',
         'Glutathione', 'Galactomyces Ferment Filtrate',
+        'Alpha Arbutin', 'Arbutin', 'Ascorbyl Glucoside',
         'Glycyrrhiza Glabra Root Extract', 'Dipotassium Glycyrrhizate',
         'Glycyrrhiza Inflata Root Extract', 'Licorice Root', 'Licorice Extract',
     ],
