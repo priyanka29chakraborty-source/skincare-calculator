@@ -48,7 +48,7 @@ function MoATooltip({ text }) {
 }
 
 // ── Ingredient Breakdown Table (with MoA + MW depth) ─────────────────────────
-function IngredientBreakdownTable({ actives }) {
+function IngredientBreakdownTable({ actives, isFacialOil = false }) {
   if (!actives || actives.length === 0) return null;
   return (
     <div className="ingredient-breakdown-table" style={{ marginTop: "1rem", overflowX: "auto" }}>
@@ -56,7 +56,7 @@ function IngredientBreakdownTable({ actives }) {
         <thead>
           <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid var(--border)" }}>
             <th style={{ padding: "6px 10px", textAlign: "left" }}>#</th>
-            <th style={{ padding: "6px 10px", textAlign: "left" }}>Active Ingredient</th>
+            <th style={{ padding: "6px 10px", textAlign: "left" }}>{isFacialOil ? "Botanical Contributor" : "Active Ingredient"}</th>
             <th style={{ padding: "6px 10px", textAlign: "center" }}>Evidence</th>
             <th style={{ padding: "6px 10px", textAlign: "left" }}>What It Does</th>
             <th style={{ padding: "6px 10px", textAlign: "center" }}>Concentration Est.</th>
@@ -698,7 +698,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         {/* Ingredient Breakdown Table */}
         {result.identified_actives?.length > 0 && (
           <div style={{ marginTop: "1rem" }}>
-            <IngredientBreakdownTable actives={result.identified_actives} />
+            <IngredientBreakdownTable actives={result.identified_actives} isFacialOil={isFacialOil} />
           </div>
         )}
 

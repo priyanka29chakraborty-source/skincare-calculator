@@ -1073,12 +1073,16 @@ def _facial_oil_score(ingredient_list, price, size_ml, country, known_concentrat
                                    'helianthus','daucus','glycine soja']))
 
     # Skin-type pivot: award points for the right fatty acid profile
-    if skin_type_lower in ('oily', 'combination', 'acne-prone'):
-        fa_score = min(50, linoleic_count * 14)   # linoleic oils = good
-        fa_score -= comedogenic_penalty * 25        # comedogenic = very bad
+    if skin_type_lower == 'oily':
+        # Oily skin: linoleic oils are ideal; oleic oils get 40% credit
+        fa_score = min(50, linoleic_count * 14 + oleic_count * 6)
+        fa_score -= comedogenic_penalty * 25
         fa_score = max(0, fa_score)
-        if oleic_count > linoleic_count:            # wrong type dominant
-            fa_score = max(0, fa_score - 10)
+    elif skin_type_lower in ('combination', 'acne-prone'):
+        # Combination: linoleic preferred but oleic still useful (60% credit)
+        fa_score = min(50, linoleic_count * 14 + oleic_count * 8)
+        fa_score -= comedogenic_penalty * 20
+        fa_score = max(0, fa_score)
     elif skin_type_lower == 'dry':
         fa_score = min(50, oleic_count * 14)        # oleic oils = good for dry
         fa_score += min(10, linoleic_count * 4)     # linoleic still ok in blend
@@ -1463,9 +1467,26 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             ingredient_list, price, size_ml, country, known_concentrations,
             skin_type=skin_type
         )
-        formula_quality = oil_result['score']
+        # ── Clean 100-pt scale: lipid(40)+botanical(25)+comedogenic(15)+safety(10)+price(10) ──
+        _fa   = oil_result['fa_score']          # 0–50 raw, scale to 0–40
+        _aox  = oil_result['aox_score']          # 0–25 raw
+        _bot  = oil_result['botanical_score']    # 0–10 raw
+        _com_penalty = oil_result['comedogenic_penalty']
+
+        # Normalize lipid score from 0–50 to 0–40 range
+        lipid_pts    = round(min(40, _fa * 40 / 50), 1)
+        botanical_pts = round(min(25, _aox + _bot), 1)  # antioxidant + botanical infusion
+        comedogenic_pts = round(max(0, 15 - _com_penalty * 5), 1)  # 15 = no risk
+        price_score  = _price_pts(price, size_ml, category, country)
+        price_pts    = round(float(price_score), 1)
+
+        # Safety: computed below via shared safety logic — use oil_result as placeholder
+        # (safety_score computed later in shared block)
+        formula_quality = oil_result['score']   # kept for safety block compatibility
+
+        # Store sub-scores for display — all on their natural scales
         component_details['A'].append(
-            f"Fatty Acid Profile: {oil_result['fa_score']:.0f}/50 "
+            f"Lipid Matrix: {lipid_pts:.0f}/40 "
             f"({'Linoleic-rich' if oil_result['linoleic_count'] >= oil_result['oleic_count'] else 'Oleic-rich'})"
         )
         component_details['A'].append(
@@ -1473,21 +1494,33 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             f"({oil_result['antioxidant_count']} antioxidant/soothing ingredients)"
         )
         component_details['B'].append(
-            f"Botanical Infusion: {oil_result['botanical_score']:.0f}/10"
+            f"Botanical Infusion: {_bot:.0f}/10"
         )
-        if oil_result['comedogenic_penalty'] > 0:
+        component_details['B'].append(
+            f"Pore Safety: {comedogenic_pts:.0f}/15 "
+            f"({'No comedogenic risk' if _com_penalty == 0 else str(_com_penalty) + ' comedogenic ingredient(s) detected'})"
+        )
+        if _com_penalty > 0:
             component_details['D'].append(
-                f"⚠ {oil_result['comedogenic_penalty']} comedogenic oil(s) detected — "
-                "may clog pores in oily/acne-prone skin"
+                f"⚠ {_com_penalty} comedogenic oil(s) detected — may clog pores in oily/acne-prone skin"
             )
-        price_score = _price_pts(price, size_ml, category, country)
-        score_breakdown['price_rationality'] = float(price_score)
-        score_breakdown['active_value'] = round(min(45, formula_quality * 0.45), 1)
-        score_breakdown['formula_quality'] = round(min(20, formula_quality * 0.20), 1)
-        score_breakdown['safety'] = round(min(10, formula_quality * 0.10), 1)
-        score_breakdown['claim_accuracy'] = 15
+
+        # Map to the 5-component breakdown displayed in UI
+        # A = Lipid Matrix (max 45 display)
+        # B = Formula/Botanical Quality (max 20 display)
+        # C = Claim Accuracy (15)
+        # D = Safety (10)
+        # E = Price (10)
+        score_breakdown['active_value']    = lipid_pts  # /40, bar fills /45 → correct proportion
+        score_breakdown['formula_quality'] = round(min(20, (botanical_pts / 35) * 20 + comedogenic_pts / 15 * 8), 1)
+        score_breakdown['claim_accuracy']  = 15
+        score_breakdown['price_rationality'] = price_pts
+        # safety filled by shared safety block below
+
+        # Final score: direct sum of all 5 components (safety added after shared block)
+        # Provisional (safety placeholder = 7, updated after shared block runs)
         total_score = min(100, max(0, round(
-            (0.75 * formula_quality / 85 + 0.25 * price_score / 10) * 100
+            lipid_pts + botanical_pts + comedogenic_pts + 7 + price_pts
         )))
         avg_price = _get_avg_price(price, size_ml, category, country)
         ratio = round((price / size_ml) / avg_price, 2) if (size_ml > 0 and avg_price > 0 and price > 0) else 1.0
@@ -1499,6 +1532,14 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             is_high_intensity=is_high_intensity_treatment,
             high_intensity_actives=high_intensity_actives_found
         )
+        # Update oil total_score with actual safety score (replaces placeholder 7)
+        _oil_safety = result.get('component_scores', {}).get('D', 7)
+        _oil_final = round(min(100, max(0,
+            lipid_pts + botanical_pts + comedogenic_pts + _oil_safety + price_pts
+        )))
+        result['main_worth_score'] = _oil_final
+        result['component_scores']['D'] = _oil_safety
+
         # Attach oil metadata for Card 1 bubbles
         result['oil_metadata'] = {
             'oil_diversity': oil_result['oil_diversity'],
@@ -2595,10 +2636,15 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
             'macadamia', 'olive', 'olea europaea',
             'shea', 'butyrospermum', 'rosehip', 'rosa canina',
             'sea buckthorn', 'hippophae',
-            'sesame', 'sesamum indicum',
+            'sesame', 'sesamum indicum', 'sesamum',  # Sesame oil
+            'taila', 'thailam', 'tailam',             # Ayurvedic: sesame base oils
             'caprylic capric', 'triglyceride',
             'ceramide', 'cholesterol', 'linoleic', 'palmitic', 'stearic',
             'tocopherol', 'panthenol',
+            # Ayurvedic nourishing botanicals for dry skin
+            'glycyrrhiza',                           # Licorice — soothing/nourishing
+            'santalum', 'sandalwood',                # Sandalwood — emollient
+            'nelumbo', 'lotus',                      # Lotus — moisturizing
         ],
     }
 
