@@ -1505,41 +1505,60 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 f"⚠ {_com_penalty} comedogenic oil(s) detected — may clog pores in oily/acne-prone skin"
             )
 
-        # Map to the 5-component breakdown displayed in UI
-        # A = Lipid Matrix (max 45 display)
-        # B = Formula/Botanical Quality (max 20 display)
-        # C = Claim Accuracy (15)
-        # D = Safety (10)
-        # E = Price (10)
-        score_breakdown['active_value']    = lipid_pts  # /40, bar fills /45 → correct proportion
-        score_breakdown['formula_quality'] = round(min(20, (botanical_pts / 35) * 20 + comedogenic_pts / 15 * 8), 1)
-        score_breakdown['claim_accuracy']  = 15
-        score_breakdown['price_rationality'] = price_pts
-        # safety filled by shared safety block below
+        # ── Oil safety computed here (oil returns early, shared block never runs) ──
+        _oil_safety_score = 10.0
+        _o_allergen_ded = 0.0
+        _oil_safety_details = []
+        for _oi, _oing in enumerate(ingredient_list):
+            _oil_il = _oing.strip().lower()
+            _oil_data = data_loader.get_ingredient_data(_oing)
+            if ('fragrance' in _oil_il or 'parfum' in _oil_il) and _oi < 10:
+                _oil_safety_score -= min(2.0, 4.0)
+                _oil_safety_details.append(f"Contains fragrance ({_oing})")
+            if ('essential oil' in _oil_il or 'limonene' in _oil_il or 'linalool' in _oil_il) and _o_allergen_ded < 4:
+                # Exposure factor 0.5: diluted in carrier oil → halved penalty
+                _d = min(1.0, 4.0 - _o_allergen_ded)
+                _oil_safety_score -= _d; _o_allergen_ded += _d
+                _oil_safety_details.append(f"Contains potential allergen ({_oing})")
+            if _oil_data:
+                _irr = str(_oil_data.get('Irritation_Risk', '')).lower()
+                if _irr == 'high':
+                    _oil_safety_score -= 1.5
+                    _oil_safety_details.append(f"{_oing} — high irritation risk")
+                elif _irr in ('medium', 'moderate'):
+                    _oil_safety_score -= 0.3
+        _oil_safety_score = round(max(0, min(10, _oil_safety_score)), 1)
+        if _oil_safety_score >= 8:
+            component_details['D'].append('Low irritation risk overall')
+        elif _oil_safety_score >= 5:
+            component_details['D'].append('Moderate sensitivity risk — patch test recommended')
+        else:
+            component_details['D'].append('Contains flagged ingredients — see details')
+        for _sd in _oil_safety_details[:2]:
+            component_details['D'].append(_sd)
 
-        # Final score: direct sum of all 5 components (safety added after shared block)
-        # Provisional (safety placeholder = 7, updated after shared block runs)
+        # Map to 5-component breakdown (all on natural scales)
+        score_breakdown['active_value']      = lipid_pts
+        score_breakdown['formula_quality']   = round(min(20, (botanical_pts / 35) * 20 + comedogenic_pts / 15 * 8), 1)
+        score_breakdown['claim_accuracy']    = 15
+        score_breakdown['safety']            = _oil_safety_score
+        score_breakdown['price_rationality'] = price_pts
+
+        # Final score: clean additive sum
         total_score = min(100, max(0, round(
-            lipid_pts + botanical_pts + comedogenic_pts + 7 + price_pts
+            lipid_pts + botanical_pts + comedogenic_pts + _oil_safety_score + price_pts
         )))
         avg_price = _get_avg_price(price, size_ml, category, country)
         ratio = round((price / size_ml) / avg_price, 2) if (size_ml > 0 and avg_price > 0 and price > 0) else 1.0
         value_tier = _ratio_to_tier(ratio)
+
         result = _build_result(
             total_score, score_breakdown, component_details, identified_actives,
             all_impact, ingredient_list, price, size_ml, category, country,
             ratio, value_tier, multipliers_applied, concentrations, known_concentrations,
-            is_high_intensity=is_high_intensity_treatment,
-            high_intensity_actives=high_intensity_actives_found
+            is_high_intensity=False,
+            high_intensity_actives=[]
         )
-        # Update oil total_score with actual safety score (replaces placeholder 7)
-        _oil_safety = result.get('component_scores', {}).get('D', 7)
-        _oil_final = round(min(100, max(0,
-            lipid_pts + botanical_pts + comedogenic_pts + _oil_safety + price_pts
-        )))
-        result['main_worth_score'] = _oil_final
-        result['component_scores']['D'] = _oil_safety
-
         # Attach oil metadata for Card 1 bubbles
         result['oil_metadata'] = {
             'oil_diversity': oil_result['oil_diversity'],
