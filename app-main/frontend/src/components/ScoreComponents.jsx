@@ -35,12 +35,14 @@ export function TierBadge({ tier, score }) {
 
 export function BreakdownRow({ icon, label, score, max, details }) {
   const pct = (score / max) * 100;
+  // Show score out of its max AND as a % of the 100pt total
+  const ptsLabel = max === 100 ? `${score} / 100` : `${score} pts  (max ${max})`;
   return (
     <div className="bd-row" data-testid={`breakdown-${label.replace(/\s+/g, "-").toLowerCase()}`}>
       <div className="bd-header">
         <i className={icon}></i>
         <span className="bd-label">{label}</span>
-        <span className="bd-score">{score} / {max}</span>
+        <span className="bd-score">{ptsLabel}</span>
       </div>
       <ProgressBar pct={pct} label={label} />
       {details?.length > 0 && (

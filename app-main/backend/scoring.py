@@ -1537,12 +1537,13 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         for _sd in _oil_safety_details[:2]:
             component_details['D'].append(_sd)
 
-        # Map to 5-component breakdown (all on natural scales)
-        score_breakdown['active_value']      = lipid_pts
-        score_breakdown['formula_quality']   = round(min(20, (botanical_pts / 35) * 20 + comedogenic_pts / 15 * 8), 1)
-        score_breakdown['claim_accuracy']    = 15
-        score_breakdown['safety']            = _oil_safety_score
-        score_breakdown['price_rationality'] = price_pts
+        # Map to 5-component breakdown — oil uses its own clean 100pt scale
+        # A=lipid(40), B=botanical(25), C=comedogenic(15), D=safety(10), E=price(10)
+        score_breakdown['active_value']      = lipid_pts           # /40
+        score_breakdown['formula_quality']   = botanical_pts        # /25
+        score_breakdown['claim_accuracy']    = comedogenic_pts      # /15 (Pore Safety)
+        score_breakdown['safety']            = _oil_safety_score    # /10
+        score_breakdown['price_rationality'] = price_pts            # /10
 
         # Final score: clean additive sum
         total_score = min(100, max(0, round(

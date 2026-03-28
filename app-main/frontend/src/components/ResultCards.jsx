@@ -677,13 +677,26 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         </button>
         <div className={"breakdown" + (showBreakdown ? " open" : "")} data-testid="breakdown-details">
           {/* Cleanser relabels first bar to "Skin Barrier Safety Score" */}
-          <BreakdownRow icon="fa-solid fa-chart-bar"
-            label={isCleanser ? "Skin Barrier Safety Score" : isFacialOil ? "Botanical Actives (What's Inside)" : "Active Ingredients (What's Inside)"}
-            score={result.component_scores?.A} max={45} details={result.component_details?.A} />
-          <BreakdownRow icon="fa-solid fa-flask" label="Formula Quality (How Well Made)" score={result.component_scores?.B} max={20} details={result.component_details?.B} />
-          <BreakdownRow icon="fa-solid fa-check-circle" label="Claims vs Reality (Honesty Score)" score={result.component_scores?.C} max={15} details={result.component_details?.C} />
-          <BreakdownRow icon="fa-solid fa-shield-halved" label="Safety Profile" score={result.component_scores?.D} max={10} details={result.component_details?.D} />
-          <BreakdownRow icon="fa-solid fa-coins" label="Price Fairness" score={result.component_scores?.E} max={10} details={result.component_details?.E} />
+          {/* Category-specific component rows — max values match actual 100pt weights */}
+          <BreakdownRow icon="fa-solid fa-droplet"
+            label={isCleanser ? "Surfactant & Barrier Safety" : isFacialOil ? "Lipid Matrix Score" : "Active Ingredients (What's Inside)"}
+            score={result.component_scores?.A}
+            max={isFacialOil ? 40 : 45}
+            details={result.component_details?.A} />
+          <BreakdownRow icon="fa-solid fa-flask"
+            label={isFacialOil ? "Botanical Activity" : "Formula Quality (How Well Made)"}
+            score={result.component_scores?.B}
+            max={isFacialOil ? 25 : 20}
+            details={result.component_details?.B} />
+          <BreakdownRow icon="fa-solid fa-check-circle"
+            label={isFacialOil ? "Pore Safety (Comedogenic)" : "Claims vs Reality (Honesty Score)"}
+            score={result.component_scores?.C}
+            max={isFacialOil ? 15 : 15}
+            details={result.component_details?.C} />
+          <BreakdownRow icon="fa-solid fa-shield-halved" label="Safety Profile"
+            score={result.component_scores?.D} max={10} details={result.component_details?.D} />
+          <BreakdownRow icon="fa-solid fa-coins" label="Price Fairness"
+            score={result.component_scores?.E} max={10} details={result.component_details?.E} />
         </div>
 
         {result.red_flags?.length > 0 && (
@@ -706,13 +719,19 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         <DeliveryBadge systems={result.delivery_systems} />
 
         {/* 1% Line Visualiser — hidden for facial oils (pure oil formulas have no water phase) */}
-        <OnePercentVisualiser marker={result.one_percent_marker} hideForOil={isFacialOil} />
+        {/* INCI 1% line: serum, treatment, moisturizer, toner only */}
+        {(isSerum || isTreatment || isMoisturizer || isToner) && (
+          <OnePercentVisualiser marker={result.one_percent_marker} hideForOil={false} />
+        )}
 
         {/* Ingredient conflicts */}
         <ConflictsSection conflicts={result.ingredient_conflicts} />
 
         {/* pH inference */}
-        <PhAnalysisSection ph={result.ph_analysis} />
+        {/* pH: always for serum/treatment/toner; optional (data-gated) for moisturizer; hidden for oil/sunscreen/mask */}
+        {!isFacialOil && !isSunscreen && !isMask && (
+          <PhAnalysisSection ph={result.ph_analysis} />
+        )}
       </div>
 
       {/* CARD 2: CONCERN FIT */}

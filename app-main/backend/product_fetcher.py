@@ -514,18 +514,39 @@ def _fetch_with_cloudscraper(url):
 
 # ─── Layer 2: Firecrawl API ──────────────────────────────────────────
 
+def _is_myntra_url(url):
+    return 'myntra.com' in (url or '')
+
+
 async def _fetch_html_firecrawl(url, timeout=25):
     api_key = os.environ.get('FIRECRAWL_API_KEY', '')
     if not api_key:
         return None
     try:
+        # Myntra needs longer wait + click to expand ingredient accordion
+        is_myntra = _is_myntra_url(url)
+        payload = {
+            'url': url,
+            'formats': ['html', 'markdown'],
+            'waitFor': 6000 if is_myntra else 3000,
+        }
+        if is_myntra:
+            # Click ingredient accordion and wait for it to expand
+            payload['actions'] = [
+                {'type': 'wait', 'milliseconds': 3000},
+                {'type': 'click', 'selector': '[class*="ingredient"]'},
+                {'type': 'wait', 'milliseconds': 1500},
+                {'type': 'click', 'selector': '[class*="Ingredient"]'},
+                {'type': 'wait', 'milliseconds': 1000},
+            ]
         async with aiohttp.ClientSession() as session:
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+            firecrawl_timeout = max(timeout, 35) if is_myntra else timeout
             async with session.post(
                 'https://api.firecrawl.dev/v1/scrape',
-                json={'url': url, 'formats': ['html', 'markdown'], 'waitFor': 3000},
+                json=payload,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=timeout)
+                timeout=aiohttp.ClientTimeout(total=firecrawl_timeout)
             ) as resp:
                 if resp.status != 200:
                     return None
@@ -596,6 +617,36 @@ def _extract_metadata(html, url):
         country, currency = country_result
     else:
         country, currency = None, None
+
+    # --- Myntra: extract from __initial_state__ JSON embedded in page --------
+    _myntra_data = {}
+    if 'myntra.com' in url:
+        for sc in soup.find_all('script'):
+            sc_text = sc.string or ''
+            # Myntra embeds product state as: window.__initial_state__ = {...}
+            # or as __REDUX_STATE__ = {...}
+            for pat in [
+                r'window\.__initial_state__\s*=\s*(\{.+?\});',
+                r'window\.__REDUX_STATE__\s*=\s*(\{.+?\});',
+                r'__PRELOADED_STATE__\s*=\s*(\{.+?\});',
+            ]:
+                m = re.search(pat, sc_text, re.DOTALL)
+                if m:
+                    try:
+                        _myntra_data = json.loads(m.group(1))
+                        break
+                    except Exception:
+                        pass
+            if _myntra_data:
+                break
+        # Also try og:description or meta-description as ingredient fallback for Myntra
+        if not _myntra_data:
+            # Myntra sometimes puts ingredients in a specific data-widget-type section
+            for el in soup.find_all(True, attrs={'data-widget-type': re.compile(r'product.*description|ingredient', re.I)}):
+                t = el.get_text(' ', strip=True)
+                if 'ingredient' in t.lower() and len(t) > 50:
+                    _myntra_data['_raw_description'] = t
+                    break
 
     # --- Product Name ---
     product_name = None
@@ -854,6 +905,70 @@ def _extract_metadata(html, url):
 
     # --- Ingredients ---
     ingredients = None
+
+    # ── Strategy 0: Myntra-specific extraction ──────────────────────────────
+    if 'myntra.com' in url and not ingredients:
+        # 0a: Try __initial_state__ JSON tree
+        if _myntra_data:
+            def _deep_find_ingredients(obj, depth=0):
+                """Walk the Myntra JSON tree looking for ingredient text."""
+                if depth > 8 or not obj:
+                    return None
+                if isinstance(obj, str):
+                    lo = obj.lower()
+                    # Must look like an INCI list: comma-separated, >3 segments
+                    if ('ingredient' in lo or 'aqua' in lo or 'glycerin' in lo) and obj.count(',') >= 3:
+                        return obj
+                    return None
+                if isinstance(obj, dict):
+                    # Prioritise keys that sound like ingredient fields
+                    for k in ['ingredients', 'ingredient', 'composition', 'inci', 'description']:
+                        if k in obj and isinstance(obj[k], str) and len(obj[k]) > 30:
+                            r = _deep_find_ingredients(obj[k], depth + 1)
+                            if r: return r
+                    for v in obj.values():
+                        r = _deep_find_ingredients(v, depth + 1)
+                        if r: return r
+                if isinstance(obj, list):
+                    for item in obj:
+                        r = _deep_find_ingredients(item, depth + 1)
+                        if r: return r
+                return None
+            _found = _deep_find_ingredients(_myntra_data)
+            if _found:
+                ingredients = _found
+                logger.info('Myntra: ingredients from __initial_state__ JSON')
+        # 0b: Myntra ingredient section in rendered HTML — look for specific CSS classes
+        if not ingredients:
+            for sel in [
+                {'class': re.compile(r'ingredient|pdp-product-description|product-detail', re.I)},
+                {'data-testid': re.compile(r'ingredient|composition', re.I)},
+                {'id': re.compile(r'ingredient|composition', re.I)},
+            ]:
+                el = soup.find(True, attrs=sel)
+                if el:
+                    t = el.get_text(' ', strip=True)
+                    if len(t) > 30 and t.count(',') >= 3:
+                        _lo = t.lower()
+                        if not any(mk in _lo for mk in ['buy now', 'add to bag', 'size chart']):
+                            ingredients = t
+                            logger.info('Myntra: ingredients from HTML element')
+                            break
+        # 0c: Firecrawl markdown often gives clean text — extract ingredient section
+        if not ingredients and '<!-- MARKDOWN_CONTENT:' in html:
+            md_start = html.find('<!-- MARKDOWN_CONTENT:') + len('<!-- MARKDOWN_CONTENT:')
+            md_end   = html.find(' -->', md_start)
+            md_text  = html[md_start:md_end].strip() if md_end > md_start else ''
+            if md_text:
+                # Look for ingredient section in markdown
+                _md_ing_pat = re.compile(
+                    r'(?:ingredients?|composition|inci)\s*[:\-]?\s*([\w][^\n]{30,}(?:,[^\n]{2,}){4,})',
+                    re.I
+                )
+                md_m = _md_ing_pat.search(md_text)
+                if md_m:
+                    ingredients = md_m.group(1).strip()
+                    logger.info('Myntra: ingredients from firecrawl markdown')
 
     # Pre-clean: remove "Read more" / "Show more" / "View more" button text from soup
     _UI_TAIL_RE = re.compile(r'\b(read\s*more|show\s*more|view\s*more|see\s*more|load\s*more)\b', re.I)
