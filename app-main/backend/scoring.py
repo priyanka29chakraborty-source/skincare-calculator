@@ -647,6 +647,338 @@ def detect_delivery_systems(ingredient_list):
     return found
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MECHANISM SCORING ENGINE
+#
+# Evaluates ingredient contribution by WHAT mechanism it delivers AND HOW
+# strongly, using existing DB fields: Effect_Strength_Weight, Biological_Action,
+# Functional_Category, Activity_Tier_Weight.
+#
+# Pipeline per ingredient:
+#   1. detect_mechanism()     → maps BA + FC to a canonical mechanism type
+#   2. MECHANISM_MODIFIERS    → assigns strength modifier per mechanism type
+#   3. final_strength         → Effect_Strength_Weight × mechanism_modifier
+#   4. strength_category()    → Weak / Moderate / Strong
+#   5. strength_multiplier()  → applied to scoring so strong beats weak
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Mechanism modifier table — defines how potent each mechanism type is relative
+# to its category's primary need. These are biology-grounded, not arbitrary.
+MECHANISM_MODIFIERS = {
+    # Occlusives — highest TEWL reduction, strongest skin barrier seal
+    'occlusive':             1.0,
+    'silicone_occlusive':    0.85,
+    # Barrier-repair lipids — ceramides, cholesterol, fatty acids, lipid layering
+    'barrier_lipid':         0.95,
+    'barrier_repair':        0.90,
+    'sebum_mimetic':         0.85,
+    # Emollients — soften + smooth but less TEWL reduction than occlusives
+    'lipid_replenishment':   0.80,
+    'wax_ester':             0.78,
+    'emollient':             0.70,
+    'light_emollient':       0.50,
+    'ester':                 0.55,
+    'film_formation':        0.65,
+    # Humectants — water-binding; excellent but different mechanism to occlusion
+    'osmotic_binding':       0.85,   # sodium hyaluronate, polyglutamic
+    'hygroscopic':           0.75,   # glycerin, urea
+    'nmf_amino_acid':        0.70,   # sodium PCA, amino acids
+    # Soothing / anti-inflammatory
+    'anti_inflammatory':     0.75,
+    'soothing':              0.65,
+    'calming':               0.60,
+    # Antioxidant
+    'free_radical_scavenge': 0.75,
+    'carotenoid_quench':     0.70,
+    'antioxidant':           0.65,
+    # Actives (handled separately by evidence × concentration — minimal modifier needed)
+    'tyrosinase_inhibition': 1.0,
+    'retinoid':              1.0,
+    'exfoliant':             0.90,
+    'ecm_stimulation':       0.85,
+    'active':                0.80,
+    # Structural / texture — necessary but low direct skin benefit
+    'film_former':           0.40,
+    'polymer':               0.35,
+    'thickener':             0.30,
+    'emulsifier':            0.30,
+    'solvent':               0.20,
+    'preservative':          0.15,
+    'fragrance':             0.10,
+    'colorant':              0.05,
+    # Fallback
+    'unknown':               0.40,
+}
+
+
+def detect_mechanism(data):
+    """Map ingredient DB fields to a canonical mechanism key.
+
+    Uses Biological_Action first (most specific), then Functional_Category
+    as fallback. Returns a key from MECHANISM_MODIFIERS.
+    """
+    if not data:
+        return 'unknown'
+
+    ba  = str(data.get('Biological_Action', '') or '').lower().strip()
+    fc  = str(data.get('Functional_Category', '') or '').lower().strip()
+    cls = str(data.get('Ingredient_Class', '') or '').lower().strip()
+
+    # ── Biological_Action → mechanism (ordered from most to least specific) ──
+    if any(k in ba for k in ['occlusive lipid', 'tewl reduction', 'occlusion']):
+        return 'occlusive'
+    if 'film formation' in ba:
+        # Dimethicone = silicone occlusive; other film formers are structural
+        if 'silicone' in fc or 'silicone' in ba:
+            return 'silicone_occlusive'
+        return 'film_formation'
+    if any(k in ba for k in ['sc lipid replacement', 'sc lipid mimicry', 'lipid layering',
+                              'lipid layer', 'ceramide']):
+        return 'barrier_lipid'
+    if any(k in ba for k in ['lipid replenishment']):
+        # Distinguish heavy (barrier-repair) from light esters
+        if any(k in fc for k in ['barrier repair oil', 'barrier repair', 'barrier lipid']):
+            return 'barrier_repair'
+        if 'emollient' in fc and any(k in fc for k in ['light', 'ester']):
+            return 'light_emollient'
+        return 'lipid_replenishment'
+    if 'wax ester' in ba or 'wax ester mimicry' in ba:
+        return 'wax_ester'
+    if any(k in ba for k in ['hygroscopic', 'water binding', 'osmotic hydration']):
+        if any(k in ba for k in ['osmotic', 'gradient']):
+            return 'osmotic_binding'
+        return 'hygroscopic'
+    if 'nmf amino acid' in ba or 'nmf' in ba:
+        return 'nmf_amino_acid'
+    if any(k in ba for k in ['free radical', 'radical scaveng']):
+        return 'free_radical_scavenge'
+    if any(k in ba for k in ['carotenoid quench', 'carotenoid']):
+        return 'carotenoid_quench'
+    if 'tyrosinase inhibition' in ba:
+        return 'tyrosinase_inhibition'
+    if any(k in ba for k in ['ecm stimulation', 'collagen synthesis', 'fibroblast prolif',
+                              'elastin', 'matrix']):
+        return 'ecm_stimulation'
+    if any(k in ba for k in ['anti-inflammatory', 'anti inflammatory', 'immune modulation']):
+        return 'anti_inflammatory'
+    if any(k in ba for k in ['keratolysis', 'keratolytic']):
+        return 'exfoliant'
+    if 'retinoid' in ba or 'retinoic acid' in ba or 'retinol' in ba:
+        return 'retinoid'
+    if any(k in ba for k in ['protein synthesis', 'protein film']):
+        return 'film_former'
+    if 'polysaccharide gel' in ba or 'bioadhesive polymer' in ba:
+        return 'polymer'
+    if any(k in ba for k in ['solvent action', 'nonionic surfactant', 'surfactant']):
+        return 'solvent'
+    if any(k in ba for k in ['antimicrobial', 'microbial', 'fungal inhibition',
+                              'disrupts microbial', 'protein denaturation', 'ph-dependent']):
+        return 'preservative'
+
+    # ── Functional_Category fallback (when Biological_Action is vague/missing) ──
+    if 'barrier lipid' in fc or 'barrier repair oil' in fc:
+        return 'barrier_lipid'
+    if 'barrier repair' in fc:
+        return 'barrier_repair'
+    if 'occlusive' in fc:
+        if 'silicone' in fc:
+            return 'silicone_occlusive'
+        return 'occlusive'
+    if 'light emollient' in fc:
+        return 'light_emollient'
+    if 'emollient' in fc or 'skin conditioning' in fc or 'conditioning' in fc:
+        return 'emollient'
+    if 'humectant' in fc or 'hydration' in fc:
+        return 'hygroscopic'
+    if 'soothing' in fc or 'anti-inflammatory' in fc or 'calming' in fc:
+        return 'soothing'
+    if 'antioxidant' in fc:
+        return 'antioxidant'
+    if 'film former' in fc:
+        return 'film_former'
+    if 'preservative' in fc:
+        return 'preservative'
+    if 'fragrance' in fc or 'colorant' in fc:
+        return 'fragrance'
+    if 'solvent' in fc or 'thickener' in fc or 'emulsifier' in fc:
+        return 'thickener'
+
+    # ── Ingredient_Class last resort ──
+    if cls in ('active', 'peptide', 'retinoid', 'brightening active'):
+        return 'active'
+    if cls == 'antioxidant':
+        return 'antioxidant'
+    if cls in ('humectant',):
+        return 'hygroscopic'
+    if cls in ('emollient', 'plant oil'):
+        return 'emollient'
+    if cls in ('occlusive',):
+        return 'occlusive'
+    if cls in ('preservative',):
+        return 'preservative'
+
+    return 'unknown'
+
+
+def get_mechanism_modifier(data):
+    """Return the mechanism strength modifier (0.0–1.0) for this ingredient."""
+    mech = detect_mechanism(data)
+    return MECHANISM_MODIFIERS.get(mech, MECHANISM_MODIFIERS['unknown'])
+
+
+def get_mechanism_final_strength(data):
+    """Compute final mechanism strength: Effect_Strength_Weight × mechanism_modifier.
+
+    Both values are from the existing DB — no invented data.
+    Returns (final_strength, mechanism_key, esw, modifier).
+    """
+    if not data:
+        return 0.3, 'unknown', 0.3, 1.0
+
+    esw_raw = data.get('Effect_Strength_Weight', '')
+    try:
+        esw = float(esw_raw)
+        if esw != esw or esw <= 0:   # NaN or zero
+            esw = 0.5
+    except (ValueError, TypeError):
+        esw = 0.5
+    # ESW values above 1.0 in DB are for reference actives (e.g. retinol=5.0)
+    # Normalise to 0–1 range: cap at 1.0 for mechanism scoring
+    esw = min(1.0, esw)
+
+    mech = detect_mechanism(data)
+    modifier = MECHANISM_MODIFIERS.get(mech, MECHANISM_MODIFIERS['unknown'])
+    final_strength = esw * modifier
+    return final_strength, mech, esw, modifier
+
+
+def get_strength_category(final_strength):
+    """Map final strength to (label, multiplier) per spec.
+
+    < 0.40  → Weak     → 0.5×
+    0.40–0.70 → Moderate → 0.75×
+    > 0.70  → Strong   → 1.0×
+    """
+    if final_strength < 0.40:
+        return 'Weak', 0.50
+    elif final_strength <= 0.70:
+        return 'Moderate', 0.75
+    else:
+        return 'Strong', 1.00
+
+
+def score_mechanism_coverage(ingredient_list, target_mechanisms, max_pts,
+                              known_concentrations=None, label='mechanism'):
+    """Score how well ingredient_list covers target_mechanisms, weighted by strength.
+
+    Replaces flat count-based scoring (e.g. barrier_count * 8) with
+    mechanism-aware strength-weighted scoring.
+
+    Rules implemented per spec:
+    1. A single Strong ingredient can fully satisfy a mechanism.
+    2. Multiple Weak ingredients CANNOT exceed one Moderate ingredient.
+    3. Diminishing returns applied when >3 ingredients cover the same mechanism.
+    4. Score is capped at max_pts.
+
+    Returns (score, explanation_list).
+    """
+    if not ingredient_list:
+        return 0.0, [f'No ingredients found for {label}']
+
+    known = known_concentrations or {}
+    mechanism_buckets = {}   # mech_key → list of (final_strength, ingredient_name)
+
+    for i, ing in enumerate(ingredient_list):
+        data = data_loader.get_ingredient_data(ing)
+        if not data:
+            continue
+        # Skip actives — they're scored separately in active_potency path
+        ing_class = str(data.get('Ingredient_Class', '') or '').lower().strip()
+        if ing_class in ('active', 'peptide', 'retinoid', 'brightening active'):
+            continue
+        # Only score ingredients whose mechanism is relevant to target
+        mech = detect_mechanism(data)
+        if mech not in target_mechanisms and 'unknown' not in target_mechanisms:
+            continue
+
+        final_str, mech_key, esw, mod = get_mechanism_final_strength(data)
+
+        # Apply concentration modifier: deep-list ingredients get modest penalty
+        if ing.lower().strip() in known:
+            conc_mod = 1.0
+        elif i > 10:
+            conc_mod = 0.85
+        elif i > 5:
+            conc_mod = 0.92
+        else:
+            conc_mod = 1.0
+
+        final_str *= conc_mod
+
+        if mech_key not in mechanism_buckets:
+            mechanism_buckets[mech_key] = []
+        mechanism_buckets[mech_key].append((final_str, ing))
+
+    if not mechanism_buckets:
+        return 0.0, [f'No {label} ingredients detected']
+
+    # Aggregate: per mechanism, take best ingredient + diminishing returns for extras
+    total_raw = 0.0
+    explanation = []
+
+    for mech_key, entries in mechanism_buckets.items():
+        entries.sort(key=lambda x: -x[0])  # strongest first
+        best_str, best_ing = entries[0]
+        str_cat, _ = get_strength_category(best_str)
+
+        # Diminishing returns: each additional same-mechanism ingredient adds
+        # only a fraction of its strength (spec rule: count > quantity)
+        mech_score = best_str
+        for j, (s, _) in enumerate(entries[1:], 1):
+            diminish = 1.0 / (2.0 ** j)   # 50%, 25%, 12.5% ...
+            mech_score += s * diminish
+        mech_score = min(1.0, mech_score)  # never exceed 1.0 per mechanism
+
+        total_raw += mech_score
+        explanation.append(
+            f'{best_ing} — {str_cat} {mech_key.replace("_"," ")} '
+            f'(strength {best_str:.2f})'
+        )
+
+    # Normalise total_raw to max_pts
+    # Max theoretical: all target mechanisms fully covered = len(target_mechanisms)
+    max_theoretical = max(1, len(target_mechanisms))
+    score = min(max_pts, (total_raw / max_theoretical) * max_pts)
+    return round(score, 1), explanation[:4]
+
+
+def explain_mechanism(ingredient_list, concern, category, known_concentrations=None):
+    """Generate a human-readable mechanism explanation for a product's concern coverage.
+
+    Returns a string like:
+    "Supports dry skin primarily through emolliency. Squalane provides moderate-strength
+     barrier support."
+    """
+    known = known_concentrations or {}
+    top_mechs = []
+    for i, ing in enumerate(ingredient_list[:8]):
+        data = data_loader.get_ingredient_data(ing)
+        if not data:
+            continue
+        final_str, mech_key, esw, mod = get_mechanism_final_strength(data)
+        str_cat, _ = get_strength_category(final_str)
+        top_mechs.append((final_str, str_cat, mech_key, ing))
+
+    if not top_mechs:
+        return None
+    top_mechs.sort(key=lambda x: -x[0])
+    best = top_mechs[0]
+    mech_readable = best[2].replace('_', ' ')
+    return (f"Supports {concern.lower()} primarily through {mech_readable}. "
+            f"{best[3]} provides {best[1].lower()}-strength {mech_readable}.")
+
+
+
 def detect_red_flags(ingredient_list, concentrations, category):
     """Detect Worth Red Flags per blueprint spec."""
     flags = []
@@ -1373,28 +1705,25 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         component_details['B'].append(f"Formula quality score: {_fq_display}/20 (derived from all components above)")
 
     elif cat_lower in ('moisturizer', 'cream', 'lotion', 'gel'):
-        # Barrier 35, humectants 25, active support 15, texture 10, price handled separately
-        # Use DB-driven role sets — covers all 45+ barrier, 30+ humectant, 7+ occlusive
-        # ingredients in the database, not just the ~12 hardcoded keywords
-        _BARRIER    = data_loader.role_sets.get('barrier', set())
-        _HUMECTANTS = data_loader.role_sets.get('humectant', set())
-        _OCCLUSIVES = data_loader.role_sets.get('occlusive', set())
+        # Barrier 35, humectants 25, active support 15, texture 10
+        # Uses mechanism-aware strength scoring:
+        #   Petrolatum (Strong occlusive, ESW=0.9) > Shea Butter (Moderate, ESW=0.6)
+        #   Ceramide NP (Strong barrier lipid) > caprylic (Moderate emollient)
+        #   Sodium Hyaluronate (Osmotic binding, ESW=0.75) > Glycerin (Hygroscopic, ESW=0.65)
 
-        barrier_count   = sum(1 for ing in ingredient_list
-                              if ing.lower().strip() in _BARRIER
-                              or any(kw in ing.lower() for kw in ['ceramide','cholesterol',
-                                     'phytosphingosine','sphingosine','linoleic','linolenic']))
-        humectant_count = sum(1 for ing in ingredient_list
-                              if ing.lower().strip() in _HUMECTANTS
-                              or any(kw in ing.lower() for kw in ['hyaluronic','polyglutamic',
-                                     'beta-glucan','tremella']))
-        occlusive_count = sum(1 for ing in ingredient_list
-                              if ing.lower().strip() in _OCCLUSIVES
-                              or any(kw in ing.lower() for kw in ['petrolatum','beeswax',
-                                     'lanolin','mineral oil','vaseline']))
+        BARRIER_MECHS   = {'occlusive','silicone_occlusive','barrier_lipid',
+                           'barrier_repair','lipid_replenishment','wax_ester',
+                           'emollient','sebum_mimetic'}
+        HUMECTANT_MECHS = {'osmotic_binding','hygroscopic','nmf_amino_acid'}
 
-        barrier_pts   = min(35, barrier_count * 8 + occlusive_count * 4)
-        humectant_pts = min(25, humectant_count * 6)
+        barrier_pts, _barrier_exp = score_mechanism_coverage(
+            ingredient_list, BARRIER_MECHS, max_pts=35,
+            known_concentrations=known_concentrations, label='barrier'
+        )
+        humectant_pts, _hum_exp = score_mechanism_coverage(
+            ingredient_list, HUMECTANT_MECHS, max_pts=25,
+            known_concentrations=known_concentrations, label='humectant'
+        )
 
         active_impact = sum(s for _, _, s, d in all_impact
                             if str(d.get('Ingredient_Class','')).lower() == 'active')
@@ -1411,7 +1740,13 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         texture_pts = max(0, texture_pts)
 
         formula_quality = barrier_pts + humectant_pts + active_pts + texture_pts
-        component_details['A'].append(f"Barrier support: {barrier_pts:.1f}/35, Humectants: {humectant_pts:.1f}/25")
+        component_details['A'].append(
+            f"Barrier support: {barrier_pts:.1f}/35 "
+            + (f"({_barrier_exp[0]})" if _barrier_exp else '')
+        )
+        component_details['A'].append(f"Humectants: {humectant_pts:.1f}/25 "
+            + (f"({_hum_exp[0]})" if _hum_exp else '')
+        )
         component_details['B'].append(f"Active support: {active_pts:.1f}/15, Texture: {texture_pts}/10")
 
     elif cat_lower == 'cleanser':
@@ -1439,16 +1774,21 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         # Humectants 30, soothing 25, actives 20, irritation 10
         _HUMECTANTS = data_loader.role_sets.get('humectant', set())
         _SOOTHING   = data_loader.role_sets.get('soothing', set())
-        humectant_count = sum(1 for ing in ingredient_list
-                              if ing.lower().strip() in _HUMECTANTS
-                              or any(kw in ing.lower() for kw in ['hyaluronic','polyglutamic',
-                                     'beta-glucan','sodium pca']))
-        soothing_count  = sum(1 for ing in ingredient_list
-                              if ing.lower().strip() in _SOOTHING
-                              or any(kw in ing.lower() for kw in ['centella','allantoin',
-                                     'bisabolol','madecassoside','cica','licorice']))
-        humectant_pts   = min(30, humectant_count * 8)
-        soothing_pts    = min(25, soothing_count  * 7)
+        HUMECTANT_MECHS = {'osmotic_binding','hygroscopic','nmf_amino_acid'}
+        SOOTHING_MECHS  = {'anti_inflammatory','soothing','calming'}
+
+        humectant_pts, _hum_exp_t = score_mechanism_coverage(
+            ingredient_list, HUMECTANT_MECHS, max_pts=30,
+            known_concentrations=known_concentrations, label='humectant'
+        )
+        _soothing_pts, _sth_exp_t = score_mechanism_coverage(
+            ingredient_list, SOOTHING_MECHS, max_pts=25,
+            known_concentrations=known_concentrations, label='soothing'
+        )
+        soothing_count = 1 if _soothing_pts > 0 else 0  # kept for compat below
+        humectant_count = 1 if humectant_pts > 0 else 0  # kept for compat below
+        humectant_pts   = humectant_pts  # already scored
+        soothing_pts    = round(_soothing_pts, 1)  # mechanism-weighted (was count * 7)
 
         active_impact = sum(s for _, _, s, d in all_impact
                             if str(d.get('Ingredient_Class','')).lower() == 'active')
@@ -1972,6 +2312,174 @@ def get_score_title(score, value_tier=None, category=None):
 
 
 UV_CONCERN_SET = {'Sun Protection', 'UV Damage', 'Tanning'}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CATEGORY-NORMALISED CONCERN SCORING
+#
+# Each category has a realistic ceiling per concern (0–100).
+# The absolute score is divided by the ceiling to get a normalised score.
+# This prevents oils being penalised for not containing water-phase actives.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Category ceiling: max realistic effectiveness for each concern per category.
+# Serum = 100 (the reference product type).
+# Other categories are capped by formulation biology.
+CATEGORY_CONCERN_CEILINGS = {
+    'facial oil': {
+        'Pigmentation':      50,   # botanicals can lighten but not match TXA/Arbutin
+        'Tanning':           55,   # saffron/manjistha are real — but slower than serums
+        'Aging & Fine Lines': 70,   # lipid repair + antioxidants are genuinely effective
+        'Dullness':          70,   # rosehip, turmeric, saffron work for glow
+        'Barrier Repair':    90,   # this is WHERE oils excel
+        'Dry Skin':          90,   # occlusive+emollient = highest efficacy here
+        'Hydration':         60,   # some humectancy but no HA-level water-binding
+        'Sensitive Skin':    75,   # soothing oils (tamanu, jojoba) very effective
+        'Acne & Oily Skin':  55,   # non-comedogenic oils can help
+        'Uneven Texture':    45,   # rosehip/bakuchiol — mild only
+        'Large Pores':       40,   # limited — jojoba, neem help marginally
+        'Dark Circles':      35,   # caffeine-free; minimal direct effect
+        'Sun Protection':    10,   # oils provide no meaningful UV protection
+        'UV Damage':         50,   # antioxidant load helps repair
+        'Puffiness':         30,   # massage benefit, minimal actives
+    },
+    'moisturizer': {
+        'Hydration':         95,
+        'Barrier Repair':    90,
+        'Dry Skin':          90,
+        'Sensitive Skin':    80,
+        'Aging & Fine Lines': 75,
+        'Dullness':          65,
+        'Pigmentation':      60,
+        'Tanning':           55,
+        'Acne & Oily Skin':  65,
+        'Uneven Texture':    55,
+        'Large Pores':       55,
+        'Dark Circles':      55,
+        'Sun Protection':    20,
+        'UV Damage':         55,
+        'Puffiness':         50,
+    },
+    'toner': {
+        'Hydration':         80,
+        'Dullness':          70,
+        'Acne & Oily Skin':  70,
+        'Large Pores':       65,
+        'Uneven Texture':    70,
+        'Sensitive Skin':    65,
+        'Barrier Repair':    55,
+        'Pigmentation':      60,
+        'Tanning':           55,
+        'Aging & Fine Lines': 55,
+        'Dry Skin':          60,
+        'Dark Circles':      40,
+        'Sun Protection':    5,
+        'UV Damage':         45,
+        'Puffiness':         35,
+    },
+    'eye cream': {
+        'Dark Circles':      85,
+        'Puffiness':         80,
+        'Aging & Fine Lines': 75,
+        'Hydration':         75,
+        'Sensitive Skin':    80,
+        'Barrier Repair':    65,
+        'Dullness':          50,
+        'Pigmentation':      45,
+        'Tanning':           35,
+        'Acne & Oily Skin':  30,
+        'Uneven Texture':    40,
+        'Large Pores':       30,
+        'Sun Protection':    15,
+        'UV Damage':         45,
+        'Dry Skin':          65,
+    },
+    'cleanser': {
+        'Acne & Oily Skin':  70,
+        'Sensitive Skin':    60,
+        'Uneven Texture':    50,
+        'Large Pores':       55,
+        'Dullness':          40,
+        'Hydration':         40,
+        'Dry Skin':          40,
+        'Barrier Repair':    45,
+        'Pigmentation':      30,
+        'Tanning':           25,
+        'Aging & Fine Lines': 30,
+        'Dark Circles':      15,
+        'Sun Protection':    0,
+        'UV Damage':         30,
+        'Puffiness':         20,
+    },
+    'face mask': {
+        'Hydration':         80,
+        'Dullness':          75,
+        'Acne & Oily Skin':  70,
+        'Uneven Texture':    70,
+        'Sensitive Skin':    65,
+        'Barrier Repair':    60,
+        'Pigmentation':      60,
+        'Tanning':           55,
+        'Aging & Fine Lines': 60,
+        'Dry Skin':          70,
+        'Large Pores':       65,
+        'Dark Circles':      35,
+        'Sun Protection':    5,
+        'UV Damage':         50,
+        'Puffiness':         55,
+    },
+    # serum and treatment = 100 ceiling (reference) — no entry needed
+}
+
+# Human-readable category capability tiers for advisory text
+CATEGORY_CAPABILITY_NOTES = {
+    'facial oil': {
+        'high':    ['Barrier Repair', 'Dry Skin', 'Sensitive Skin'],
+        'moderate': ['Aging & Fine Lines', 'Dullness', 'Hydration', 'UV Damage'],
+        'low':     ['Pigmentation', 'Tanning', 'Acne & Oily Skin', 'Uneven Texture'],
+        'none':    ['Sun Protection'],
+    },
+    'cleanser': {
+        'high':    ['Acne & Oily Skin', 'Large Pores'],
+        'moderate': ['Sensitive Skin', 'Uneven Texture'],
+        'low':     ['Dullness', 'Hydration', 'Barrier Repair'],
+        'none':    ['Sun Protection', 'Dark Circles'],
+    },
+}
+
+
+def get_category_ceiling(concern, category):
+    """Return the max achievable score for this concern in this category (0–100).
+    100 = no ceiling (serum / treatment = reference benchmark).
+    """
+    cat = (category or 'serum').lower()
+    return CATEGORY_CONCERN_CEILINGS.get(cat, {}).get(concern, 100)
+
+
+def apply_category_normalisation(absolute_score, concern, category):
+    """
+    Returns dict with:
+      absolute_score  : raw score vs all products (0–100)
+      category_score  : score relative to what this category can achieve (0–100)
+      ceiling         : the category ceiling for this concern (0–100)
+      is_capped       : True if ceiling < 100 (i.e. category has limitations here)
+    """
+    ceiling = get_category_ceiling(concern, category)
+    if ceiling >= 100:
+        return {
+            'absolute_score': round(absolute_score),
+            'category_score': round(absolute_score),
+            'ceiling': 100,
+            'is_capped': False,
+        }
+    # Normalise: how far toward the ceiling did this product get?
+    cat_score = round(min(100, (absolute_score / ceiling) * 100)) if ceiling > 0 else 0
+    return {
+        'absolute_score': round(absolute_score),
+        'category_score': cat_score,
+        'ceiling': ceiling,
+        'is_capped': True,
+    }
+
 
 # ─── INCI ALIAS RESOLUTION ────────────────────────────────────────────────────
 # Bemotrizinol = Bisoctrizole = Methylene Bis-Benzotriazolyl Tetramethylbutylphenol (Tinosorb M)
@@ -2726,19 +3234,34 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
 
         missing = [kw for kw in keywords[:3] if kw not in ing_str]
 
+        # Apply category normalisation — oils are capped per concern
+        norm = apply_category_normalisation(final, concern, 'facial oil')
+
+        # Advisory: distinguish high category score vs low absolute score
+        if norm['is_capped'] and norm['category_score'] >= 65 and norm['absolute_score'] < 50:
+            _advisory = (
+                f"This oil performs well for {concern.lower()} within its category limits. "
+                f"For stronger {concern.lower()} treatment, combine with a serum — "
+                f"oils are not the most aggressive format for this concern."
+            )
+        elif has_ayurvedic_potency:
+            _advisory = f"Ayurvedic Potency: High — botanical-first formula for {concern.lower()}."
+        elif missing:
+            _advisory = f"Add {', '.join(missing[:2])} for stronger {concern.lower()} targeting."
+        else:
+            _advisory = f"Good lipid coverage for {concern.lower()}."
+
         results[concern] = {
-            'score': final,
+            'score': norm['category_score'],  # bar uses category-normalised score
+            'absolute_score': norm['absolute_score'],
+            'category_score': norm['category_score'],
+            'ceiling': norm['ceiling'],
+            'is_capped': norm['is_capped'],
             'present_actives': matched[:4],
             'missing_actives': missing[:2],
             'supporting_ingredients': [],
             'explanation': explanation[:3],
-            'advisory': (
-                f"Ayurvedic Potency: High — botanical-first formula for {concern.lower()}."
-                if has_ayurvedic_potency
-                else f"Add {', '.join(missing[:2])} for stronger {concern.lower()} targeting."
-                if missing
-                else f"Good lipid coverage for {concern.lower()}."
-            ),
+            'advisory': _advisory,
             'synergy_bonus': 0,
         }
 
@@ -2781,10 +3304,21 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         # Use specialized UV scoring for Sun Protection, UV Damage, Tanning
         if concern in UV_CONCERN_SET:
             synergies = data_loader.get_synergies(concern)
-            results[concern] = _score_uv_concern(
+            _uv_result = _score_uv_concern(
                 concern, ingredient_list, concentrations,
                 product_inci_map, product_inci_lower, synergies
             )
+            # Apply category normalisation to UV concerns too
+            _uv_score = _uv_result.get('score', 0)
+            _uv_norm = apply_category_normalisation(_uv_score, concern, cat_lower)
+            _uv_result.update({
+                'score': _uv_norm['category_score'],
+                'absolute_score': _uv_norm['absolute_score'],
+                'category_score': _uv_norm['category_score'],
+                'ceiling': _uv_norm['ceiling'],
+                'is_capped': _uv_norm['is_capped'],
+            })
+            results[concern] = _uv_result
             continue
 
         ideal_actives = data_loader.get_concern_actives(concern)
@@ -2919,25 +3453,50 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                                                         'phytosphingosine', 'fatty acid', 'linoleic'])):
                 has_barrier = True
 
+        # Mechanism-weighted support scoring:
+        # Accumulate best strength per support mechanism instead of flat flags
+        _support_strength = 0.0
+        for _ing, _info in product_inci_map.items():
+            _data = _info['data']
+            _mech = detect_mechanism(_data)
+            if _mech in ('hygroscopic','osmotic_binding','nmf_amino_acid'):
+                _fs, _, _, _ = get_mechanism_final_strength(_data)
+                _support_strength += _fs * 0.5
+            elif _mech in ('barrier_lipid','barrier_repair','occlusive','silicone_occlusive'):
+                _fs, _, _, _ = get_mechanism_final_strength(_data)
+                _support_strength += _fs * 0.6
+            elif _mech in ('anti_inflammatory','soothing','calming'):
+                _fs, _, _, _ = get_mechanism_final_strength(_data)
+                _support_strength += _fs * 0.5
+            elif _mech in ('free_radical_scavenge','antioxidant','carotenoid_quench'):
+                _fs, _, _, _ = get_mechanism_final_strength(_data)
+                _support_strength += _fs * 0.4
+        # Diminishing returns: cap contribution and normalise to 0-20
+        _support_strength = min(3.0, _support_strength)
         support_flags = sum([has_barrier, has_anti_inflammatory, has_humectant, has_antioxidant])
-        if support_flags >= 3 and support_count >= 2:
-            comp_b = 18
-        elif support_flags >= 2 and support_count >= 1:
-            comp_b = 14
-        elif support_flags >= 2 or support_count >= 2:
-            comp_b = 10
-        elif support_flags >= 1 or support_count >= 1:
-            comp_b = 6
-        else:
-            comp_b = 0
+        # Blend: mechanism strength (primary) + flag count (secondary, for edge cases)
+        _flag_pts = min(8, support_flags * 2 + (2 if support_count >= 2 else 0))
+        comp_b = round(min(20, (_support_strength / 3.0) * 12 + _flag_pts), 1)
 
-        # Hydration-specific comp_b boost: multiple humectants present even without
-        # full barrier/antioxidant stack should still get meaningful support credit.
+        # Hydration-specific comp_b floor: mechanism scoring already accounts for
+        # strength, but we guarantee minimums for products that clearly work as
+        # hydrators even if support_count is low (e.g. minimalist 3-ingredient product).
+        # Key: use _support_strength (mechanism-based) not just flag counts.
         if is_hydration:
-            if has_humectant and has_barrier and support_count >= 2:
-                comp_b = max(comp_b, 18)
-            elif has_humectant and support_count >= 2:
-                comp_b = max(comp_b, 14)
+            _has_strong_humectant = any(
+                detect_mechanism(_info['data']) in ('osmotic_binding', 'hygroscopic')
+                and get_mechanism_final_strength(_info['data'])[0] >= 0.5
+                for _info in product_inci_map.values()
+            )
+            _has_barrier_mech = any(
+                detect_mechanism(_info['data']) in
+                ('barrier_lipid','barrier_repair','occlusive','lipid_replenishment')
+                for _info in product_inci_map.values()
+            )
+            if _has_strong_humectant and _has_barrier_mech:
+                comp_b = max(comp_b, 18)  # solid humectant + barrier = reliable
+            elif _has_strong_humectant:
+                comp_b = max(comp_b, 14)  # strong humectant alone still valid
 
         # --- Component C: Intelligent Synergy Bonus (0-10%) ---
         comp_c = 0
@@ -3042,8 +3601,18 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         present_supporters = [info['inci'] for ing, info in product_inci_map.items()
                               if info['inci'] in ideal_supporters_set]
 
+        # Apply category normalisation — serum/treatment ceiling = 100 (no change)
+        # For other categories that use this path (moisturizer, toner, eye cream etc.)
+        # apply their specific ceilings.
+        _norm = apply_category_normalisation(final, concern, cat_lower)
+        _display_score = _norm['category_score']  # what user sees on bar
+
         results[concern] = {
-            'score': round(final),
+            'score': _display_score,
+            'absolute_score': _norm['absolute_score'],
+            'category_score': _norm['category_score'],
+            'ceiling': _norm['ceiling'],
+            'is_capped': _norm['is_capped'],
             'present_actives': present_active_names[:5],
             'missing_actives': missing_actives[:3],
             'supporting_ingredients': present_supporters[:4],

@@ -75,8 +75,17 @@ function FitBars({ bars, color }) {
 export function ConcernCard({ concern, data }) {
   const [open, setOpen] = useState(false);
   const ic = CONCERNS_LIST.find(c => c.key === concern)?.icon || "fa-solid fa-circle";
-  const fit = getFitLevel(data.score);
-  const barColor = getBarColor(data.score);
+
+  // Dual-score display: category-normalised score for the bar (fair comparison within
+  // category), absolute score shown as secondary context (honest cross-category view)
+  const displayScore  = data.score;                              // bar always uses category score
+  const absoluteScore = data.absolute_score ?? data.score;       // fallback for serums (ceiling=100)
+  const isCapped      = data.is_capped === true;
+  const ceiling       = data.ceiling ?? 100;
+
+  const fit      = getFitLevel(displayScore);
+  const barColor = getBarColor(displayScore);
+
   return (
     <div className="concern-result" data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
       <div className="concern-header" onClick={() => setOpen(!open)}>
@@ -87,14 +96,37 @@ export function ConcernCard({ concern, data }) {
           <span style={{ fontSize: '0.75rem', color: barColor, fontWeight: 600, marginLeft: '4px' }}>{fit.label}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`} title={`${data.score}/100 — most products fall between 20–60`}></i>
+          <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`}
+             title={`${displayScore}/100 within category — most products fall between 20–60`}></i>
         </div>
       </div>
-      <ProgressBar pct={data.score} label={concern} />
+      <ProgressBar pct={displayScore} label={concern} />
       <div className={"concern-detail" + (open ? " open" : "")}>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontStyle: 'italic', marginBottom: '6px' }}>
-          {data.score}/100 = {fit.label.toLowerCase()} vs an ideal formula for this concern. Most products fall between 20–60.
-        </p>
+
+        {/* Dual-score block — only shown when category ceiling < 100 */}
+        {isCapped ? (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '120px', background: 'var(--bg-deep)', borderRadius: '8px',
+                          padding: '8px 10px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', textTransform: 'uppercase',
+                            letterSpacing: '0.5px', marginBottom: '2px' }}>Within category</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: barColor }}>{displayScore}/100</div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>{fit.label}</div>
+            </div>
+            <div style={{ flex: 1, minWidth: '120px', background: 'var(--bg-deep)', borderRadius: '8px',
+                          padding: '8px 10px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', textTransform: 'uppercase',
+                            letterSpacing: '0.5px', marginBottom: '2px' }}>vs all formats</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-sub)' }}>{absoluteScore}/100</div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>max possible: {ceiling}/100</div>
+            </div>
+          </div>
+        ) : (
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontStyle: 'italic', marginBottom: '6px' }}>
+            {displayScore}/100 = {fit.label.toLowerCase()} vs an ideal formula for this concern. Most products fall between 20–60.
+          </p>
+        )}
+
         <ul className="concern-explain">
           {data.explanation?.map((e, i) => <li key={i}>{e}</li>)}
         </ul>
