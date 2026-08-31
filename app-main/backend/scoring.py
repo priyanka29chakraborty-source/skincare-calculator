@@ -4094,6 +4094,29 @@ def analyze_product(product_data):
         skin_type=product_data.get("skin_type", "normal")
     )
 
+    # ── Formulation score (v2) ────────────────────────────────────────────────
+    # Price-independent quality, scored against a per-category rubric that sums
+    # to 100. Replaces the old blended "worth score", in which price was 25% of
+    # a quality number and several categories could not exceed ~50 however well
+    # they were formulated. See formulation.py for the design rules.
+    import formulation as _formulation
+    _concs = estimate_concentration(ingredient_list, known_concentrations)
+    formulation_result = _formulation.score_formulation(
+        ingredient_list, _concs,
+        product_data.get("category", "Serum"),
+        known_concentrations=known_concentrations,
+    )
+    value_result = _formulation.score_value(
+        product_data.get("price", 0),
+        product_data.get("size_ml", 30),
+        product_data.get("category", "Serum"),
+        product_data.get("country", "India"),
+    )
+    # Contextual advisories (pregnancy, sensitivities). Informational only —
+    # these never reduce the formulation score, because they depend on the
+    # person rather than on how the product is made.
+    advisory_flags = _formulation.build_advisory_flags(ingredient_list)
+
     concern_fit = calculate_skin_concern_fit(
         ingredient_list,
         product_data.get("concerns", []),
@@ -4143,9 +4166,32 @@ def analyze_product(product_data):
         score_confidence_level = "low"
 
     return {
-        "main_worth_score": main_score['score'],
-        "main_worth_tier": main_score['tier_badge'],
-        "score_title": main_score['score_title'],
+        # ── Primary score: how well-made is this product, for what it is ──────
+        # Price-independent and category-specific. A flawless product in any
+        # category can reach 100.
+        "formulation_score": formulation_result['score'],
+        "formulation_category": formulation_result['category_label'],
+        "formulation_rationale": formulation_result['rationale'],
+        "formulation_breakdown": formulation_result['components'],
+        "formulation_confidence": formulation_result['confidence'],
+        "formulation_confidence_note": formulation_result['confidence_note'],
+        "formulation_flags": formulation_result['flags'],
+
+        # ── Value: reported separately, never folded into quality ────────────
+        "value_assessment": value_result,
+
+        # ── Contextual advisories — informational, never affect any score ────
+        "advisory_flags": advisory_flags,
+
+        # ── Backwards compatibility ──────────────────────────────────────────
+        # Existing clients read main_worth_score. It now carries the
+        # formulation score so old and new surfaces agree on one number.
+        "main_worth_score": formulation_result['score'],
+        "main_worth_tier": _formulation.formulation_tier(
+            formulation_result['score'], product_data.get("category", "Serum")),
+        "score_title": _formulation.formulation_summary(
+            formulation_result['score'], product_data.get("category", "Serum"),
+            formulation_result['components'], formulation_result['confidence']),
         "component_scores": {
             "A": main_score['breakdown']['active_value'],
             "B": main_score['breakdown']['formula_quality'],
