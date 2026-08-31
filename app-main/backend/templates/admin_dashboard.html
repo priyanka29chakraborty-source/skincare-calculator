@@ -277,6 +277,20 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
 // _sanitize() only strips complete <tag> constructs and does not encode quotes,
 // so it cannot protect an HTML attribute - escaping has to happen at the point
 // of injection, which is here.
+// ── CSRF ─────────────────────────────────────────────────────────────────
+// The admin session cookie is SameSite=None (required, because the public
+// frontend is on a different origin), so the browser will attach it to
+// cross-site requests too. This token is bound to the session, delivered only
+// inside this page - which itself requires a valid session - and cannot be
+// read cross-origin, so an attacker's page cannot supply it.
+const CSRF = "{{ csrf_token }}";
+function post(url, opts) {
+  opts = opts || {};
+  opts.method = 'POST';
+  opts.headers = Object.assign({}, opts.headers || {}, {'X-CSRF-Token': CSRF});
+  return fetch(url, opts);
+}
+
 function esc(v){
   if (v === null || v === undefined) return '';
   return String(v).replace(/[&<>"']/g, function(c){
@@ -514,7 +528,7 @@ async function testSite(domain, url, btn) {
   btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner spinner"></i>';
   const el = document.getElementById('tr-'+domain.replace(/\./g,'-'));
   try {
-    const r = await fetch(API+'/test-site',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    const r = await post(API+'/test-site',{headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
     const d = await r.json();
     el.className='test-result show'; el.style.background=d.success?'#f0fdf4':'#fef2f2';
     el.innerHTML = d.success?`<strong>${esc(d.source)}</strong> | ${esc(d.time_ms)}ms | Fetched: ${escList(d.fetched)}${d.missing.length?' | Missing: '+escList(d.missing):''}` : `Failed | ${d.time_ms}ms`;
@@ -620,7 +634,7 @@ async function resolveFlag(id, btn) {
   btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-spinner spinner"></i>';
   try {
-    const r = await fetch(API + '/resolve-flag/' + id, {method:'POST'});
+    const r = await post(API + '/resolve-flag/' + id);
     const d = await r.json();
     if (d.ok) {
       const row = document.getElementById('flag-row-' + id);
@@ -653,7 +667,7 @@ async function loadConfig() {
     `<div class="config-item">${set?'<i class="fa-solid fa-circle-check check"></i>':'<i class="fa-solid fa-circle-xmark cross"></i>'} ${key}</div>`).join('');
 }
 async function reloadCSV() {
-  const r = await fetch(API+'/reload-csv',{method:'POST'});
+  const r = await post(API+'/reload-csv');
   const d = await r.json();
   document.getElementById('config-msg').innerHTML = d.status==='ok'
     ?`<span style="color:var(--green)"><i class="fa-solid fa-check"></i> CSV reloaded: ${d.ingredients} ingredients</span>`
@@ -662,7 +676,7 @@ async function reloadCSV() {
 }
 async function clearOldLogs() {
   if (!confirm('Delete all fetch logs older than 30 days?')) return;
-  const r = await fetch(API+'/clear-old-logs',{method:'POST'});
+  const r = await post(API+'/clear-old-logs');
   const d = await r.json();
   document.getElementById('config-msg').innerHTML =
     `<span style="color:var(--green)"><i class="fa-solid fa-check"></i> Cleared ${d.deleted} old log entries</span>`;

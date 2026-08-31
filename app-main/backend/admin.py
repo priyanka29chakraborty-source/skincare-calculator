@@ -52,14 +52,33 @@ TEST_URLS = {
 
 import secrets
 
-_active_sessions = {}  # token -> expiry timestamp
+# token -> {'exp': float, 'csrf': str}
+_active_sessions = {}
+
+
+def _session_entry(token):
+    """Normalise the stored value.
+
+    Older sessions stored a bare expiry float. Handling both shapes means a
+    deploy does not log every admin out mid-session.
+    """
+    raw = _active_sessions.get(token)
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return raw
+    return {'exp': raw, 'csrf': None}
 
 
 def _make_session_token():
     token = secrets.token_hex(32)
-    _active_sessions[token] = time.time() + 28800  # 8 hours
+    _active_sessions[token] = {
+        'exp': time.time() + 28800,          # 8 hours
+        'csrf': secrets.token_hex(32),
+    }
     # Clean up expired sessions
-    expired = [t for t, exp in list(_active_sessions.items()) if time.time() > exp]
+    expired = [t for t, v in list(_active_sessions.items())
+               if time.time() > (v['exp'] if isinstance(v, dict) else v)]
     for t in expired:
         _active_sessions.pop(t, None)
     return token
@@ -69,12 +88,64 @@ def _verify_session(request: Request):
     token = request.cookies.get('admin_session')
     if not token:
         return False
-    expiry = _active_sessions.get(token)
-    if not expiry:
+    entry = _session_entry(token)
+    if not entry:
         return False
-    if time.time() > expiry:
+    if time.time() > entry['exp']:
         _active_sessions.pop(token, None)
         return False
+    return True
+
+
+def _get_csrf_token(request: Request):
+    """The CSRF token bound to this session, for embedding in the dashboard."""
+    entry = _session_entry(request.cookies.get('admin_session'))
+    return (entry or {}).get('csrf') or ''
+
+
+# Origins permitted to drive admin actions. The dashboard is served by this same
+# app, so in practice this is the backend's own origin.
+def _origin_is_acceptable(request: Request):
+    """Reject obvious cross-site submissions.
+
+    Defence in depth alongside the token. Sec-Fetch-Site is set by the browser
+    and cannot be spoofed by page JavaScript; when it is absent (older browsers,
+    non-browser clients) we fall back to the token alone rather than locking
+    legitimate tools out.
+    """
+    site = request.headers.get('sec-fetch-site')
+    if site and site not in ('same-origin', 'same-site', 'none'):
+        return False
+    return True
+
+
+def _require_csrf(request: Request):
+    """Guard every state-changing admin route.
+
+    The session cookie is SameSite=None because the public frontend lives on a
+    different origin from this API. That is necessary, but it means the browser
+    attaches the admin cookie to cross-site requests too, so a page the admin
+    happens to visit could fire an admin action in their session. CORS does not
+    prevent this - it governs whether the attacker can READ the response, not
+    whether the browser SENDS the request, and a deletion has already happened
+    by then.
+
+    The token is bound to the session, delivered only inside the dashboard HTML
+    (which requires a valid session to load), and cannot be read cross-origin.
+    """
+    entry = _session_entry(request.cookies.get('admin_session'))
+    if not entry:
+        raise HTTPException(401)
+    if not _origin_is_acceptable(request):
+        raise HTTPException(403, detail="Cross-site request rejected.")
+    expected = entry.get('csrf')
+    if not expected:
+        # Session predates CSRF support; require re-login rather than allowing
+        # an unprotected state change.
+        raise HTTPException(403, detail="Session out of date - please sign in again.")
+    supplied = request.headers.get('x-csrf-token', '')
+    if not supplied or not secrets.compare_digest(supplied, expected):
+        raise HTTPException(403, detail="Invalid or missing CSRF token.")
     return True
 
 
@@ -146,7 +217,7 @@ async def admin_dashboard(request: Request):
     if not _verify_session(request):
         return RedirectResponse(url="/api/admin/login", status_code=302)
     tmpl = jinja_env.get_template('admin_dashboard.html')
-    return HTMLResponse(tmpl.render())
+    return HTMLResponse(tmpl.render(csrf_token=_get_csrf_token(request)))
 
 
 # ─── API Endpoints for Dashboard Data ─────────────────────────
@@ -296,6 +367,7 @@ async def get_flagged_analyses(request: Request):
 async def resolve_flag(analysis_id: int, request: Request):
     if not _verify_session(request):
         raise HTTPException(401)
+    _require_csrf(request)
     ok = admin_db.resolve_flag(analysis_id)
     return {'ok': ok}
 
@@ -304,6 +376,7 @@ async def resolve_flag(analysis_id: int, request: Request):
 async def test_site(request: Request):
     if not _verify_session(request):
         raise HTTPException(401)
+    _require_csrf(request)
     body = await request.json()
     url = body.get('url', '')
     if not url:
@@ -356,6 +429,7 @@ async def get_db_info(request: Request):
 async def reload_csv(request: Request):
     if not _verify_session(request):
         raise HTTPException(401)
+    _require_csrf(request)
     try:
         data_loader.load_data()
         return {'status': 'ok', 'ingredients': len(data_loader.ingredient_lookup)}
@@ -367,6 +441,7 @@ async def reload_csv(request: Request):
 async def clear_old_logs(request: Request):
     if not _verify_session(request):
         raise HTTPException(401)
+    _require_csrf(request)
     deleted = admin_db.clear_old_logs(30)
     return {'deleted': deleted}
 
