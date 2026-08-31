@@ -268,6 +268,23 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
 </div><!-- .content -->
 
 <script>
+// ── XSS defence ──────────────────────────────────────────────────────────
+// Every value below originates from untrusted input: product URLs supplied to
+// /api/fetch-product (the `domain` is urlparse(netloc), which happily keeps
+// quotes and angle brackets) and ingredient/product text posted to
+// /api/analyze. Both endpoints are unauthenticated, so an attacker can plant a
+// payload that executes here in an authenticated admin session. The server-side
+// _sanitize() only strips complete <tag> constructs and does not encode quotes,
+// so it cannot protect an HTML attribute - escaping has to happen at the point
+// of injection, which is here.
+function esc(v){
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function escList(a){ return Array.isArray(a) ? a.map(esc).join(', ') : esc(a); }
+
 const API = '/api/admin';
 const COLORS = ['#BF8888','#C9A87C','#8BA89C','#9B8EC4','#D4A574','#7BAFD4','#D48BA5','#8BC9A8'];
 
@@ -346,7 +363,7 @@ async function loadLogs() {
     if (log.success && missing.length===0){cls='row-green';badge='<span class="badge badge-green">Full</span>';}
     else if (log.success){cls='row-yellow';badge='<span class="badge badge-yellow">Partial</span>';}
     const ts = log.timestamp?log.timestamp.substring(0,19).replace('T',' '):'';
-    tbody.innerHTML += `<tr class="${cls}"><td style="white-space:nowrap">${ts}</td><td>${log.domain||'-'}</td><td>${log.layer_attempted||'-'}</td><td>${fetched.join(', ')||'-'}</td><td>${missing.join(', ')||'-'}</td><td>${Math.round(log.response_time_ms||0)}ms</td><td>${badge}</td></tr>`;
+    tbody.innerHTML += `<tr class="${cls}"><td style="white-space:nowrap">${ts}</td><td>${esc(log.domain||'-')}</td><td>${esc(log.layer_attempted||'-')}</td><td>${escList(fetched)||'-'}</td><td>${escList(missing)||'-'}</td><td>${Math.round(log.response_time_ms||0)}ms</td><td>${badge}</td></tr>`;
   }
 }
 document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -427,7 +444,7 @@ async function loadAnalytics() {
   } else {
     const max = td.trends[0].count||1;
     tel.innerHTML = td.trends.map(t=>`<li class="trend-item">
-      <span style="min-width:140px;font-weight:500">${t.name}</span>
+      <span style="min-width:140px;font-weight:500">${esc(t.name)}</span>
       <div class="trend-bar-bg"><div class="trend-bar-fill" style="width:${Math.round(t.count/max*100)}%"></div></div>
       <span class="trend-count">${t.count}</span></li>`).join('');
   }
@@ -444,18 +461,18 @@ async function loadAnalytics() {
       const score = a.main_worth_score!=null?Math.round(a.main_worth_score):'-';
       const scoreColor = score>=75?'var(--green)':score>=50?'var(--yellow)':'var(--red)';
       const ft = a.fetch_type||'manual';
-      const badge = ftBadge[ft]||`<span class="badge badge-gray">${ft}</span>`;
+      const badge = ftBadge[ft]||`<span class="badge badge-gray">${esc(ft)}</span>`;
       const flagIcon = a.is_flagged?'<i class="fa-solid fa-flag" style="color:var(--red);margin-left:4px" title="Flagged"></i>':'';
       return `<tr class="${a.is_flagged?'row-red':''}">
         <td style="white-space:nowrap;font-size:0.72rem">${ts}</td>
-        <td style="font-weight:500">${a.product_name||'<em style="color:var(--text-sub)">—</em>'}${flagIcon}</td>
-        <td>${a.brand||'—'}</td>
-        <td>${a.product_category||'—'}</td>
-        <td>${a.skin_type||'—'}</td>
+        <td style="font-weight:500">${a.product_name?esc(a.product_name):'<em style="color:var(--text-sub)">—</em>'}${flagIcon}</td>
+        <td>${esc(a.brand||'—')}</td>
+        <td>${esc(a.product_category||'—')}</td>
+        <td>${esc(a.skin_type||'—')}</td>
         <td>${a.ingredient_count||0}</td>
         <td style="font-weight:700;color:${scoreColor}">${score}</td>
         <td>${badge}</td>
-        <td>${a.country||'—'}</td>
+        <td>${esc(a.country||'—')}</td>
       </tr>`;
     }).join('');
   }
@@ -479,16 +496,16 @@ async function loadSites() {
     const warnHtml = stat.health_warning?`<span style="color:var(--red);font-size:0.68rem;font-weight:600;display:block;margin-top:2px">⚠ Scraper likely broken</span>`:'';
     const testUrl = TEST_URLS[stat.domain];
     tbody.innerHTML += `<tr class="${stat.health_warning?'row-red':''}">
-      <td><strong>${stat.domain}</strong>${warnHtml}</td>
+      <td><strong>${esc(stat.domain)}</strong>${warnHtml}</td>
       <td style="font-size:0.72rem">${stat.last_tested?stat.last_tested.substring(0,16).replace('T',' '):'—'}</td>
       <td><span class="badge ${rateClass}">${rate}%</span></td>
       <td>${Math.round(stat.avg_ms)}ms</td>
-      <td style="font-size:0.7rem">${stat.missing_fields&&stat.missing_fields.length?stat.missing_fields.join(', '):'—'}</td>
+      <td style="font-size:0.7rem">${stat.missing_fields&&stat.missing_fields.length?escList(stat.missing_fields):'—'}</td>
       <td>${stat.total}</td>
       <td><div class="dot ${dot}" style="display:inline-block"></div></td>
       <td>${testUrl
-        ?`<button class="btn btn-secondary btn-sm" onclick="testSite('${stat.domain}','${testUrl}',this)"><i class="fa-solid fa-play"></i> Test</button>
-           <div class="test-result" id="tr-${stat.domain.replace(/\./g,'-')}"></div>`
+        ?`<button class="btn btn-secondary btn-sm" onclick="testSite('${esc(stat.domain)}','${esc(testUrl)}',this)"><i class="fa-solid fa-play"></i> Test</button>
+           <div class="test-result" id="tr-${esc(stat.domain).replace(/\./g,'-')}"></div>`
         :'<span style="color:var(--text-sub);font-size:0.7rem">—</span>'}</td>
     </tr>`;
   }
@@ -500,8 +517,8 @@ async function testSite(domain, url, btn) {
     const r = await fetch(API+'/test-site',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
     const d = await r.json();
     el.className='test-result show'; el.style.background=d.success?'#f0fdf4':'#fef2f2';
-    el.innerHTML = d.success?`<strong>${d.source}</strong> | ${d.time_ms}ms | Fetched: ${d.fetched.join(', ')}${d.missing.length?' | Missing: '+d.missing.join(', '):''}` : `Failed | ${d.time_ms}ms`;
-  } catch(e){el.className='test-result show';el.style.background='#fef2f2';el.innerHTML='Error: '+e.message;}
+    el.innerHTML = d.success?`<strong>${esc(d.source)}</strong> | ${esc(d.time_ms)}ms | Fetched: ${escList(d.fetched)}${d.missing.length?' | Missing: '+escList(d.missing):''}` : `Failed | ${d.time_ms}ms`;
+  } catch(e){el.className='test-result show';el.style.background='#fef2f2';el.textContent='Error: '+e.message;}
   btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-play"></i> Test';
 }
 async function testAllSites() {
@@ -579,17 +596,17 @@ async function loadFlagged() {
     const score = a.main_worth_score!=null?Math.round(a.main_worth_score):'-';
     const scoreColor = score<15?'var(--red)':score<25?'#d97706':'var(--text)';
     const ft = a.fetch_type||'manual';
-    const badge = ftBadge[ft]||`<span class="badge badge-gray">${ft}</span>`;
-    const ingsPreview = a.ingredients?`<div class="ingredients-preview" title="${a.ingredients}">${a.ingredients}</div>`:'';
+    const badge = ftBadge[ft]||`<span class="badge badge-gray">${esc(ft)}</span>`;
+    const ingsPreview = a.ingredients?`<div class="ingredients-preview" title="${esc(a.ingredients)}">${esc(a.ingredients)}</div>`:'';
     const isResolved = !a.flag_reason; // resolved rows have flag_reason cleared
     return `<tr class="${isResolved?'resolved-row':'row-red'}" id="flag-row-${a.id}">
       <td style="white-space:nowrap;font-size:0.72rem">${ts}</td>
-      <td style="font-weight:500">${a.product_name||'<em style="color:var(--text-sub)">Unknown product</em>'}${ingsPreview}</td>
-      <td>${a.brand||'—'}</td>
+      <td style="font-weight:500">${a.product_name?esc(a.product_name):'<em style="color:var(--text-sub)">Unknown product</em>'}${ingsPreview}</td>
+      <td>${esc(a.brand||'—')}</td>
       <td style="font-weight:700;color:${scoreColor}">${score}</td>
       <td>${a.ingredient_count||0}</td>
       <td>${badge}</td>
-      <td><span class="flag-reason">${a.flag_reason||'Resolved'}</span></td>
+      <td><span class="flag-reason">${esc(a.flag_reason||'Resolved')}</span></td>
       <td>${isResolved
         ? '<span style="color:var(--text-sub);font-size:0.7rem">Resolved</span>'
         : `<button class="btn btn-success btn-sm" onclick="resolveFlag(${a.id},this)">

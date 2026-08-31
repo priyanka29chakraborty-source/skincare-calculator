@@ -10,7 +10,7 @@ import requests
 import time
 import hashlib
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from scoring import analyze_product
 from data_loader import data_loader
@@ -103,9 +103,11 @@ async def payload_limit_middleware(request: Request, call_next):
 
 class AnalyzeRequest(BaseModel):
     ingredients: str
-    price: float = 0
-    size: float = 30  # default 30ml
-    size_ml: Optional[float] = None
+    # ge=0: a negative price previously slipped past `if not price` (False for
+    # negatives) and produced the *maximum* price-fairness score.
+    price: float = Field(0, ge=0, le=10_000_000)
+    size: float = Field(30, ge=0, le=100_000)  # default 30ml
+    size_ml: Optional[float] = Field(None, ge=0, le=100_000)
     category: str = "Serum"
     skin_concerns: Optional[List[str]] = []
     concerns: Optional[List[str]] = []
@@ -154,6 +156,12 @@ async def health():
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}
+# Derived from the scoring engine's own concern map so the two cannot drift.
+try:
+    from config import CONCERNS_MAP as _CONCERNS_MAP
+    VALID_CONCERNS = set(_CONCERNS_MAP.keys())
+except Exception:
+    VALID_CONCERNS = set()
 VALID_CATEGORIES = {'serum', 'moisturizer', 'cleanser', 'toner', 'sunscreen',
                     'eye cream', 'mask', 'treatment', 'facial oil', 'oil'}
 
@@ -185,7 +193,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
             'price': req.price,
             'size_ml': size_ml,
             'category': category_display,
-            'concerns': [_sanitize(c) for c in concerns],
+            'concerns': [c for c in (_sanitize(x) for x in concerns)
+                         if not VALID_CONCERNS or c in VALID_CONCERNS],
             'skin_type': skin_type_raw,
             'country': _sanitize(req.country) or "India",
             'currency': _sanitize(req.currency) or "INR",
@@ -316,6 +325,15 @@ async def fetch_from_barcode(barcode: str):
 
 
 async def fetch_from_url(url: str):
+    from url_guard import validate_public_url, UnsafeURLError
+    try:
+        url = validate_public_url(url)
+    except UnsafeURLError as exc:
+        logger.warning("Rejected fetch-product URL: %s", exc)
+        return JSONResponse(status_code=400, content={
+            "error": "That URL cannot be fetched. Provide a public product page "
+                     "link (http or https).",
+        })
     try:
         result = await fetch_product_data(url, timeout=25)
         if result:
@@ -725,9 +743,17 @@ async def find_alternatives(req: FindAlternativesRequest, request: Request):
     }
 
 
+_RATES_CACHE = {}
+_RATES_TTL = 3600
+
+
 @api_router.get("/rates")
-async def get_rates():
+@limiter.limit("20/minute")
+async def get_rates(request: Request):
     import json as _json
+    _cached = _RATES_CACHE.get('v')
+    if _cached and (time.time() - _cached['ts']) < _RATES_TTL:
+        return _cached['data']
     FALLBACK_PATH = ROOT_DIR / 'fallback_rates.json'
 
     def _load_fallback():
@@ -744,7 +770,9 @@ async def get_rates():
     try:
         resp = requests.get(f"https://v6.exchangerate-api.com/v6/{api_key}/latest/USD", timeout=10)
         if resp.status_code == 200:
-            return {"rates": resp.json().get("conversion_rates", {}), "base": "USD", "source": "live"}
+            _live = {"rates": resp.json().get("conversion_rates", {}), "base": "USD", "source": "live"}
+            _RATES_CACHE['v'] = {'data': _live, 'ts': time.time()}
+            return _live
         logger.warning(f"ExchangeRate API returned {resp.status_code} — using fallback")
         return _load_fallback()
     except Exception as e:

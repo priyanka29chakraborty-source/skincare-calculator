@@ -1465,6 +1465,17 @@ async def fetch_product_data(url, timeout=25):
         log_fetch = lambda *a, **k: None
         increment_credits = lambda *a, **k: None
 
+    # ── SSRF guard ────────────────────────────────────────────────────────
+    # This function fetches an arbitrary caller-supplied URL server-side, so it
+    # must never be reachable for loopback, link-local (cloud metadata) or
+    # private-network addresses. Validated once here, before any layer runs.
+    from url_guard import validate_public_url, UnsafeURLError
+    try:
+        url = validate_public_url(url)
+    except UnsafeURLError as exc:
+        logger.warning("Refused to fetch unsafe URL: %s", exc)
+        return None
+
     domain = urlparse(url).netloc.replace('www.', '') if url else ''
     ALL_FIELDS = ['product_name', 'brand', 'price', 'size_ml', 'ingredients', 'category', 'country']
     partial_data = None
