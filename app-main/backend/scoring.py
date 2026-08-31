@@ -3300,9 +3300,39 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
     product_inci_set = {v['inci'] for v in product_inci_map.values()}
     product_inci_lower = {v['inci'].lower() for v in product_inci_map.values()}
 
+    def _use_uv_logic(concern):
+        """Whether to judge this concern by sunscreen standards.
+
+        'Tanning' and 'UV Damage' each describe two different jobs:
+          - PREVENTION, which needs UV filters (a sunscreen's job), and
+          - FADING / REPAIR of tanning and damage that already happened, which
+            is done with brightening actives and exfoliants.
+
+        A de-tan mask, a brightening serum or a vitamin C treatment does the
+        second. Marking one down for "missing UVA1 filter" is judging it against
+        a job it was never meant to do - no mask contains UV filters, and none
+        should. So sunscreen logic applies only when the product is a sun
+        product by category.
+
+        'Sun Protection' is different and always uses UV logic: a product with
+        no filters genuinely cannot protect against sun, so a low score is the
+        correct answer rather than an unfair one.
+
+        Note this is decided by CATEGORY, not by whether UV-filter ingredients
+        appear. Titanium dioxide and zinc oxide are widely used as white
+        pigments and opacifiers in masks, primers and cleansers, so their
+        presence is not evidence that a product is a sun product - the de-tan
+        mask that exposed this bug contains titanium dioxide purely as a
+        colourant.
+        """
+        if concern == 'Sun Protection':
+            return True
+        return cat_lower in ('sunscreen', 'sunblock', 'spf')
+
     for concern in concerns:
-        # Use specialized UV scoring for Sun Protection, UV Damage, Tanning
-        if concern in UV_CONCERN_SET:
+        # Use specialized UV scoring for Sun Protection, and for Tanning /
+        # UV Damage only when the product is actually a sun product.
+        if concern in UV_CONCERN_SET and _use_uv_logic(concern):
             synergies = data_loader.get_synergies(concern)
             _uv_result = _score_uv_concern(
                 concern, ingredient_list, concentrations,
@@ -3404,15 +3434,23 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             contribution = ev_factor * conc_factor * syn_factor
             active_contributions.append(contribution)
 
-        # Theoretical max: cap at 4 ideal actives for realistic normalization
-        # This allows a product with 1-2 strong actives to score meaningfully
-        norm_count = min(4, len(ideal_actives))
-        for _ in range(norm_count):
-            max_theoretical += 1.2 * 1.0 * 1.1
-
-        if max_theoretical > 0:
-            comp_a = (sum(active_contributions) / max_theoretical) * 50
-        comp_a = min(50, comp_a)
+        # ── How well do the actives this product ACTUALLY has address the
+        #    concern? ─────────────────────────────────────────────────────────
+        # This used to normalise against four ideal actives
+        # (max_theoretical = 4 x 1.2 x 1.0 x 1.1 = 5.28), so a product with one
+        # excellent, well-dosed active scored ~11/50 - marked down for the three
+        # actives it did not contain rather than judged on the one it did. A
+        # lactic acid mask scored 13/100 for dullness on that basis, despite
+        # lactic acid being a genuine, evidenced treatment for dullness.
+        #
+        # There is no evidence that more actives works better; formulation space
+        # and irritant load are both finite, and stacking actives has costs. So
+        # the first strong active carries most of the weight and each additional
+        # one adds less. A single optimal-dose, strong-evidence active reaches
+        # roughly 78% of the budget on its own; two comfortably max it.
+        active_contributions.sort(reverse=True)
+        saturated = sum(c * (0.6 ** i) for i, c in enumerate(active_contributions))
+        comp_a = min(60, (saturated / 1.7) * 60)
 
         # --- Component B: Support System Quality (0-20%) ---
         has_barrier = False
@@ -3476,7 +3514,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         support_flags = sum([has_barrier, has_anti_inflammatory, has_humectant, has_antioxidant])
         # Blend: mechanism strength (primary) + flag count (secondary, for edge cases)
         _flag_pts = min(8, support_flags * 2 + (2 if support_count >= 2 else 0))
-        comp_b = round(min(20, (_support_strength / 3.0) * 12 + _flag_pts), 1)
+        comp_b = round(min(25, (_support_strength / 2.2) * 15 + _flag_pts * 1.25), 1)
 
         # Hydration-specific comp_b floor: mechanism scoring already accounts for
         # strength, but we guarantee minimums for products that clearly work as
@@ -3494,9 +3532,9 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                 for _info in product_inci_map.values()
             )
             if _has_strong_humectant and _has_barrier_mech:
-                comp_b = max(comp_b, 18)  # solid humectant + barrier = reliable
+                comp_b = max(comp_b, 22)  # solid humectant + barrier = reliable
             elif _has_strong_humectant:
-                comp_b = max(comp_b, 14)  # strong humectant alone still valid
+                comp_b = max(comp_b, 17)  # strong humectant alone still valid
 
         # --- Component C: Intelligent Synergy Bonus (0-10%) ---
         comp_c = 0
@@ -3511,7 +3549,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                 comp_c += syn['bonus']
                 synergy_found.append(syn['mechanism'])
                 seen_groups.add(group_id)
-        comp_c = min(10, comp_c)
+        comp_c = min(15, comp_c * 1.5)
 
         # --- Component D: Worsening Ingredient Penalty (max -30%) ---
         comp_d = 0
@@ -3539,6 +3577,11 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
 
         comp_d = max(-30, comp_d)
 
+        # Components sum to 100: actives 60 + support 25 + synergy 15,
+        # minus up to 30 for ingredients that work against the concern.
+        # Previously these summed to 80, so an ideal formula for a concern
+        # could not exceed 80 and in practice peaked around 60 - which is
+        # why the UI had to tell users 'most products fall between 20-60'.
         final = max(0, min(100, comp_a + comp_b + comp_c + comp_d))
 
         # Hydration floor: a product with ≥3 classic humectants and minimal penalty
@@ -3566,16 +3609,32 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                 "Solid hydrating base with multiple humectants; not a high-powered treatment serum."
             )
         elif present_actives_data:
+            # Lead with what this product ACTUALLY contains for the concern, and
+            # why it does or does not go far enough. Opening with a list of
+            # absent ingredients reads as a scolding for what the product is not,
+            # and tells the user nothing about what they are holding.
+            _names = [d.get('inci') or d.get('name') for d in present_actives_data
+                      if (d.get('inci') or d.get('name'))]
+            _lead = ", ".join(_names[:2]) if _names else None
             if comp_a >= 30:
-                explanation.append("Strong clinically supported ingredients present")
+                explanation.append(
+                    "Contains {} — well suited to this concern.".format(_lead)
+                    if _lead else "Strong clinically supported ingredients present")
             elif comp_a >= 15:
-                explanation.append("Some clinically supported ingredients present")
+                explanation.append(
+                    "Contains {}, which does target this concern, though at a "
+                    "supporting rather than treatment strength.".format(_lead)
+                    if _lead else "Some clinically supported ingredients present")
             else:
-                # No prominent actives but supporters present
-                if support_count >= 2 or support_flags >= 2:
+                if _lead:
                     explanation.append(
-                        "Supportive formula for this concern, but missing the strongest treatment actives."
-                    )
+                        "Contains {}, but it appears low in the ingredient list, "
+                        "so it is likely below the concentration shown to work "
+                        "for this concern.".format(_lead))
+                elif support_count >= 2 or support_flags >= 2:
+                    explanation.append(
+                        "Supportive formula for this concern, but without a "
+                        "treatment-strength active.")
                 else:
                     explanation.append("Limited active ingredients for this concern")
         else:
@@ -3595,7 +3654,12 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         else:
             explanation.append("Contains ingredients that may worsen condition")
         if missing_actives:
-            explanation.append(f"Key actives not found: {', '.join(missing_actives[:2])}")
+            # Framed as a suggestion for the routine, not a deduction against
+            # this product. A cleanser is not a worse cleanser for lacking
+            # niacinamide; it simply is not the step that delivers it.
+            explanation.append(
+                "Could be paired with {} for a stronger effect on this concern."
+                .format(' or '.join(missing_actives[:2])))
 
         # Supporting ingredient display
         present_supporters = [info['inci'] for ing, info in product_inci_map.items()
