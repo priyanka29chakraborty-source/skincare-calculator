@@ -197,11 +197,36 @@ def one_percent_line(ingredient_list):
     return len(ingredient_list)
 
 
+# Preservatives the ingredient database does not classify as such. Missing any
+# of these produces a false "no preservative" warning on a properly preserved
+# product, which is worse than useless - it tells the user a safe formula is
+# unsafe.
+_EXTRA_PRESERVATIVES = (
+    'chlorhexidine', 'iodopropynyl butylcarbamate', 'methylisothiazolinone',
+    'methylchloroisothiazolinone', 'benzalkonium chloride', 'benzethonium chloride',
+    'sodium hydroxymethylglycinate', 'diazolidinyl urea', 'imidazolidinyl urea',
+    'dmdm hydantoin', 'quaternium-15', 'sorbic acid', 'salicylic acid',
+    'zinc pyrithione', 'climbazole', 'piroctone olamine', 'undecylenic acid',
+)
+
+# Multifunctional humectants and solvents with mild antimicrobial activity.
+# These BOOST a preservative system but are not adequate preservation on their
+# own, so they earn partial credit rather than a clean pass.
+_PRESERVATIVE_BOOSTERS = (
+    'pentylene glycol', 'propanediol', '1,3-propanediol', 'butylene glycol',
+    'hexylene glycol', 'glyceryl caprylate', 'glyceryl undecylenate',
+    'caprylhydroxamic acid', 'ethylhexylglycerin', 'phenylpropanol',
+)
+
+
 def _has_preservative(ingredient_list):
+    """True when the formula carries a recognised primary preservative."""
     preserved = data_loader.role_sets.get('preservative', set())
     for ing in ingredient_list:
         n = _norm(ing)
         if n in preserved:
+            return True
+        if any(m in n for m in _EXTRA_PRESERVATIVES):
             return True
         d = data_loader.get_ingredient_data(ing) or {}
         if 'preserv' in str(d.get('Functional_Category', '')).lower():
@@ -209,6 +234,11 @@ def _has_preservative(ingredient_list):
         if str(d.get('Ingredient_Class', '')).lower() == 'preservative':
             return True
     return False
+
+
+def _has_preservative_booster(ingredient_list):
+    """Multifunctionals that support preservation without replacing it."""
+    return _any(ingredient_list, _PRESERVATIVE_BOOSTERS)
 
 
 # --- Shared component scorers -----------------------------------------------
@@ -377,6 +407,23 @@ def _score_integrity(ingredient_list, max_pts, category):
     elif _has_preservative(ingredient_list):
         preserve_pts = preserve_budget
         explanations.append("Adequately preserved.")
+    elif _has_preservative_booster(ingredient_list):
+        # Multifunctional glycols raise the antimicrobial hurdle but are not
+        # adequate preservation alone. Partial credit, and a softer message -
+        # this is a formulation question, not an alarm.
+        preserve_pts = preserve_budget * 0.5
+        explanations.append(
+            "Relies on multifunctional ingredients rather than a conventional "
+            "preservative.")
+        flags.append({
+            'type': 'preservative_boosters_only',
+            'severity': 'info',
+            'message': "This formula appears to rely on multifunctional "
+                       "ingredients (such as pentylene glycol) rather than a "
+                       "conventional preservative. That can work, but it is a "
+                       "narrower margin - pay attention to the shelf life once "
+                       "opened.",
+        })
     else:
         preserve_pts = 0.0
         explanations.append(
