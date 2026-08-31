@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { getBarColor } from "../constants";
-import { ScoreCircle, TierBadge, BreakdownRow, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
+import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
+import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
 import AlternativesCard from "./AlternativesCard";
 import BestPriceCard from "./BestPriceCard";
 
@@ -672,31 +673,27 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           </div>
         )}
 
+        {/* Value and personal advisories sit ABOVE the collapsed breakdown on
+            purpose. Price is shown next to the quality score rather than inside
+            it, and a pregnancy advisory must never be hidden behind a toggle
+            the user has to discover. */}
+        <ValueCard value={result.value_assessment} currency={currency} />
+        <AdvisoryFlags flags={result.advisory_flags} />
+
         <button className="breakdown-toggle" data-testid="breakdown-toggle" onClick={() => setShowBreakdown(!showBreakdown)} aria-expanded={showBreakdown}>
           {showBreakdown ? "Hide" : "Show"} Analysis Details {showBreakdown ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
         </button>
         <div className={"breakdown" + (showBreakdown ? " open" : "")} data-testid="breakdown-details">
-          {/* Cleanser relabels first bar to "Skin Barrier Safety Score" */}
-          {/* Category-specific component rows — max values match actual 100pt weights */}
-          <BreakdownRow icon="fa-solid fa-droplet"
-            label={isCleanser ? "Surfactant & Barrier Safety" : isFacialOil ? "Lipid Matrix Score" : "Active Ingredients (What's Inside)"}
-            score={result.component_scores?.A}
-            max={isFacialOil ? 40 : 45}
-            details={result.component_details?.A} />
-          <BreakdownRow icon="fa-solid fa-flask"
-            label={isFacialOil ? "Botanical Activity" : "Formula Quality (How Well Made)"}
-            score={result.component_scores?.B}
-            max={isFacialOil ? 25 : 20}
-            details={result.component_details?.B} />
-          <BreakdownRow icon="fa-solid fa-check-circle"
-            label={isFacialOil ? "Pore Safety (Comedogenic)" : "Claims vs Reality (Honesty Score)"}
-            score={result.component_scores?.C}
-            max={isFacialOil ? 15 : 15}
-            details={result.component_details?.C} />
-          <BreakdownRow icon="fa-solid fa-shield-halved" label="Safety Profile"
-            score={result.component_scores?.D} max={10} details={result.component_details?.D} />
-          <BreakdownRow icon="fa-solid fa-coins" label="Price Fairness"
-            score={result.component_scores?.E} max={10} details={result.component_details?.E} />
+          {/* Category-aware breakdown. Components and weights come from the
+              backend rubric for this product type, so a cleanser is judged on
+              surfactant mildness and a sunscreen on its filter system, rather
+              than every category being forced through the same five bars.
+              These always sum to the headline score. */}
+          <FormulationBreakdown result={result} />
+          <ConfidenceNote
+            level={result.formulation_confidence}
+            note={result.formulation_confidence_note} />
+          <FormulationFlags flags={result.formulation_flags} />
         </div>
 
         {result.red_flags?.length > 0 && (

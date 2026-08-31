@@ -1,5 +1,26 @@
 import { CONCERNS_LIST, SKIN_TYPES, CATEGORIES, COUNTRIES, SIZE_UNITS, CURRENCY_MAP } from "../constants";
 
+
+// Keyboard support for the custom radio chips. They carry role="radio", which
+// promises arrow-key navigation and space/enter selection to assistive tech;
+// without this they were announced as radios but could not be operated at all.
+function handleRadioKey(e, options, current, onSelect) {
+  const i = options.indexOf(current);
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    onSelect(current);
+    return;
+  }
+  const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
+  const back = e.key === "ArrowLeft" || e.key === "ArrowUp";
+  if (!forward && !back) return;
+  e.preventDefault();
+  const next = options[(i + (forward ? 1 : -1) + options.length) % options.length];
+  onSelect(next);
+  const el = e.currentTarget.parentElement?.children[options.indexOf(next)];
+  if (el) el.focus();
+}
+
 export default function InputForm({
   fetchInput, setFetchInput, fetchLoading, fetchMsg, fetchStatus, fetchError, handleFetch,
   fetchVerifyPending, onFetchVerifyDismiss,
@@ -127,6 +148,8 @@ export default function InputForm({
         <div className="skin-type-row" role="radiogroup" aria-label="Skin type">
           {SKIN_TYPES.map(t => (
             <div key={t} role="radio" aria-checked={skinType === t} data-testid={`skin-type-${t.toLowerCase()}`}
+              tabIndex={skinType === t || (!skinType && t === SKIN_TYPES[0]) ? 0 : -1}
+              onKeyDown={e => handleRadioKey(e, SKIN_TYPES, t, setSkinType)}
               className={`skin-chip ${skinType === t ? "active" : ""}`} onClick={() => setSkinType(t)}>{t}</div>
           ))}
         </div>
@@ -134,6 +157,10 @@ export default function InputForm({
         <div className="concerns-grid" role="group" aria-label="Skin concerns">
           {CONCERNS_LIST.map(c => (
             <div key={c.key} data-testid={`concern-${c.key.replace(/\s+/g, "-").toLowerCase()}`}
+              role="button" tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleConcern(c.key); }
+              }}
               className={`concern-card ${concerns.includes(c.key) ? "selected" : ""}`}
               onClick={() => toggleConcern(c.key)} aria-pressed={concerns.includes(c.key)}>
               <span className="concern-icon"><i className={c.icon}></i></span>

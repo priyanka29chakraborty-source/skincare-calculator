@@ -117,7 +117,10 @@ async def admin_login(request: Request):
         tmpl = jinja_env.get_template('admin_login.html')
         return HTMLResponse(tmpl.render(error="Too many attempts. Try again in 30 minutes."))
 
-    if password == _get_admin_password() and _get_admin_password():
+    _expected = _get_admin_password()
+    # Constant-time comparison: `==` short-circuits on the first
+    # mismatched byte, which leaks how much of the password was correct.
+    if _expected and secrets.compare_digest(password, _expected):
         _record_attempt(ip, True)
         token = _make_session_token()
         resp = RedirectResponse(url="/api/admin/dashboard", status_code=302)
