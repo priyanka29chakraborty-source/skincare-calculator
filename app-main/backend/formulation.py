@@ -581,7 +581,7 @@ def _score_hydration(ingredient_list, max_pts):
     # Position matters: a humectant in the top 5 is present at a meaningful level.
     for i, (ing, pos) in enumerate(found[:5]):
         positional = 1.0 if pos < 5 else (0.65 if pos < 10 else 0.4)
-        pts += max_pts * 0.50 * positional * (0.6 ** i)
+        pts += max_pts * 0.44 * positional * (0.55 ** i)
 
     glycerin_high = any('glycerin' in _norm(i) and p < 5 for i, p in found)
     notes = ["Hydration from {}.".format(
@@ -706,12 +706,32 @@ def _score_surfactant_system(ingredient_list, max_pts):
         })
     elif harsh and mild:
         # Blending a non-ionic/amphoteric with an anionic genuinely reduces
-        # irritation versus the anionic alone.
-        pts = max_pts * 0.62
-        explanations.append(
-            "Blends {} with gentler co-surfactants ({}), which measurably "
-            "reduces irritation compared with a sulfate alone."
-            .format(harsh[0], mild[0]))
+        # irritation versus the anionic alone - but only meaningfully when the
+        # sulfate is not still doing most of the cleansing. Position matters:
+        # a sulfate listed before the gentle co-surfactants is the primary
+        # agent, and the blend bonus should be small.
+        _pos = {_norm(i): k for k, i in enumerate(ingredient_list)}
+        harsh_first = min((_pos.get(_norm(h), 99) for h in harsh), default=99)
+        mild_first = min((_pos.get(_norm(m), 99) for m in mild), default=99)
+        if harsh_first < mild_first:
+            pts = max_pts * 0.42
+            explanations.append(
+                "Built primarily on {}, a sulfate surfactant, with gentler "
+                "co-surfactants further down the list."
+                .format(harsh[0]))
+            flags.append({
+                'type': 'harsh_surfactant',
+                'severity': 'info',
+                'message': "{} is the main cleansing agent here. The gentler "
+                           "co-surfactants soften it, but this is still a "
+                           "sulfate-led formula.".format(harsh[0]),
+            })
+        else:
+            pts = max_pts * 0.66
+            explanations.append(
+                "Led by gentler surfactants ({}) with {} as a secondary agent, "
+                "which measurably reduces irritation versus a sulfate alone."
+                .format(mild[0], harsh[0]))
     elif soap and not mild:
         pts = max_pts * 0.35
         explanations.append(
@@ -817,6 +837,9 @@ def _score_uv_system(ingredient_list, max_pts_uva, max_pts_photo, max_pts_uvb):
     unstable = [(ing, uv) for ing, uv in filters
                 if str(uv.get('Photostability_Rating', '')).strip().lower()
                 in ('low', 'poor', 'very low')]
+    middling = [(ing, uv) for ing, uv in filters
+                if str(uv.get('Photostability_Rating', '')).strip().lower()
+                in ('moderate', 'medium')]
     stabilisers = [ing for ing, uv in filters
                    if str(uv.get('Photostabilizer', '')).strip().lower().startswith('yes')]
     # Film formers and SPF boosters also contribute to real-world performance.
@@ -840,6 +863,14 @@ def _score_uv_system(ingredient_list, max_pts_uva, max_pts_photo, max_pts_uvb):
         explanations.append(
             "{} is photounstable on its own but is stabilised here by {}."
             .format(unstable[0][0], stabilisers[0]))
+    elif middling:
+        # Partially photostable filters (octinoxate and the salicylates) lose
+        # meaningful protection over a few hours of exposure. Not a failure,
+        # but not the full budget either.
+        photo_pts = max_pts_photo * (0.80 if stabilisers else 0.62)
+        explanations.append(
+            "{} is only moderately photostable, so protection declines over "
+            "several hours of sun exposure.".format(middling[0][0]))
     else:
         explanations.append("Filter system is inherently photostable.")
 
@@ -893,6 +924,42 @@ def _score_oil_lipids(ingredient_list, max_pts, skin_type='normal'):
 
     fa = float(res.get('fa_score', 0) or 0)          # 0-50 raw
     pts = min(max_pts, (fa / 50.0) * max_pts)
+
+    # The fatty-acid model reads linoleic/oleic balance across a BLEND, so it
+    # scores near zero for two things it should rate highly:
+    #   - squalane, which is a saturated hydrocarbon, not a triglyceride, and
+    #     is among the most stable and best-tolerated emollients available;
+    #   - single-oil products, which have no "diversity" to measure but can be
+    #     excellent (100% squalane, cold-pressed rosehip, pure jojoba).
+    # Pilgrim's 100% Squalane scored 8.4/35 on lipid profile before this.
+    _PREMIUM_EMOLLIENTS = {
+        'squalane': 1.00,           # saturated, non-comedogenic, very stable
+        'simmondsia chinensis': 0.92,   # jojoba - wax ester, sebum-mimetic
+        'caprylic/capric triglyceride': 0.88,
+        'argania spinosa': 0.85,
+        'rosa canina': 0.82,
+        'sclerocarya birrea': 0.82,     # marula
+        'coco-caprylate': 0.85,
+        'isoamyl laurate': 0.85,
+        'sesamum indicum': 0.72,
+        'helianthus annuus': 0.70,
+        'prunus amygdalus dulcis': 0.72,
+        'olea europaea': 0.62,
+        'cocos nucifera oil': 0.40,     # highly comedogenic on facial skin
+    }
+    best = 0.0
+    best_name = None
+    for ing in ingredient_list:
+        n = _norm(ing)
+        for marker, quality in _PREMIUM_EMOLLIENTS.items():
+            if marker in n and quality > best:
+                best, best_name = quality, ing
+    if best:
+        # Judge the oil on the quality of its base lipid, and take whichever
+        # reading is kinder - a rich blend scores through the fatty-acid model,
+        # a pure single oil scores through this one.
+        pts = max(pts, best * max_pts)
+
     notes = []
     lin = res.get('linoleic_count', 0)
     ole = res.get('oleic_count', 0)
@@ -1145,7 +1212,20 @@ def score_formulation(ingredient_list, concentrations, category,
                 ingredient_list, concentrations, weight, cat_key,
                 known_concentrations)
         elif key == 'evidence':
-            pts, notes = _score_evidence(ingredient_list, weight)
+            if cat_key == 'facial oil':
+                # An oil's evidence rests on its lipids and antioxidants, not on
+                # "actives" - 100% squalane has no active by class and was
+                # scoring 0/15 despite being an excellent, well-evidenced
+                # emollient.
+                pts, notes = _score_evidence(ingredient_list, weight)
+                if pts < weight * 0.5:
+                    lipids = _find(ingredient_list, tuple(_OCCLUSIVES) + ('oil', 'squalane'))
+                    if lipids:
+                        pts = max(pts, weight * 0.62)
+                        notes = ["Built on well-characterised emollient lipids "
+                                 "({}).".format(", ".join(sorted(set(lipids))[:2]))]
+            else:
+                pts, notes = _score_evidence(ingredient_list, weight)
         elif key == 'integrity':
             pts, notes, flags = _score_integrity(ingredient_list, weight, cat_key)
         elif key == 'tolerability':
@@ -1208,6 +1288,20 @@ def score_formulation(ingredient_list, concentrations, category,
 
     total = sum(c['score'] for c in components)
     total = max(0.0, min(100.0, total))
+
+    if cat_key == 'sunscreen':
+        _uva = next((c for c in components if c['key'] == 'uva'), None)
+        if _uva and _uva['max'] and (_uva['score'] / _uva['max']) < 0.45:
+            # Capped, not zeroed: it still blocks UVB, which is worth something.
+            total = min(total, 55.0)
+            all_flags.append({
+                'type': 'uva_gate',
+                'severity': 'high',
+                'message': "This filter system is weak on UVA, which is the "
+                           "band that drives photoageing and passes through "
+                           "glass. Its overall score is capped for that reason "
+                           "even though it performs on UVB.",
+            })
 
     # --- Honest confidence ---
     cutoff = one_percent_line(ingredient_list)
@@ -1384,15 +1478,20 @@ def formulation_tier(score, category=None):
     cheap, and not whether it suits you. Those are reported separately."""
     label = CATEGORY_RUBRICS.get(resolve_category(category or 'serum'),
                                  {}).get('label', 'product')
-    if score >= 90:
+    # Thresholds calibrated against 90 real Indian-market products across all
+    # nine categories (tests/indian_corpus.py), where the observed median was
+    # 82. Most commercial skincare is competently formulated, so without this
+    # calibration half the market reads as "well formulated" and the label
+    # stops discriminating. "Excellent" is deliberately rare.
+    if score >= 92:
         return "Excellent formulation"
-    if score >= 78:
+    if score >= 82:
         return "Well formulated"
-    if score >= 65:
+    if score >= 70:
         return "Solidly formulated"
-    if score >= 50:
+    if score >= 55:
         return "Average formulation"
-    if score >= 35:
+    if score >= 40:
         return "Weak formulation"
     return "Poorly formulated"
 

@@ -419,3 +419,88 @@ def test_analyze_product_exposes_the_new_contract():
     # Legacy field must agree with the new one so old and new surfaces never
     # show contradictory numbers.
     assert result["main_worth_score"] == result["formulation_score"]
+
+
+# --- Real-market calibration (Indian brands) --------------------------------
+# These guard against the specific regressions found by running 90 real
+# products through the engine. See tests/indian_corpus.py.
+
+
+def test_pure_squalane_oil_scores_well():
+    """100% squalane scored 46/100 ("Weak formulation") because the fatty-acid
+    model reads linoleic/oleic balance across a blend, and squalane is a
+    saturated hydrocarbon with neither. It is among the most stable and
+    best-tolerated emollients available."""
+    assert score("Squalane", "facial oil")["score"] >= 75
+
+
+def test_single_ingredient_oils_are_not_penalised_for_lacking_diversity():
+    for oil in ("Simmondsia Chinensis Seed Oil, Tocopherol",
+                "Rosa Canina Fruit Oil, Tocopherol",
+                "Argania Spinosa Kernel Oil, Tocopherol"):
+        assert score(oil, "facial oil")["score"] >= 60, oil
+
+
+def test_sulfate_led_cleanser_scores_below_sulfate_free():
+    """Position matters: a sulfate listed before the gentle co-surfactants is
+    doing most of the cleansing, so the blend bonus should be small."""
+    sulfate_led = ("Aqua, Sodium Laureth Sulfate, Cocamidopropyl Betaine, "
+                   "Glycerin, Sodium Chloride, Phenoxyethanol")
+    mild_led = ("Aqua, Sodium Cocoyl Isethionate, Cocamidopropyl Betaine, "
+                "Coco-Glucoside, Glycerin, Phenoxyethanol")
+    assert score(sulfate_led, "cleanser")["score"] < score(mild_led, "cleanser")["score"] - 15
+
+
+def test_weak_uva_sunscreen_is_capped():
+    """A sunscreen that fails on UVA has failed at the job, however strong its
+    UVB numbers. An octinoxate + titanium dioxide formula scored 77/100 before
+    this gate, on UVB performance alone."""
+    weak = ("Aqua, Ethylhexyl Methoxycinnamate, Titanium Dioxide, Glycerin, "
+            "Carbomer, Triethanolamine, Fragrance")
+    result = score(weak, "sunscreen")
+    assert result["score"] <= 60
+    assert any(f["type"] == "uva_gate" for f in result["flags"])
+
+
+def test_moderately_photostable_filters_do_not_score_full_marks():
+    """Octinoxate is rated 'Moderate' photostability and was receiving the full
+    photostability budget, which is only correct for inherently stable filters."""
+    moderate = ("Aqua, Ethylhexyl Methoxycinnamate, Zinc Oxide, Glycerin, "
+                "Phenoxyethanol")
+    photo = next(c for c in score(moderate, "sunscreen")["components"]
+                 if c["key"] == "photostability")
+    assert photo["score"] < photo["max"]
+
+
+def test_modern_filter_system_outranks_legacy_one():
+    modern = ("Aqua, Ethylhexyl Triazone, Diethylamino Hydroxybenzoyl Hexyl "
+              "Benzoate, Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine, Zinc "
+              "Oxide, Glycerin, Tocopherol, Phenoxyethanol")
+    legacy = ("Aqua, Ethylhexyl Methoxycinnamate, Titanium Dioxide, Glycerin, "
+              "Carbomer, Fragrance, Methylparaben")
+    assert score(modern, "sunscreen")["score"] - score(legacy, "sunscreen")["score"] >= 30
+
+
+def test_real_market_corpus_has_no_crashes_and_ranks_sensibly():
+    """Every product in the Indian-market corpus must score without error, and
+    the best-formulated products must outrank the worst."""
+    import sys as _sys
+    import os as _os
+    _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__))))
+    from indian_corpus import CORPUS
+
+    scored = {}
+    for name, brand, cat, price, size, concerns, skin, expect, inci in CORPUS:
+        result = analyze_product({
+            "ingredients": inci, "price": price, "size_ml": size,
+            "category": cat, "concerns": concerns, "skin_type": skin,
+            "country": "India", "currency": "INR", "product_name": name})
+        s = result["formulation_score"]
+        assert 0 <= s <= 100, "{} scored {}".format(name, s)
+        scored["{} {}".format(brand, name)] = s
+
+    # A modern, well-built product must beat a fragrance-and-alcohol one.
+    assert scored["Re'equil Oxybenzone Free Sunscreen SPF 50"] > scored["Lotus Herbals Sunscreen Gel SPF 40"]
+    assert scored["Minimalist Niacinamide 10% + Zinc 1%"] > scored["Mamaearth Glow Serum with Vitamin C"]
+    assert scored["Re'equil Ceramide & Hyaluronic Moisturiser"] > scored["Patanjali Aloe Vera Gel"]
+    assert scored["Re'equil Oil Control Face Wash"] > scored["Himalaya Neem Face Wash"]

@@ -60,7 +60,11 @@ CONCERNS_MAP = {
     ],
     'Large Pores':       ['Niacinamide', 'Salicylic Acid', 'Retinol', 'Glycolic Acid'],
     'Dullness':          [
-        'Ascorbic Acid', 'Niacinamide', 'Glycolic Acid',
+        # AHAs belong here alongside the brighteners: exfoliation is a primary,
+        # evidenced route to radiance. Lactic acid was previously absent even
+        # though its own database record lists Dullness.
+        'Ascorbic Acid', 'Niacinamide', 'Glycolic Acid', 'Lactic Acid',
+        'Mandelic Acid',
         'Glutathione', 'Galactomyces Ferment Filtrate',
         'Alpha Arbutin', 'Arbutin', 'Ascorbyl Glucoside',
         'Glycyrrhiza Glabra Root Extract', 'Dipotassium Glycyrrhizate',
@@ -74,7 +78,10 @@ CONCERNS_MAP = {
     ],
     'Sun Protection':    ['Zinc Oxide', 'Titanium Dioxide', 'Avobenzone', 'Octinoxate', 'Homosalate', 'Bemotrizinol'],
     'UV Damage':         ['Ferulic Acid', 'Ascorbic Acid', 'Resveratrol', 'Caffeine', 'Glycyrrhiza Glabra Root Extract'],
-    'Tanning':           ['Alpha Arbutin', 'Kojic Acid', 'Tranexamic Acid', 'Ascorbic Acid', 'Niacinamide', 'Glutathione', 'Glutathione Ethyl Ester'],
+    # Tan FADING is done with brightening actives AND exfoliants - AHAs
+    # accelerate turnover of pigmented corneocytes. UV filters prevent
+    # tanning but do nothing to fade one that already happened.
+    'Tanning':           ['Alpha Arbutin', 'Kojic Acid', 'Tranexamic Acid', 'Ascorbic Acid', 'Niacinamide', 'Glutathione', 'Glutathione Ethyl Ester', 'Lactic Acid', 'Glycolic Acid', 'Mandelic Acid'],
     'Puffiness':         ['Caffeine', 'Niacinamide', 'Acetyl Tetrapeptide-5', 'Hesperidin Methyl Chalcone', 'Centella Asiatica Extract', 'Centella Asiatica'],
 }
 
@@ -361,7 +368,7 @@ class DataLoader:
             for name in top_db_names:
                 if name not in merged:
                     merged.append(name)
-            self.concern_actives[concern] = merged[:10]
+            self.concern_actives[concern] = merged[:16]
             extra_actives = [name for name, _ in db_actives[8:]]
             self.concern_supporters[concern] = list(set(supporters + extra_actives))
             logger.info(f"  {concern}: {len(self.concern_actives[concern])} ideal actives")

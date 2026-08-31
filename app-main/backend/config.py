@@ -170,12 +170,12 @@ CONCERNS_MAP = {
     'Sensitive Skin':    ['Centella Asiatica', 'Panthenol', 'Allantoin', 'Ceramide', 'Madecassoside'],
     'Hydration':         ['Sodium Hyaluronate', 'Glycerin', 'Panthenol', 'Sodium PCA', 'Urea'],
     'Large Pores':       ['Niacinamide', 'Salicylic Acid', 'Retinol', 'Glycolic Acid'],
-    'Dullness':          ['Ascorbic Acid', 'Niacinamide', 'Glycolic Acid', 'Licorice Extract', 'Sodium Ascorbyl Phosphate', 'Magnesium Ascorbyl Phosphate', 'Tocopheryl Acetate'],
+    'Dullness':          ['Ascorbic Acid', 'Niacinamide', 'Glycolic Acid', 'Lactic Acid', 'Mandelic Acid', 'Licorice Extract', 'Sodium Ascorbyl Phosphate', 'Magnesium Ascorbyl Phosphate', 'Tocopheryl Acetate'],
     'Uneven Texture':    ['Glycolic Acid', 'Salicylic Acid', 'Retinol', 'Lactic Acid'],
     'Dark Circles':      ['Caffeine', 'Vitamin K', 'Ascorbic Acid', 'Peptides', 'Niacinamide'],
     'Sun Protection':    ['Zinc Oxide', 'Titanium Dioxide', 'Avobenzone', 'Octinoxate', 'Homosalate', 'Bemotrizinol'],
     'UV Damage':         ['Ferulic Acid', 'Polypodium Leucotomos', 'Ascorbic Acid', 'Astaxanthin', 'Resveratrol', 'Green Tea Extract', 'Tocopheryl Acetate', 'Sodium Ascorbyl Phosphate'],
-    'Tanning':           ['Alpha Arbutin', 'Kojic Acid', 'Tranexamic Acid', 'Ascorbic Acid', 'Niacinamide', 'Glutathione'],
+    'Tanning':           ['Alpha Arbutin', 'Kojic Acid', 'Tranexamic Acid', 'Ascorbic Acid', 'Niacinamide', 'Glutathione', 'Lactic Acid', 'Glycolic Acid', 'Mandelic Acid', 'Licorice Extract'],
     'Puffiness':         ['Caffeine', 'Acetyl Tetrapeptide-5', 'Hesperidin Methyl Chalcone', 'Niacinamide', 'Centella Asiatica'],
 }
 
