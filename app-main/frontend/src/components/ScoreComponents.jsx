@@ -97,7 +97,7 @@ export function ConcernCard({ concern, data }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`}
-             title={`${displayScore}/100 within category — most products fall between 20–60`}></i>
+             title={`${displayScore}/100 — how well this formula addresses the concern you selected`}></i>
         </div>
       </div>
       <ProgressBar pct={displayScore} label={concern} />
@@ -123,7 +123,7 @@ export function ConcernCard({ concern, data }) {
           </div>
         ) : (
           <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontStyle: 'italic', marginBottom: '6px' }}>
-            {displayScore}/100 = {fit.label.toLowerCase()} vs an ideal formula for this concern. Most products fall between 20–60.
+            {displayScore}/100 = {fit.label.toLowerCase()} for this concern, based on the actives this product actually contains and whether they are at doses shown to work.
           </p>
         )}
 
