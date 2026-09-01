@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import "@/App.css";
-import axios from "axios";
+import { api, describeError } from "./api";
 import { API, CURRENCY_MAP } from "./constants";
 import InputForm from "./components/InputForm";
 import ResultCards from "./components/ResultCards";
@@ -47,7 +47,7 @@ function App() {
       for (const [k, v] of Object.entries(concernFit)) {
         concernScores[k] = typeof v === 'object' ? v.score : v;
       }
-      const { data } = await axios.post(`${API}/find-alternatives`, {
+      const { data } = await api.post(`${API}/find-alternatives`, {
         product_category: category,
         key_actives: (res.identified_actives || []).map(a => a.name),
         country, currency,
@@ -76,7 +76,7 @@ function App() {
     setBestPriceLoading(true);
     try {
       const userUrl = isUrl ? fetchInput.trim() : null;
-      const { data } = await axios.post(`${API}/best-price`, {
+      const { data } = await api.post(`${API}/best-price`, {
         product_name: pName,
         brand: brand || null,
         size_ml: parseFloat(size) || null,
@@ -99,7 +99,7 @@ function App() {
       const isUrlFetch = fetchInput.trim().startsWith('http');
       const isBarcodeInput = /^\d{8,14}$/.test(fetchInput.trim());
       const fetchTypeValue = isUrlFetch ? 'url' : isBarcodeInput ? 'barcode' : 'manual';
-      const { data } = await axios.post(`${API}/analyze`, {
+      const { data } = await api.post(`${API}/analyze`, {
         ingredients, price: parseFloat(price) || 0, size_ml: sizeMl,
         category, skin_concerns: concerns, skin_type: skinType.toLowerCase(), country, currency,
         url_provided: isUrlFetch,
@@ -116,7 +116,7 @@ function App() {
       // Only search for alternatives if score < 75 AND there are weak concern fits
       if (data.main_worth_score < 75 && weakConcerns.length > 0 && concerns.length > 0) fetchAlts(data);
       fetchBestPrice();
-    } catch (e) { setError(e.response?.data?.error || "Analysis failed"); }
+    } catch (e) { setError(describeError(e)); }
     finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, brand, activeConcentrations, fetchAlts, fetchBestPrice]);
@@ -144,7 +144,7 @@ function App() {
 
     try {
       const body = isBarcode ? { barcode: fetchInput.trim() } : { url: fetchInput.trim() };
-      const { data } = await axios.post(`${API}/fetch-product`, body);
+      const { data } = await api.post(`${API}/fetch-product`, body);
       if (data.ingredients) {
         // Strip emojis, section headings (e.g. "Key Ingredients:"), and normalize separators
         const cleaned = data.ingredients
@@ -194,7 +194,7 @@ function App() {
         setFetchMsg("Product details fetched successfully!");
         setFetchVerifyPending(true);
       }
-    } catch (e) { setFetchError(e.response?.data?.error || "Failed to fetch. Please fill in manually."); }
+    } catch (e) { setFetchError(describeError(e) + " You can paste the ingredient list manually instead."); }
     finally { setFetchLoading(false); }
   }, [fetchInput]);
 

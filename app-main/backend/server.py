@@ -27,6 +27,11 @@ load_dotenv(ROOT_DIR / '.env')
 
 from product_fetcher import fetch_multiple_products, fetch_product_data
 
+# Error monitoring must be initialised before the app is created so that
+# startup failures are captured too. No-op unless SENTRY_DSN is set.
+from observability import init_error_monitoring, capture
+init_error_monitoring()
+
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
@@ -90,6 +95,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error: {exc}", exc_info=True)
+    capture(exc, path=request.url.path, method=request.method)
     return JSONResponse(status_code=500, content={"error": "An internal error occurred. Please try again."})
 
 
@@ -266,6 +272,9 @@ async def analyze(req: AnalyzeRequest, request: Request):
     except Exception as e:
         import traceback
         logger.error(f"Analysis failed: {e}\n{traceback.format_exc()}")
+        # This handler swallows the exception and returns a friendly message, so
+        # without reporting it a scoring bug would be invisible in production.
+        capture(e, endpoint='analyze', category=category_display)
         return JSONResponse(status_code=500, content={"error": "Analysis failed. Please check your inputs."})
 
 
