@@ -1,0 +1,250 @@
+import React, { useState } from "react";
+
+/**
+ * Progressive personalisation.
+ *
+ * Deliberately shown AFTER a result, never before one. Asking eight questions
+ * up front is a wall in front of the thing people came for - most of them are
+ * holding one product and want one answer. Once they have that answer, three
+ * more questions to sharpen it is a fair trade they can see the value of.
+ *
+ * Nothing here changes the formulation score. These answers refine how well
+ * the product suits THIS person, which is a different question from how well
+ * it is made, and the card says so plainly.
+ */
+
+const FITZPATRICK = [
+  { key: "I", swatch: "#F5D9C7", label: "Always burns, never tans" },
+  { key: "II", swatch: "#EFC9A8", label: "Burns easily, tans minimally" },
+  { key: "III", swatch: "#DFAE7E", label: "Burns moderately, tans gradually" },
+  { key: "IV", swatch: "#C08A5A", label: "Burns minimally, tans easily" },
+  { key: "V", swatch: "#8D5A34", label: "Rarely burns, tans profusely" },
+  { key: "VI", swatch: "#5A3420", label: "Never burns, deeply pigmented" },
+];
+
+const CLIMATES = [
+  { key: "tropical_humid", label: "Humid", hint: "Coastal, monsoon, tropical" },
+  { key: "hot_arid", label: "Hot & dry", hint: "Desert, arid summer" },
+  { key: "temperate", label: "Temperate", hint: "Mild, four seasons" },
+  { key: "cold_dry", label: "Cold & dry", hint: "Winter, heated indoors" },
+];
+
+const ALLERGENS = [
+  { key: "fragrance", label: "Fragrance" },
+  { key: "essential_oils", label: "Essential oils" },
+  { key: "alcohol", label: "Drying alcohols" },
+  { key: "sulfates", label: "Sulfates" },
+  { key: "silicones", label: "Silicones" },
+  { key: "parabens", label: "Parabens" },
+  { key: "nut_oils", label: "Nut oils" },
+  { key: "lanolin", label: "Lanolin" },
+];
+
+export default function PersonaliseCard({ profile, onApply, loading, level }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState({
+    fitzpatrick: profile?.fitzpatrick || "",
+    climate: profile?.climate || "",
+    allergens: profile?.allergens || [],
+    current_routine: profile?.current_routine || "",
+  });
+
+  const toggleAllergen = (key) =>
+    setDraft((d) => ({
+      ...d,
+      allergens: d.allergens.includes(key)
+        ? d.allergens.filter((a) => a !== key)
+        : [...d.allergens, key],
+    }));
+
+  const answered = ["fitzpatrick", "climate", "current_routine"].filter((k) => draft[k]).length
+    + (draft.allergens.length ? 1 : 0);
+
+  // Collapsed state: a single honest invitation, not a nag.
+  if (!open) {
+    return (
+      <div className="personalise-prompt" data-testid="personalise-prompt">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <i className="fa-solid fa-wand-magic-sparkles" style={{ color: "var(--dusty-rose-dark)" }}></i>
+          <strong style={{ fontSize: 14 }}>
+            {level === "none"
+              ? "Want a more accurate result?"
+              : "Refine your result further"}
+          </strong>
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ marginLeft: "auto" }}
+            onClick={() => setOpen(true)}
+            data-testid="personalise-open"
+          >
+            {level === "none" ? "Answer 3 questions" : "Edit answers"}
+          </button>
+        </div>
+        <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--text-sub)", lineHeight: 1.5 }}>
+          {level === "none"
+            ? "Your skin tone, climate and any sensitivities change how well this suits you — not how well it is made. The score above stays the same either way."
+            : "You have answered some of these. Adding the rest sharpens the fit assessment."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="personalise-card" data-testid="personalise-card">
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <strong style={{ fontSize: 14.5 }}>Make this more accurate</strong>
+        <span
+          style={{
+            marginLeft: "auto", fontSize: 10.5, textTransform: "uppercase",
+            letterSpacing: "0.04em", color: "var(--text-sub)", fontWeight: 700,
+          }}
+        >
+          Does not change the formulation score
+        </span>
+      </div>
+      <p style={{ margin: "0 0 16px", fontSize: 12.5, color: "var(--text-sub)", lineHeight: 1.5 }}>
+        All optional. Each answer sharpens how well this product suits you personally.
+      </p>
+
+      {/* 1 — Skin tone */}
+      <div className="personalise-step">
+        <div className="field-label" style={{ marginBottom: 8 }}>
+          Skin tone <span style={{ fontWeight: 400, color: "var(--text-sub)" }}>— affects dark-mark and burn risk</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="radiogroup" aria-label="Skin tone">
+          {FITZPATRICK.map((f) => {
+            const active = draft.fitzpatrick === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                title={f.label}
+                onClick={() => setDraft((d) => ({ ...d, fitzpatrick: active ? "" : f.key }))}
+                data-testid={`fitz-${f.key}`}
+                style={{
+                  width: 52, padding: "6px 0 5px", borderRadius: 8, cursor: "pointer",
+                  border: active ? "2px solid var(--dusty-rose-dark)" : "1px solid var(--border)",
+                  background: "var(--warm-white)",
+                }}
+              >
+                <span
+                  style={{
+                    display: "block", width: 26, height: 26, borderRadius: "50%",
+                    background: f.swatch, margin: "0 auto 4px",
+                    border: "1px solid rgba(0,0,0,0.08)",
+                  }}
+                />
+                <span style={{ fontSize: 10.5, fontWeight: 600 }}>{f.key}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 2 — Climate */}
+      <div className="personalise-step">
+        <div className="field-label" style={{ marginBottom: 8 }}>
+          Your climate <span style={{ fontWeight: 400, color: "var(--text-sub)" }}>— affects how a texture feels</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="radiogroup" aria-label="Climate">
+          {CLIMATES.map((c) => {
+            const active = draft.climate === c.key;
+            return (
+              <button
+                key={c.key}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setDraft((d) => ({ ...d, climate: active ? "" : c.key }))}
+                data-testid={`climate-${c.key}`}
+                style={{
+                  padding: "7px 12px", borderRadius: 8, cursor: "pointer", textAlign: "left",
+                  border: active ? "2px solid var(--dusty-rose-dark)" : "1px solid var(--border)",
+                  background: "var(--warm-white)",
+                }}
+              >
+                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{c.label}</div>
+                <div style={{ fontSize: 10.5, color: "var(--text-sub)" }}>{c.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3 — Sensitivities */}
+      <div className="personalise-step">
+        <div className="field-label" style={{ marginBottom: 8 }}>
+          Anything you react to?{" "}
+          <span style={{ fontWeight: 400, color: "var(--text-sub)" }}>— we will warn you if it is in there</span>
+        </div>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+          {ALLERGENS.map((a) => {
+            const active = draft.allergens.includes(a.key);
+            return (
+              <button
+                key={a.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleAllergen(a.key)}
+                data-testid={`allergen-${a.key}`}
+                style={{
+                  padding: "5px 11px", borderRadius: 99, fontSize: 12, cursor: "pointer",
+                  border: active ? "2px solid var(--dusty-rose-dark)" : "1px solid var(--border)",
+                  background: active ? "var(--rose)" : "var(--warm-white)",
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {a.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Optional 4th — routine */}
+      <div className="personalise-step">
+        <div className="field-label" style={{ marginBottom: 6 }}>
+          What are you already using?{" "}
+          <span style={{ fontWeight: 400, color: "var(--text-sub)" }}>— optional, catches clashes</span>
+        </div>
+        <input
+          type="text"
+          value={draft.current_routine}
+          onChange={(e) => setDraft((d) => ({ ...d, current_routine: e.target.value }))}
+          placeholder="e.g. The Ordinary Retinol, vitamin C serum"
+          aria-label="Current routine"
+          data-testid="routine-input"
+          style={{
+            width: "100%", padding: "9px 11px", borderRadius: 8, fontSize: 13,
+            border: "1px solid var(--border)", background: "var(--warm-white)",
+          }}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
+        <button
+          className="btn btn-primary"
+          onClick={() => onApply(draft)}
+          disabled={loading || answered === 0}
+          data-testid="personalise-apply"
+        >
+          {loading ? (
+            <>
+              <i className="fa-solid fa-spinner fa-spin"></i> Updating…
+            </>
+          ) : (
+            <>Update my result {answered > 0 && `(${answered})`}</>
+          )}
+        </button>
+        <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={loading}>
+          Not now
+        </button>
+        <span style={{ fontSize: 11.5, color: "var(--text-sub)" }}>
+          Answers stay on this device.
+        </span>
+      </div>
+    </div>
+  );
+}

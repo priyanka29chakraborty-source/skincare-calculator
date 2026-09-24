@@ -534,3 +534,30 @@ body::before {
   .sc-card { padding: 16px 14px; }
   .disclaimer-list { gap: 8px; }
 }
+/* ── Progressive personalisation ─────────────────────────────────────────── */
+/* Uses the existing palette tokens only - no new colours introduced. */
+.personalise-prompt {
+  background: var(--lavender);
+  border: 1px solid var(--lavender-border);
+  border-radius: 12px;
+  padding: 13px 16px;
+  margin-bottom: 18px;
+}
+.personalise-card {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+.personalise-step { margin-bottom: 18px; }
+.personalise-step:last-of-type { margin-bottom: 0; }
+.personalise-card button:focus-visible,
+.personalise-prompt button:focus-visible {
+  outline: 2px solid var(--dusty-rose-dark);
+  outline-offset: 2px;
+}
+@media (max-width: 480px) {
+  .personalise-card { padding: 16px 14px; }
+  .personalise-step { margin-bottom: 15px; }
+}

@@ -4,6 +4,7 @@ import { api, describeError } from "./api";
 import { API, CURRENCY_MAP } from "./constants";
 import InputForm from "./components/InputForm";
 import ResultCards from "./components/ResultCards";
+import PersonaliseCard from "./components/PersonaliseCard";
 
 function App() {
   const [ingredients, setIngredients] = useState("");
@@ -19,6 +20,9 @@ function App() {
   const [activeConcentrations, setActiveConcentrations] = useState({});
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  // Personal context, gathered AFTER a first result rather than before it.
+  const [userProfile, setUserProfile] = useState({});
+  const [personalising, setPersonalising] = useState(false);
   const [error, setError] = useState("");
   const [fetchInput, setFetchInput] = useState("");
   const [fetchLoading, setFetchLoading] = useState(false);
@@ -89,6 +93,32 @@ function App() {
     finally { setBestPriceLoading(false); }
   }, [productName, brand, fetchInput, size, country, currency, price]);
 
+  // Re-score with newly supplied personal context. Only the Fit score and
+  // advisories can change - the formulation score is computed from the product
+  // alone and will come back identical.
+  const applyPersonalisation = useCallback(async (profile) => {
+    setUserProfile(profile);
+    if (!result) return;
+    setPersonalising(true);
+    try {
+      let sizeMl = parseFloat(size) || 30;
+      if (sizeUnit === "oz" || sizeUnit === "fl oz") sizeMl = sizeMl * 29.5735;
+      const { data } = await api.post(`${API}/analyze`, {
+        ingredients, price: parseFloat(price) || 0, size_ml: sizeMl,
+        category, skin_concerns: concerns, skin_type: skinType.toLowerCase(),
+        country, currency,
+        product_name: productName || '', brand: brand || '',
+        active_concentrations: activeConcentrations || {},
+        size_defaulted: !size.trim(),
+        user_profile: profile,
+      });
+      setResult(data);
+    } catch (e) { setError(describeError(e)); }
+    finally { setPersonalising(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, ingredients, price, size, sizeUnit, category, concerns, skinType,
+      country, currency, productName, brand, activeConcentrations]);
+
   const handleAnalyze = useCallback(async () => {
     if (!ingredients.trim()) { setError("Please enter ingredients"); return; }
     if (!skinType) { setError("Please select a skin type"); return; }
@@ -107,7 +137,8 @@ function App() {
         product_name: productName || '',
         brand: brand || '',
         active_concentrations: activeConcentrations || {},
-        size_defaulted: !size.trim()
+        size_defaulted: !size.trim(),
+        user_profile: userProfile,
       });
       setResult(data);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
@@ -236,6 +267,16 @@ function App() {
 
         {result && (
           <section className="sc-results" ref={resultRef} data-testid="results-section">
+            {/* Shown after the result, never before it. Three questions to
+                sharpen the fit assessment is a fair trade once someone can see
+                what they are sharpening. Eight questions before any answer is
+                a wall in front of the thing they came for. */}
+            <PersonaliseCard
+              profile={userProfile}
+              onApply={applyPersonalisation}
+              loading={personalising}
+              level={result.personalisation?.level || "none"}
+            />
             <ResultCards
               result={result} concerns={concerns} skinType={skinType} currency={currency}
               alternatives={alternatives} altLoading={altLoading}
