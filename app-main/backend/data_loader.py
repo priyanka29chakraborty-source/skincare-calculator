@@ -24,6 +24,19 @@ CONCERN_TAG_MAP = {
     'UV Damage': ['photoaging', 'oxidative stress', 'sunburn'],
     'Tanning': ['pigmentation', 'brightening', 'uneven tone', 'pih', 'melasma', 'cosmetic tan'],
     'Puffiness': ['eye bags', 'under-eye circles', 'puffiness'],
+    # ── Added: concerns with a genuinely distinct active profile ──────────
+    'Post-Inflammatory Hyperpigmentation': ['pih', 'post-inflammatory', 'pigmentation',
+                                            'acne marks', 'hyperpigmentation', 'melasma'],
+    'Redness & Rosacea':       ['rosacea', 'redness', 'sensitive skin', 'inflammation',
+                                'soothing', 'anti-inflammatory'],
+    'Blackheads & Congestion': ['acne', 'blackheads', 'congestion', 'pores',
+                                'comedones', 'exfoliation'],
+    'Loss of Firmness':        ['firmness', 'elasticity', 'aging', 'collagen',
+                                'sagging', 'anti-aging'],
+    'Eczema-Prone Skin':       ['eczema', 'barrier repair', 'sensitive skin',
+                                'atopic', 'soothing'],
+    'Hormonal Breakouts':      ['acne', 'hormonal', 'oil control', 'sebum',
+                                'anti-acne'],
 }
 
 SYNERGY_CONCERN_MAP = {
@@ -83,6 +96,28 @@ CONCERNS_MAP = {
     # tanning but do nothing to fade one that already happened.
     'Tanning':           ['Alpha Arbutin', 'Kojic Acid', 'Tranexamic Acid', 'Ascorbic Acid', 'Niacinamide', 'Glutathione', 'Glutathione Ethyl Ester', 'Lactic Acid', 'Glycolic Acid', 'Mandelic Acid'],
     'Puffiness':         ['Caffeine', 'Niacinamide', 'Acetyl Tetrapeptide-5', 'Hesperidin Methyl Chalcone', 'Centella Asiatica Extract', 'Centella Asiatica'],
+    # ── Added concerns ────────────────────────────────────────────────────
+    # Azelaic acid leads PIH and rosacea: it is the best-evidenced option for
+    # papulopustular rosacea and works on pigment without hydroquinone's
+    # regulatory baggage.
+    'Post-Inflammatory Hyperpigmentation': [
+        'Azelaic Acid', 'Niacinamide', 'Tranexamic Acid', 'Alpha Arbutin',
+        'Ascorbic Acid', 'Retinol', 'Kojic Acid', 'Glycolic Acid', 'Lactic Acid'],
+    'Redness & Rosacea': [
+        'Azelaic Acid', 'Niacinamide', 'Centella Asiatica', 'Madecassoside',
+        'Allantoin', 'Bisabolol', 'Panthenol', 'Green Tea Extract'],
+    'Blackheads & Congestion': [
+        'Salicylic Acid', 'Retinol', 'Retinal', 'Adapalene', 'Niacinamide',
+        'Zinc PCA', 'Mandelic Acid', 'Azelaic Acid'],
+    'Loss of Firmness': [
+        'Retinol', 'Retinal', 'Palmitoyl Pentapeptide-4', 'Palmitoyl Tripeptide-1',
+        'Ascorbic Acid', 'Bakuchiol', 'Niacinamide', 'Peptides'],
+    'Eczema-Prone Skin': [
+        'Ceramide NP', 'Cholesterol', 'Colloidal Oatmeal', 'Panthenol',
+        'Glycerin', 'Allantoin', 'Bisabolol', 'Squalane', 'Niacinamide'],
+    'Hormonal Breakouts': [
+        'Azelaic Acid', 'Salicylic Acid', 'Niacinamide', 'Retinol',
+        'Zinc PCA', 'Benzoyl Peroxide'],
 }
 
 CONCERN_INCI_PREFIXES = {

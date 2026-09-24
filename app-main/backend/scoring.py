@@ -4181,6 +4181,19 @@ def analyze_product(product_data):
     # person rather than on how the product is made.
     advisory_flags = _formulation.build_advisory_flags(ingredient_list)
 
+    # ── Personal context (optional) ───────────────────────────────────────────
+    # Fitzpatrick tone, climate, declared allergies and current routine. These
+    # describe the USER, so they refine the Fit score and raise advisories -
+    # they never touch the formulation score.
+    import personalization as _personal
+    personal = _personal.build_personal_context(
+        product_data.get('user_profile') or {},
+        ingredient_list,
+        product_data.get('concerns', []),
+        _formulation.resolve_category(product_data.get('category', 'Serum')),
+        product_data.get('country'),
+    )
+
     concern_fit = calculate_skin_concern_fit(
         ingredient_list,
         product_data.get("concerns", []),
@@ -4201,6 +4214,21 @@ def analyze_product(product_data):
 
     concern_dict = concern_fit.get('concerns', {})
     am_pm = concern_fit.get('am_pm', 'Suitable for: AM & PM')
+
+    # ── Apply personal context to FIT only ───────────────────────────────────
+    # A declared allergy makes a product unsuitable for this person whatever
+    # its formulation quality, so the deduction belongs here and nowhere else.
+    # The formulation score above has already been computed and is untouched.
+    if personal['fit_penalty'] > 0:
+        _pen = personal['fit_penalty']
+        for _c, _v in list(concern_dict.items()):
+            if isinstance(_v, dict) and isinstance(_v.get('score'), (int, float)):
+                _v['score'] = max(0, round(_v['score'] - _pen))
+                _v.setdefault('explanation', []).insert(
+                    0, "Reduced because this product contains something you told "
+                       "us you react to.")
+            elif isinstance(_v, (int, float)):
+                concern_dict[_c] = max(0, round(_v - _pen))
 
     # New analyses — 1% marker, conflicts, pH, delivery systems
     marker_idx, marker_name = _find_one_percent_marker(ingredient_list)
@@ -4245,7 +4273,17 @@ def analyze_product(product_data):
         "value_assessment": value_result,
 
         # ── Contextual advisories — informational, never affect any score ────
-        "advisory_flags": advisory_flags,
+        "advisory_flags": advisory_flags + personal['flags'],
+        "personalisation": {
+            'level': personal['personalisation_level'],
+            'questions_answered': personal['questions_answered'],
+            'climate': personal['climate'],
+            'climate_label': personal['climate_label'],
+            'fitzpatrick': personal['fitzpatrick'],
+            'routine_conflicts': [f for f in personal['flags']
+                                  if f['type'] in ('routine_conflict', 'routine_redundant')],
+            'product_active_families': personal['product_active_families'],
+        },
 
         # ── Backwards compatibility ──────────────────────────────────────────
         # Existing clients read main_worth_score. It now carries the

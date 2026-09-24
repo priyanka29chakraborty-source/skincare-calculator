@@ -9,6 +9,7 @@ import html as html_module
 import requests
 import time
 import hashlib
+import json
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -58,6 +59,10 @@ def _make_cache_key(data: dict) -> str:
         ",".join(sorted(data.get('concerns', []))),
         str(data.get('skin_type', '')),
         str(data.get('country', '')),
+        # Personal context changes the Fit score and advisories, so it must be
+        # part of the key. Omitting it would serve one user's personalised
+        # result to another.
+        json.dumps(data.get('user_profile') or {}, sort_keys=True),
     ])
     return hashlib.md5(key_str.encode()).hexdigest()
 
@@ -125,6 +130,11 @@ class AnalyzeRequest(BaseModel):
     url_provided: Optional[bool] = False
     fetch_type: Optional[str] = None  # "url" | "barcode" | "manual" — set by frontend
     active_concentrations: Optional[dict] = None  # scraped from product page
+    # Optional personal context, asked AFTER a first result rather than as a
+    # wall in front of it. Every field is optional; omitting them reproduces
+    # the previous behaviour exactly. These refine the Fit score and produce
+    # advisories - they never alter the formulation score.
+    user_profile: Optional[dict] = None
     size_defaulted: Optional[bool] = False  # True when frontend had no size and assumed 30ml
 
 
@@ -206,6 +216,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
             'currency': _sanitize(req.currency) or "INR",
             'product_name': _sanitize(req.product_name or ''),
             'active_concentrations': req.active_concentrations or {},
+            'user_profile': req.user_profile or {},
         }
 
         # Check cache

@@ -518,7 +518,7 @@ def _score_tolerability(ingredient_list, max_pts, occlusive_context=False,
     if allergens:
         pts -= max_pts * 0.10 * multiplier
         flags.append({
-            'type': 'declared_allergens',
+            'type': 'eu_declarable_allergens',
             'severity': 'info',
             'message': "Contains EU-declarable fragrance allergens ({}). These "
                        "become sensitising mainly once oxidised by air."
