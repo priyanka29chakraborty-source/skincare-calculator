@@ -1,0 +1,338 @@
+"""Personal context: Fitzpatrick tone, climate, allergies, current routine.
+
+ARCHITECTURAL RULE, and the reason this is a separate module:
+
+    Nothing here may ever change the formulation score.
+
+A product is not better made because it suits your skin, and not worse made
+because it does not. Fitzpatrick type, climate, allergies and what is already
+on your shelf all describe YOU. They belong in the Fit score and in advisories.
+Formulation quality stays price-independent and person-independent, so two
+users scanning the same product always see the same number for how well it is
+made - and different numbers for whether it suits them.
+
+Everything here is optional. A user who answers nothing gets exactly the
+behaviour they got before; each answer refines the Fit score only.
+"""
+
+import re
+
+# --- Fitzpatrick ------------------------------------------------------------
+# I-VI. The evidenced, practically useful signals are:
+#   - higher phototypes carry substantially greater risk of post-inflammatory
+#     hyperpigmentation after any inflammatory insult, so irritants matter more;
+#   - lower phototypes burn faster and need UVB protection sooner.
+# Both are directional and well established. We do NOT claim precise risk
+# multipliers - none are published in a form that would justify one.
+FITZPATRICK = {
+    'I':   {'label': 'Always burns, never tans',        'pih_risk': 0.20, 'burn_risk': 1.00},
+    'II':  {'label': 'Burns easily, tans minimally',    'pih_risk': 0.30, 'burn_risk': 0.90},
+    'III': {'label': 'Burns moderately, tans gradually','pih_risk': 0.55, 'burn_risk': 0.70},
+    'IV':  {'label': 'Burns minimally, tans easily',    'pih_risk': 0.80, 'burn_risk': 0.50},
+    'V':   {'label': 'Rarely burns, tans profusely',    'pih_risk': 0.95, 'burn_risk': 0.35},
+    'VI':  {'label': 'Never burns, deeply pigmented',   'pih_risk': 1.00, 'burn_risk': 0.25},
+}
+
+# --- Climate ----------------------------------------------------------------
+# Humidity changes what a good moisturiser looks like: in humid air a heavy
+# occlusive is uncomfortable and can aggravate congestion, while in dry air
+# humectants alone can draw water from the skin rather than to it.
+CLIMATE = {
+    'tropical_humid': {'label': 'Tropical / humid', 'humidity': 'high',
+                       'occlusion_pref': 'light',  'uv_band': 'very_high'},
+    'hot_arid':       {'label': 'Hot & dry',        'humidity': 'low',
+                       'occlusion_pref': 'rich',   'uv_band': 'very_high'},
+    'temperate':      {'label': 'Temperate',        'humidity': 'moderate',
+                       'occlusion_pref': 'medium', 'uv_band': 'moderate'},
+    'cold_dry':       {'label': 'Cold & dry',       'humidity': 'low',
+                       'occlusion_pref': 'rich',   'uv_band': 'low'},
+}
+
+# Best-guess default per country, offered to the user as a prefilled answer
+# rather than applied silently - India alone spans several of these.
+COUNTRY_CLIMATE = {
+    'India': 'tropical_humid', 'Singapore': 'tropical_humid',
+    'Brazil': 'tropical_humid', 'UAE': 'hot_arid',
+    'Australia': 'temperate', 'USA': 'temperate', 'UK': 'temperate',
+    'France': 'temperate', 'Germany': 'temperate', 'Japan': 'temperate',
+    'South Korea': 'temperate', 'Canada': 'cold_dry',
+}
+
+# --- Allergens the user can declare ----------------------------------------
+# Each maps to ingredient markers. These produce PERSONAL warnings and Fit
+# deductions - never a formulation penalty. A fragranced cream is not badly
+# made; it is unsuitable for someone allergic to fragrance.
+ALLERGEN_GROUPS = {
+    'fragrance': {
+        'label': 'Fragrance / parfum',
+        'markers': ('parfum', 'fragrance', 'aroma', 'limonene', 'linalool',
+                    'citronellol', 'geraniol', 'eugenol', 'coumarin', 'citral',
+                    'benzyl benzoate', 'benzyl salicylate', 'cinnamal',
+                    'hexyl cinnamal', 'isoeugenol', 'farnesol'),
+    },
+    'essential_oils': {
+        'label': 'Essential oils',
+        'markers': ('essential oil', 'citrus aurantium', 'citrus limon',
+                    'citrus bergamia', 'lavandula', 'mentha piperita',
+                    'eucalyptus', 'melaleuca alternifolia', 'cymbopogon',
+                    'pelargonium graveolens', 'cananga odorata', 'menthol',
+                    'santalum album', 'rosmarinus officinalis oil'),
+    },
+    'alcohol': {
+        'label': 'Drying alcohols',
+        'markers': ('alcohol denat', 'sd alcohol', 'isopropyl alcohol',
+                    'denatured alcohol'),
+    },
+    'parabens': {
+        'label': 'Parabens',
+        'markers': ('paraben',),
+    },
+    'sulfates': {
+        'label': 'Sulfates',
+        'markers': ('lauryl sulfate', 'laureth sulfate'),
+    },
+    'silicones': {
+        'label': 'Silicones',
+        'markers': ('dimethicone', 'siloxane', 'cyclopentasiloxane',
+                    'cyclohexasiloxane', 'silsesquioxane'),
+    },
+    'nut_oils': {
+        'label': 'Nut-derived oils',
+        'markers': ('prunus amygdalus', 'sweet almond', 'corylus avellana',
+                    'macadamia', 'juglans regia', 'carya illinoensis',
+                    'anacardium occidentale', 'bertholletia excelsa'),
+    },
+    'lanolin': {
+        'label': 'Lanolin',
+        'markers': ('lanolin',),
+    },
+}
+
+# --- Active families, for routine conflict and redundancy checks ------------
+ROUTINE_ACTIVES = {
+    'retinoid': ('retinol', 'retinal', 'retinaldehyde', 'tretinoin', 'adapalene',
+                 'hydroxypinacolone retinoate', 'retinyl palmitate', 'granactive'),
+    'vitamin_c': ('ascorbic acid', 'ascorbyl', 'vitamin c', '3-o-ethyl'),
+    'aha': ('glycolic acid', 'lactic acid', 'mandelic acid', 'citric acid', 'aha'),
+    'bha': ('salicylic acid', 'bha'),
+    'benzoyl_peroxide': ('benzoyl peroxide',),
+    'niacinamide': ('niacinamide',),
+    'azelaic': ('azelaic acid',),
+    'peptides': ('peptide', 'palmitoyl'),
+    'exfoliant_enzyme': ('papain', 'bromelain'),
+}
+
+# Combinations worth flagging, with the honest reason. Each entry is
+# (family_a, family_b, severity, message). Anything contested is stated as
+# contested rather than asserted.
+ROUTINE_INTERACTIONS = [
+    ('retinoid', 'aha', 'caution',
+     "You are already using an AHA. Layering it with a retinoid in the same "
+     "routine raises irritation risk for many people - most dermatologists "
+     "suggest alternating nights rather than combining."),
+    ('retinoid', 'bha', 'caution',
+     "You are already using a BHA. Combined with a retinoid this can be more "
+     "than the barrier tolerates - consider alternating nights."),
+    ('retinoid', 'benzoyl_peroxide', 'caution',
+     "Benzoyl peroxide can oxidise some retinoids when applied together. "
+     "Using them at different times of day avoids the issue. Note this does "
+     "not apply to adapalene, which is stable with benzoyl peroxide."),
+    ('aha', 'bha', 'info',
+     "You are already using an acid exfoliant. Adding a second one rarely "
+     "improves results and does raise irritation risk."),
+]
+
+# Families where owning two products is redundant rather than additive.
+REDUNDANT_WITH_SELF = ('retinoid', 'vitamin_c', 'aha', 'bha', 'benzoyl_peroxide')
+
+
+def _norm(s):
+    return re.sub(r'\s+', ' ', str(s or '').strip().lower())
+
+
+def resolve_climate(profile, country=None):
+    """Climate the user confirmed, else a country-based default, else None."""
+    explicit = (profile or {}).get('climate')
+    if explicit in CLIMATE:
+        return explicit
+    return COUNTRY_CLIMATE.get(country)
+
+
+def detect_families(ingredient_list):
+    """Which active families appear in this product."""
+    found = set()
+    for ing in ingredient_list or []:
+        n = _norm(ing)
+        for family, markers in ROUTINE_ACTIVES.items():
+            if any(m in n for m in markers):
+                found.add(family)
+    return found
+
+
+def parse_routine(routine_input):
+    """Accept a free-text routine or a list, return the active families in it.
+
+    Users type things like "the ordinary retinol, vitamin c serum, cerave
+    cleanser" - we only need the families, not the products.
+    """
+    if not routine_input:
+        return set()
+    text = ' '.join(routine_input) if isinstance(routine_input, (list, tuple)) \
+        else str(routine_input)
+    n = _norm(text)
+    return {fam for fam, markers in ROUTINE_ACTIVES.items()
+            if any(m in n for m in markers)}
+
+
+def check_allergens(ingredient_list, declared):
+    """Personal allergen matches. Returns (flags, fit_penalty).
+
+    The penalty applies to Fit only. A product containing something this user
+    reacts to is unsuitable for them at any formulation quality.
+    """
+    flags = []
+    penalty = 0.0
+    for key in (declared or []):
+        group = ALLERGEN_GROUPS.get(key)
+        if not group:
+            continue
+        hits = []
+        for ing in ingredient_list or []:
+            n = _norm(ing)
+            if any(m in n for m in group['markers']):
+                hits.append(ing)
+        if hits:
+            penalty += 18.0
+            flags.append({
+                'type': 'declared_allergen',
+                'severity': 'high',
+                'group': key,
+                'message': "You told us you react to {}. This product contains "
+                           "{}.".format(group['label'].lower(),
+                                        ", ".join(sorted(set(hits))[:3])),
+                'ingredients': sorted(set(hits))[:5],
+            })
+    return flags, min(45.0, penalty)
+
+
+def check_routine(ingredient_list, routine_families):
+    """Conflicts and redundancy against what the user already uses."""
+    product_families = detect_families(ingredient_list)
+    flags = []
+
+    for a, b, severity, message in ROUTINE_INTERACTIONS:
+        # Flag when the product brings one side and the routine has the other.
+        if (a in product_families and b in routine_families) or \
+           (b in product_families and a in routine_families):
+            flags.append({'type': 'routine_conflict', 'severity': severity,
+                          'message': message})
+
+    for fam in product_families & routine_families:
+        if fam in REDUNDANT_WITH_SELF:
+            pretty = fam.replace('_', ' ')
+            flags.append({
+                'type': 'routine_redundant', 'severity': 'info',
+                'message': "You already use {} in your routine. A second one "
+                           "usually adds cost rather than results - unless you "
+                           "are replacing the first.".format(pretty),
+            })
+    return flags, product_families
+
+
+def fitzpatrick_context(profile, ingredient_list, concerns):
+    """Tone-specific advisories. Directional and clearly hedged."""
+    tone = (profile or {}).get('fitzpatrick')
+    data = FITZPATRICK.get(tone)
+    if not data:
+        return []
+
+    flags = []
+    irritants = [i for i in (ingredient_list or [])
+                 if any(m in _norm(i) for m in
+                        ('glycolic acid', 'salicylic acid', 'retinol', 'retinal',
+                         'benzoyl peroxide', 'alcohol denat'))]
+
+    if data['pih_risk'] >= 0.75 and irritants:
+        flags.append({
+            'type': 'pih_risk', 'severity': 'info',
+            'message': "At Fitzpatrick {}, irritation is more likely to leave a "
+                       "dark mark than redness. This product contains {} - "
+                       "introduce it slowly and stop if skin becomes inflamed, "
+                       "since the mark is harder to undo than the irritation."
+                       .format(tone, irritants[0]),
+        })
+    if data['burn_risk'] >= 0.85 and 'Sun Protection' not in (concerns or []):
+        flags.append({
+            'type': 'burn_risk', 'severity': 'info',
+            'message': "At Fitzpatrick {}, skin burns quickly. Daily sun "
+                       "protection matters more than any single active in your "
+                       "routine.".format(tone),
+        })
+    return flags
+
+
+def climate_context(climate_key, ingredient_list, category):
+    """Humidity-appropriate texture guidance. Comfort and adherence, not safety."""
+    data = CLIMATE.get(climate_key)
+    if not data or category not in ('moisturizer', 'facial oil', 'mask'):
+        return []
+
+    heavy = [i for i in (ingredient_list or [])
+             if any(m in _norm(i) for m in
+                    ('petrolatum', 'paraffinum', 'lanolin', 'cera alba',
+                     'beeswax', 'shea butter', 'butyrospermum'))]
+    flags = []
+    if data['humidity'] == 'high' and heavy:
+        flags.append({
+            'type': 'climate_texture', 'severity': 'info',
+            'message': "In a humid climate a rich occlusive like {} can feel "
+                       "heavy and sit on the skin. It is not a flaw in the "
+                       "formula - it may simply be more than your air requires."
+                       .format(heavy[0]),
+        })
+    elif data['humidity'] == 'low' and not heavy:
+        flags.append({
+            'type': 'climate_texture', 'severity': 'info',
+            'message': "In dry air, humectants work best with something on top "
+                       "to seal them in. This formula is light on occlusives, "
+                       "so you may want a richer layer over it.",
+        })
+    return flags
+
+
+def build_personal_context(profile, ingredient_list, concerns, category, country=None):
+    """Everything personal, in one call.
+
+    Returns flags (advisory, user-facing) and fit_penalty (applies to the Fit
+    score only - never to formulation quality).
+    """
+    profile = profile or {}
+    flags = []
+
+    allergen_flags, fit_penalty = check_allergens(
+        ingredient_list, profile.get('allergens'))
+    flags.extend(allergen_flags)
+
+    routine_families = parse_routine(profile.get('current_routine'))
+    routine_flags, product_families = check_routine(ingredient_list, routine_families)
+    flags.extend(routine_flags)
+
+    flags.extend(fitzpatrick_context(profile, ingredient_list, concerns))
+
+    climate_key = resolve_climate(profile, country)
+    flags.extend(climate_context(climate_key, ingredient_list, category))
+
+    answered = sum(1 for k in ('fitzpatrick', 'climate', 'allergens', 'current_routine')
+                   if profile.get(k))
+    return {
+        'flags': flags,
+        'fit_penalty': fit_penalty,
+        'climate': climate_key,
+        'climate_label': (CLIMATE.get(climate_key) or {}).get('label'),
+        'fitzpatrick': profile.get('fitzpatrick'),
+        'product_active_families': sorted(product_families),
+        'routine_active_families': sorted(routine_families),
+        'questions_answered': answered,
+        'personalisation_level': (
+            'high' if answered >= 3 else 'partial' if answered >= 1 else 'none'),
+    }

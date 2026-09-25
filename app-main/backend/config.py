@@ -162,22 +162,13 @@ CONCENTRATION_THRESHOLDS = {
     'Chlorphenesin': 0.5,
 }
 
-CONCERNS_MAP = {
-    'Acne & Oily Skin':  ['Salicylic Acid', 'Benzoyl Peroxide', 'Azelaic Acid', 'Niacinamide', 'Retinol', 'Zinc PCA'],
-    'Pigmentation':      ['Tranexamic Acid', 'Azelaic Acid', 'Alpha Arbutin', 'Niacinamide', 'Ascorbic Acid', 'Kojic Acid', 'Sodium Ascorbyl Phosphate', 'Magnesium Ascorbyl Phosphate', 'Tocopheryl Acetate'],
-    'Aging & Fine Lines': ['Retinol', 'Retinal', 'Peptides', 'Ascorbic Acid', 'Glycolic Acid', 'Bakuchiol', 'Tocopheryl Acetate', 'Sodium Ascorbyl Phosphate'],
-    'Barrier Repair':    ['Ceramide', 'Cholesterol', 'Fatty Acid', 'Panthenol', 'Niacinamide'],
-    'Sensitive Skin':    ['Centella Asiatica', 'Panthenol', 'Allantoin', 'Ceramide', 'Madecassoside'],
-    'Hydration':         ['Sodium Hyaluronate', 'Glycerin', 'Panthenol', 'Sodium PCA', 'Urea'],
-    'Large Pores':       ['Niacinamide', 'Salicylic Acid', 'Retinol', 'Glycolic Acid'],
-    'Dullness':          ['Ascorbic Acid', 'Niacinamide', 'Glycolic Acid', 'Lactic Acid', 'Mandelic Acid', 'Licorice Extract', 'Sodium Ascorbyl Phosphate', 'Magnesium Ascorbyl Phosphate', 'Tocopheryl Acetate'],
-    'Uneven Texture':    ['Glycolic Acid', 'Salicylic Acid', 'Retinol', 'Lactic Acid'],
-    'Dark Circles':      ['Caffeine', 'Vitamin K', 'Ascorbic Acid', 'Peptides', 'Niacinamide'],
-    'Sun Protection':    ['Zinc Oxide', 'Titanium Dioxide', 'Avobenzone', 'Octinoxate', 'Homosalate', 'Bemotrizinol'],
-    'UV Damage':         ['Ferulic Acid', 'Polypodium Leucotomos', 'Ascorbic Acid', 'Astaxanthin', 'Resveratrol', 'Green Tea Extract', 'Tocopheryl Acetate', 'Sodium Ascorbyl Phosphate'],
-    'Tanning':           ['Alpha Arbutin', 'Kojic Acid', 'Tranexamic Acid', 'Ascorbic Acid', 'Niacinamide', 'Glutathione', 'Lactic Acid', 'Glycolic Acid', 'Mandelic Acid', 'Licorice Extract'],
-    'Puffiness':         ['Caffeine', 'Acetyl Tetrapeptide-5', 'Hesperidin Methyl Chalcone', 'Niacinamide', 'Centella Asiatica'],
-}
+# CONCERNS_MAP lives in data_loader.py - it is merged there with actives
+# derived from the ingredient database, and data_loader's copy is the one
+# scoring imports. A second copy here drifted out of sync and silently
+# swallowed an edit (lactic acid was added to Dullness here and had no effect),
+# so it has been removed rather than left as a trap.
+from data_loader import CONCERNS_MAP  # noqa: F401  (re-exported for callers)
+
 
 SUPPORTING_KEYWORDS = {
     'Acne & Oily Skin': ['zinc', 'glycerin', 'centella', 'panthenol', 'pentylene glycol', 'tea tree'],
@@ -194,6 +185,13 @@ SUPPORTING_KEYWORDS = {
     'UV Damage':        ['vitamin e', 'niacinamide', 'ceramide', 'panthenol', 'centella'],
     'Tanning':          ['ferulic', 'vitamin e', 'panthenol', 'glycerin', 'licorice'],
     'Puffiness':        ['hyaluronic', 'glycerin', 'allantoin', 'panthenol', 'green tea'],
+    # ── Added concerns ───────────────────────────────────────────────────
+    'Post-Inflammatory Hyperpigmentation': ['niacinamide', 'licorice', 'vitamin e', 'ferulic', 'panthenol'],
+    'Redness & Rosacea':       ['centella', 'allantoin', 'bisabolol', 'panthenol', 'glycerin', 'oat'],
+    'Blackheads & Congestion': ['zinc', 'niacinamide', 'glycerin', 'centella', 'pentylene glycol'],
+    'Loss of Firmness':        ['niacinamide', 'hyaluronic', 'ceramide', 'peptide', 'ferulic'],
+    'Eczema-Prone Skin':       ['glycerin', 'squalane', 'oat', 'allantoin', 'bisabolol', 'sodium hyaluronate'],
+    'Hormonal Breakouts':      ['zinc', 'niacinamide', 'centella', 'panthenol', 'glycerin'],
 }
 
 WORSENING_INGREDIENTS = {
@@ -215,6 +213,22 @@ WORSENING_INGREDIENTS = {
     'UV Damage':          [('fragrance', -5), ('parfum', -5), ('limonene', -8), ('linalool', -8)],
     'Tanning':            [('fragrance', -5), ('parfum', -5), ('limonene', -10), ('bergamot', -10)],
     'Puffiness':          [('fragrance', -5), ('parfum', -5), ('alcohol denat', -5)],
+    # ── Added concerns ───────────────────────────────────────────────────
+    # Eczema-prone and rosacea skin react to far more than average, so the
+    # irritant penalties here are deliberately heavier than for other concerns.
+    'Post-Inflammatory Hyperpigmentation': [('fragrance', -8), ('parfum', -8), ('limonene', -6),
+                                            ('linalool', -6), ('bergamot', -10), ('alcohol denat', -6)],
+    'Redness & Rosacea':       [('fragrance', -15), ('parfum', -15), ('alcohol denat', -12),
+                                ('essential oil', -12), ('menthol', -12), ('limonene', -10),
+                                ('linalool', -10), ('sodium lauryl sulfate', -10)],
+    'Blackheads & Congestion': [('isopropyl myristate', -10), ('coconut oil', -10),
+                                ('cocos nucifera', -10), ('lanolin', -8), ('fragrance', -5)],
+    'Loss of Firmness':        [('alcohol denat', -8), ('fragrance', -5), ('parfum', -5)],
+    'Eczema-Prone Skin':       [('fragrance', -18), ('parfum', -18), ('essential oil', -15),
+                                ('alcohol denat', -12), ('sodium lauryl sulfate', -15),
+                                ('limonene', -10), ('linalool', -10), ('methylisothiazolinone', -15)],
+    'Hormonal Breakouts':      [('isopropyl myristate', -10), ('coconut oil', -10),
+                                ('cocos nucifera', -10), ('lanolin', -8), ('fragrance', -5)],
 }
 
 COUNTRY_CURRENCY_MAP = {
