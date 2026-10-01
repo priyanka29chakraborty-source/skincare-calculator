@@ -14,6 +14,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from scoring import analyze_product
+from entitlement import filter_for_entitlement, audit_no_paid_leakage
 from data_loader import data_loader
 from admin import admin_router
 from admin_db import log_fetch, log_analysis, increment_credits
@@ -171,6 +172,20 @@ async def health():
     return PlainTextResponse("ok")
 
 
+def _resolve_entitlement(request: Request) -> bool:
+    """Whether this caller has paid for the personal analysis.
+
+    Resolved entirely server-side. When the credit ledger lands this reads a
+    verified session and decrements a balance; until then it returns False so
+    the free path is the one actually exercised in production.
+
+    Deliberately ignores anything in the request body. A header, cookie or JSON
+    field claiming entitlement is a request to be trusted, not proof of
+    payment.
+    """
+    return False
+
+
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}
 # Derived from the scoring engine's own concern map so the two cannot drift.
 try:
@@ -224,7 +239,16 @@ async def analyze(req: AnalyzeRequest, request: Request):
         cached = _cache_get(cache_key)
         if cached:
             logger.info("Cache hit for analysis request")
-            return cached
+            # The cache stores the FULL result so one entry serves both tiers.
+            # The gate must therefore run on this path too - returning the
+            # cached object directly would hand a free caller the paid data
+            # whenever anyone had analysed the same product before them, which
+            # is precisely how a paywall leaks without anyone noticing.
+            _entitled = _resolve_entitlement(request)
+            _out = filter_for_entitlement(cached, _entitled)
+            if not _entitled:
+                audit_no_paid_leakage(_out)
+            return _out
 
         result = analyze_product(product_data)
         elapsed = round((_time.time() - t0) * 1000)
@@ -272,6 +296,20 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
         # Store in cache (always store clean result without per-request notes)
         _cache_set(cache_key, result)
+
+        # ── Entitlement gate ─────────────────────────────────────────────────
+        # Resolved server-side. Never read from the request body: a
+        # client-supplied entitlement flag would be the entire paywall in one
+        # editable field. Until accounts and credits exist this resolves to
+        # False, so the free payload is what ships and the gate is exercised in
+        # production from day one rather than bolted on later.
+        entitled = _resolve_entitlement(request)
+        result = filter_for_entitlement(result, entitled)
+        if not entitled:
+            # Last line of defence before serialisation - if a future change
+            # ever lets a paid key through, this fails loudly instead of
+            # quietly giving the product away.
+            audit_no_paid_leakage(result)
 
         # Inject size_defaulted note AFTER caching so it never contaminates cached result
         if req.size_defaulted and not result.get('price_analysis', {}).get('price_note'):
