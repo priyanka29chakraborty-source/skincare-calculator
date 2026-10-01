@@ -34,6 +34,15 @@ from product_fetcher import fetch_multiple_products, fetch_product_data
 from observability import init_error_monitoring, capture
 init_error_monitoring()
 
+# Development override: unlock the paid tier without accounts or payment.
+# Server-side only - never settable from a request. Logged at startup because a
+# paywall silently disabled in production would be the worst kind of bug.
+_DEV_UNLOCK = os.environ.get('DEV_UNLOCK_ALL', '').strip().lower() in ('1', 'true', 'yes')
+if _DEV_UNLOCK:
+    logging.getLogger(__name__).warning(
+        "DEV_UNLOCK_ALL is set - every caller receives the FULL paid result. "
+        "This must never be set in production.")
+
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
@@ -182,7 +191,14 @@ def _resolve_entitlement(request: Request) -> bool:
     Deliberately ignores anything in the request body. A header, cookie or JSON
     field claiming entitlement is a request to be trusted, not proof of
     payment.
+
+    DEV_UNLOCK_ALL exists so the paid experience can be developed and tested
+    before accounts exist. It is read from the server environment, which the
+    client cannot influence, and is logged loudly at startup so it can never be
+    left on in production by accident.
     """
+    if _DEV_UNLOCK:
+        return True
     return False
 
 

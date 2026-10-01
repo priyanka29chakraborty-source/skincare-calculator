@@ -47,6 +47,11 @@ FREE_KEYS = {
     # What is in the bottle. Reading an ingredient list is not a premium
     # feature, and gating it would make the tool useless as a reference.
     'identified_actives', 'active_classes', 'ingredient_count',
+    # The legacy A-E breakdown and its detail bullets describe the FORMULATION
+    # score, which is free. Stripping them left the category headline cards
+    # (cleanser surfactant safety, oil lipid score, sunscreen UV stats) with a
+    # bar and no number - the UI renders them unconditionally.
+    'component_scores', 'component_details',
     'one_percent_marker', 'ingredient_conflicts', 'ph_analysis',
     'delivery_systems', 'red_flags', 'is_high_intensity',
     'high_intensity_actives', 'oil_metadata', 'am_pm_recommendation',

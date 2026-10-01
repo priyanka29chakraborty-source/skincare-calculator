@@ -603,3 +603,56 @@ body::before {
   .progress-bar-fill,
   .score-circle-wrap circle { transition: none !important; }
 }
+
+/* ── Locked (paid) sections ──────────────────────────────────────────────── */
+/* A locked value is UNKNOWN, not bad - so these are grey and calm. Nothing
+   here uses the warning palette, because implying a poor result to create
+   urgency would be a dark pattern. */
+.locked-card { position: relative; }
+.locked-pill {
+  margin-left: auto;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-sub);
+  background: var(--border-light, var(--border));
+  padding: 3px 9px;
+  border-radius: 99px;
+}
+.locked-card .card-title { display: flex; align-items: center; gap: 8px; }
+.locked-body { padding-top: 4px; }
+.locked-rows { display: flex; flex-direction: column; gap: 11px; margin-bottom: 14px; }
+.locked-row { display: flex; align-items: center; gap: 12px; }
+.locked-row-label { font-size: 0.86rem; color: var(--text-sub); flex: none; }
+.locked-bar {
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--border) 0 10px,
+    transparent 10px 18px
+  );
+  opacity: 0.75;
+}
+.locked-found {
+  font-size: 0.82rem;
+  color: var(--sage);
+  background: #f2f9f3;
+  border: 1px solid #cde7d2;
+  border-radius: 8px;
+  padding: 8px 11px;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.locked-msg { font-size: 0.86rem; color: var(--text-sub); line-height: 1.55; margin: 0 0 14px; }
+.locked-cta { width: auto; }
+.locked-safety {
+  font-size: 0.74rem;
+  color: var(--text-sub);
+  line-height: 1.5;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
