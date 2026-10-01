@@ -24,7 +24,12 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  background: linear-gradient(145deg, #FFF4F4 0%, #F9F6FE 50%, #FFF8F8 100%);
+  /* Warm neutral ground. The previous pink-to-lavender gradient competed
+     with the rose accent for attention; on a neutral, rose is the only
+     colour doing a job, which is what makes an interface read as
+     considered rather than decorated. Cards stay white, so contrast
+     against them increases slightly - which also helps legibility. */
+  background: linear-gradient(170deg, #F2EDE9 0%, #EFEAE6 55%, #F1ECE8 100%);
   background-attachment: fixed;
   font-family: 'Nunito', sans-serif;
   color: var(--charcoal);
@@ -34,13 +39,29 @@ body {
 body::before {
   content: ''; position: fixed; inset: 0;
   background-image:
-    radial-gradient(ellipse at 15% 15%, rgba(191,136,136,0.08) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 85%, rgba(156,130,200,0.07) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 50%, rgba(250,232,232,0.05) 0%, transparent 70%);
+    radial-gradient(ellipse at 12% 10%, rgba(191,136,136,0.055) 0%, transparent 58%),
+    radial-gradient(ellipse at 88% 88%, rgba(140,124,108,0.045) 0%, transparent 58%);
   pointer-events: none; z-index: 0;
 }
 
+/* Single column as before - only the ceiling moves. At 780px a 1440px laptop
+   showed ~330px of empty background on each side and used just 72% of the
+   screen. These steps lift that to ~75-80% without changing any layout. */
 .sc-app { max-width: 780px; margin: 0 auto; padding: 40px 20px; position: relative; z-index: 1; }
+@media (min-width: 1120px) { .sc-app { max-width: 1000px; padding: 44px 28px; } }
+@media (min-width: 1400px) { .sc-app { max-width: 1140px; } }
+@media (min-width: 1700px) { .sc-app { max-width: 1240px; } }
+
+/* Keep running prose readable as the container widens. Long explanatory text
+   set to the full 1140px would run past a comfortable line length; the cards,
+   tables, bars and stat grids still use the full width. */
+@media (min-width: 1120px) {
+  .sc-subtitle,
+  .score-title-text,
+  .bd-details li,
+  .locked-msg,
+  .disclaimer-list li { max-width: 78ch; }
+}
 
 /* ========== HEADER ========== */
 .sc-header { text-align: center; margin-bottom: 48px; }
