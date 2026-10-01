@@ -561,3 +561,45 @@ body::before {
   .personalise-card { padding: 16px 14px; }
   .personalise-step { margin-bottom: 15px; }
 }
+
+/* ── Numeric precision refinements ───────────────────────────────────────── */
+/* Scores and metrics are DATA, so they are set with lining tabular figures:
+   every digit occupies the same width, so values line up into a column and a
+   number does not jump sideways when it animates or updates. Typefaces and
+   palette are unchanged - this is a legibility refinement, not a redesign. */
+.bd-score,
+.pg-val,
+.score-circle-wrap text,
+.fit-score,
+.concern-score {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* Right-align the component scores so they form a clean column against the
+   bars, rather than floating at the end of each label. */
+.bd-header { align-items: baseline; }
+.bd-score {
+  min-width: 68px;
+  text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Slightly taller bars with a touch more contrast behind them, so a short bar
+   still reads as a bar rather than a hairline. */
+.progress-bar-bg {
+  height: 7px;
+  background: var(--border-light, var(--border));
+  border-radius: 4px;
+}
+.progress-bar-fill { border-radius: 4px; }
+
+/* Stat tiles: reduce visual weight so they support the score rather than
+   compete with it. */
+.pg-val { font-size: 17px; letter-spacing: -0.01em; }
+.pg-lbl { letter-spacing: 0.4px; text-transform: lowercase; }
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar-fill,
+  .score-circle-wrap circle { transition: none !important; }
+}

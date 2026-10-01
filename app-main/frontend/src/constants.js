@@ -33,9 +33,14 @@ export function getScoreColor(s) {
 }
 
 export function getBarColor(p) {
-  if (p >= 80) return "#22c55e";
-  if (p >= 60) return "#84cc16";
-  if (p >= 40) return "#eab308";
-  if (p >= 20) return "#f97316";
-  return "#ef4444";
+  // Steps widened for scannability. The previous green (#22c55e) and lime
+  // (#84cc16) were close enough that a component at 74% looked identical to
+  // one at 100%, so the breakdown could not be read at a glance - which is the
+  // whole job of a bar chart. Each step is now visibly distinct, using the
+  // existing palette (--sage, --green, --gold, --orange, --red).
+  if (p >= 85) return "#267C36";   // sage - excellent
+  if (p >= 70) return "#22c55e";   // green - good
+  if (p >= 50) return "#C9A96E";   // gold - middling
+  if (p >= 30) return "#f97316";   // orange - weak
+  return "#ef4444";                // red - poor
 }

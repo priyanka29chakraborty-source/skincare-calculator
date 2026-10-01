@@ -593,16 +593,23 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             isEyeCream    ? 'fa-eye' :
             'fa-chart-line'
           }`}></i>
-          {isFacialOil  ? ' Lipid Excellence Index'
-            : isCleanser    ? ' Barrier Preservation Score'
-            : isMoisturizer ? ' Barrier Recovery Index'
-            : isSunscreen   ? ' UV Protection Score'
-            : isTreatment   ? ' Treatment Potency Score'
-            : isSerum       ? ' Active Strength Index'
-            : isToner       ? ' Formula Function Score'
-            : isMask        ? ' Instant Effect Index'
-            : isEyeCream    ? ' Eye Care Score'
-            : ' Main Worth Score'}
+          {/* The headline number is the FORMULATION score - how well the
+              product is made for its category. The previous per-category
+              names described something narrower than what is actually
+              measured: "Active Strength Index" on a figure that includes
+              tolerability, formulation integrity and evidence quality told
+              the user the wrong thing about their own result. Each title now
+              names the category and the thing being scored. */}
+          {isFacialOil  ? ' Facial Oil — Formulation Score'
+            : isCleanser    ? ' Cleanser — Formulation Score'
+            : isMoisturizer ? ' Moisturiser — Formulation Score'
+            : isSunscreen   ? ' Sunscreen — Formulation Score'
+            : isTreatment   ? ' Treatment — Formulation Score'
+            : isSerum       ? ' Serum — Formulation Score'
+            : isToner       ? ' Toner — Formulation Score'
+            : isMask        ? ' Mask — Formulation Score'
+            : isEyeCream    ? ' Eye Cream — Formulation Score'
+            : ' Formulation Score'}
         </h2>
 
         <div className="score-header">
