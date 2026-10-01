@@ -665,3 +665,50 @@ body::before {
   padding-top: 10px;
   border-top: 1px dashed var(--border);
 }
+
+/* ── Result card identity header ─────────────────────────────────────────── */
+/* Product name leads; the score ring sits alongside. Uses existing palette
+   tokens only - no new colours. */
+.result-ident {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.result-ident-text { min-width: 0; }
+.result-brand {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--dusty-rose-dark);
+  margin-bottom: 7px;
+}
+.result-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.62rem;
+  font-weight: 600;
+  line-height: 1.16;
+  color: var(--charcoal);
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+.result-meta {
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+/* The ring keeps its own sizing; only the surrounding layout changed. */
+.result-ident .score-circle-wrap { flex: none; }
+/* The block below the identity row no longer needs to reserve space for the
+   ring, so it becomes a simple stack. */
+.score-header { align-items: flex-start; }
+
+@media (max-width: 640px) {
+  .result-ident { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .result-name { font-size: 1.35rem; }
+  .result-ident .score-circle-wrap { align-self: center; }
+}

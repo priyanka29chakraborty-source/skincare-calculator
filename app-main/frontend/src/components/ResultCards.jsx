@@ -589,7 +589,8 @@ function TreatmentIntensityBanner({ result, concerns }) {
 }
 
 // ── Main ResultCards Component ────────────────────────────────────────────────
-export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput, category, onUnlock }) {
+export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput, category, onUnlock,
+  productName, brand, price, size, sizeUnit }) {
   // Paid sections are stripped server-side, so the UI must branch on the
   // tier the server reported rather than on whether a field happens to be
   // truthy - an absent field is a locked state, not a zero.
@@ -645,8 +646,34 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             : ' Formulation Score'}
         </h2>
 
-        <div className="score-header">
+        {/* Product identity leads, score sits to the right.
+            Previously the card opened with "Serum - Formulation Score" and the
+            product the user actually asked about never appeared as a heading,
+            while the plain-language verdict - the one thing no competitor
+            produces - sat underneath as small grey caption text. Name first,
+            verdict second, number alongside. */}
+        <div className="result-ident">
+          <div className="result-ident-text">
+            {(brand || category) && (
+              <div className="result-brand">
+                {[brand, category].filter(Boolean).join(' · ')}
+              </div>
+            )}
+            {productName && <h3 className="result-name">{productName}</h3>}
+            {(() => {
+              const bits = [];
+              if (price) bits.push(`${currency} ${price}`);
+              if (size) bits.push(`${size} ${sizeUnit || 'ml'}`);
+              const ppm = result.price_analysis?.price_per_ml;
+              if (ppm) bits.push(`${currency} ${ppm} per ${sizeUnit === 'g' ? 'g' : 'ml'}`);
+              if (skinType) bits.push(`analysed for ${String(skinType).toLowerCase()} skin`);
+              return bits.length ? <div className="result-meta">{bits.join(' · ')}</div> : null;
+            })()}
+          </div>
           <ScoreCircle score={result.main_worth_score} />
+        </div>
+
+        <div className="score-header">
           <div className="score-meta">
             <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
             {/* Treatment high intensity badge — inline in score-meta */}

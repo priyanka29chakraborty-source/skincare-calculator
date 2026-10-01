@@ -279,6 +279,7 @@ function App() {
             />
             <ResultCards
               result={result} concerns={concerns} skinType={skinType} currency={currency}
+              productName={productName} brand={brand} price={price} size={size} sizeUnit={sizeUnit}
               alternatives={alternatives} altLoading={altLoading}
               bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
               fetchInput={fetchInput}
