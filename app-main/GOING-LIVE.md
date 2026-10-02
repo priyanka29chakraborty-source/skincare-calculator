@@ -9,6 +9,71 @@ the ledger is durable, sessions survive a restart, Razorpay is configured, and
 
 ---
 
+## 0. Switching the paywall on (and what it covers)
+
+Everything is visible today. One variable closes the gate:
+
+```
+PAYWALL_ENABLED=1
+```
+
+Unset, `_resolve_entitlement` returns `True` for every request and no credit is
+ever spent. Set, it reads the signed session cookie and spends one credit per
+product. Both states are covered by tests — `test_paid_flow.py` runs with it on,
+`test_paywall_off.py` with it off — so this is a configuration change, not a
+development project.
+
+`GET /api/readiness` reports `paywall_enabled` and `currently_charging`.
+
+### What is free, and why
+
+Free is everything about the **product**: the formulation score and the full
+reasoning behind it, the ingredient list and identified actives, price and
+value, pH, conflicts, and all safety warnings. That answer is identical for
+every reader, which makes it cacheable, shareable and the reason anyone finds
+the site. Gating it would make the tool useless as a reference and kill the
+thing that brings people in.
+
+Pregnancy warnings and declared-allergen warnings are **always** free, even
+with the paywall on. Charging someone to learn a product may be unsafe for them
+in pregnancy is not a business model.
+
+### What a credit buys
+
+Everything about **you** — in `PAID_KEYS` in `backend/entitlement.py`:
+
+| Gated now | Key |
+|---|---|
+| How well it treats your concerns | `skin_concern_fit` |
+| Whether it suits your skin type | `skin_type_compatibility`, `skin_type_details`, `skin_type_risk_level` |
+| Pore-clogging and allergen risk for you | `comedogenic_warnings`, `allergen_warnings` |
+| What would suit you better | `better_suited`, `upgrade_suggestions` |
+| The three personalisation questions | `personalisation` |
+
+### Still to gate
+
+These are built but not behind the gate yet, because you have now said they
+should be. Each needs a decision from you about *how*, not whether:
+
+- **PDF export.** The report is generated in the browser from data already
+  sent, so gating it means gating the data, not the button. Simplest honest
+  version: the report renders only for a product the account has unlocked —
+  which, given billing is per product, it already has if they paid for it.
+  So this falls out for free once the paywall is on.
+- **Comparison.** Currently free and deliberately so, because it compares
+  formulation scores and those are free. If it is to be paid, the natural
+  line is: the score table stays free, and the parts that depend on *you* —
+  per-concern comparison, layering advice, `choose_if` — cost a credit. That
+  keeps the free half useful enough to attract people.
+- **Personalisation.** `personalisation` is already in `PAID_KEYS`, but the
+  "Answer 3 questions" card is shown to everyone and the re-analysis is free.
+  With the paywall on it will return a locked card; the card needs copy that
+  says so before the questions, not after.
+
+Tell me which of those three you want and I will wire them.
+
+---
+
 ## 1. The credit ledger must be on PostgreSQL
 
 **This is the one that loses money if you skip it.**
