@@ -36,10 +36,11 @@ def call_api(prompt, options, context):
         'confidence_note': result['formulation_confidence_note'],
         'notes': notes,
         'concern_scores': {k: d['score'] for k, d in result['skin_concern_fit'].items()},
+        'am_pm': result.get('am_pm_recommendation', ''),
         'advisories': [d['advisory'] for d in result['skin_concern_fit'].values()],
         'explanations': [e for d in result['skin_concern_fit'].values()
                          for e in d.get('explanation', [])],
     }
-    out['all_text'] = ([out['summary'], out['confidence_note']] + notes
+    out['all_text'] = ([out['summary'], out['confidence_note'], out['am_pm']] + notes
                        + out['advisories'] + out['explanations'])
     return {'output': json.dumps(out)}

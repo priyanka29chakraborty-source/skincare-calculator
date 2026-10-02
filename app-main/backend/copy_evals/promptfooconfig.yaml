@@ -30,6 +30,9 @@ defaultTest:
     - type: python
       value: file://assertions.py:sentences_are_readable
       metric: sentences_are_readable
+    - type: python
+      value: file://assertions.py:advice_says_when_not_just_what
+      metric: advice_says_when_not_just_what
 tests:
   - description: "Serum with strong actives"
     vars:
@@ -71,3 +74,7 @@ tests:
     vars:
       category: "Facial Oil"
       ingredients: "Squalane, Jojoba Oil, Tocopherol"
+  - description: "AHA exfoliant"
+    vars:
+      category: "Serum"
+      ingredients: "Aqua, Glycolic Acid, Glycerin, Panthenol, Phenoxyethanol"
