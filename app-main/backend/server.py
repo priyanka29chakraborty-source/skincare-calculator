@@ -19,6 +19,8 @@ from affiliate import disclosure_for
 import wallet
 import identity
 from accounts import accounts_router, current_account
+import history
+from compare import compare as compare_products, CompareError, MAX_PRODUCTS
 from data_loader import data_loader
 from admin import admin_router
 from admin_db import log_fetch, log_analysis, increment_credits
@@ -221,7 +223,7 @@ async def readiness():
     }
 
 
-def _resolve_entitlement(request: Request, analysis_key: str = None) -> bool:
+def _resolve_entitlement(request: Request, product_data: dict = None) -> bool:
     """Whether this caller has paid for the personal analysis.
 
     Resolved entirely server-side from a signed session cookie and the credit
@@ -230,12 +232,13 @@ def _resolve_entitlement(request: Request, analysis_key: str = None) -> bool:
     proof of payment, and the session cookie is only believed after its HMAC
     verifies.
 
-    *analysis_key* is the cache key for this product and profile. It is used as
-    the ledger idempotency reference, which makes re-analysing the same product
-    free - a page refresh, a retry after a dropped connection, or coming back
-    to a product tomorrow all reuse the credit already spent. "Every new
-    product costs a credit" is the promise; charging twice for one product
-    because the network blipped is not something to discover from a complaint.
+    *product_data* is fingerprinted to the ledger's idempotency reference, so
+    one account pays once per product and never again - a page refresh, a retry
+    after a dropped connection, answering the personalisation questions, fixing
+    a typo in the price, or coming back to it next month all reuse the credit
+    already spent. See _product_fingerprint for why that is narrower than the
+    cache key. "Every new product costs a credit" is the promise; anything else
+    is something the customer finds out from their balance rather than from us.
 
     Returning False is not an error. It is the free tier: the caller gets the
     formulation analysis and the paid sections are stripped before
@@ -254,7 +257,7 @@ def _resolve_entitlement(request: Request, analysis_key: str = None) -> bool:
         return False
 
     try:
-        wallet.spend(account_id, reference=_spend_reference(account_id, analysis_key))
+        wallet.spend(account_id, reference=_spend_reference(account_id, product_data))
         return True
     except wallet.InsufficientCredits:
         return False
@@ -265,16 +268,91 @@ def _resolve_entitlement(request: Request, analysis_key: str = None) -> bool:
         return False
 
 
-def _spend_reference(account_id, analysis_key):
-    """The idempotency key for one account analysing one product.
+def _product_fingerprint(product_data):
+    """What makes this *the same product*, for billing purposes.
 
-    None when there is no cache key - a spend with no reference is never
-    deduplicated, which is the safe direction: the customer is charged once per
-    call rather than possibly twice for one product.
+    Deliberately narrower than the cache key. The cache key includes everything
+    that changes the output - skin type, concerns, personal profile, price -
+    because a different output needs a different cache entry. Billing is a
+    different question: those are all the same tube of serum.
+
+    Keying the charge on the full cache key meant that answering the
+    personalisation questions, correcting a typo in the price, or re-opening a
+    saved product with a concern unticked all produced a "new" product and took
+    another credit. That is not what "one credit per new product" means to the
+    person paying, and it is the kind of thing they would find out from their
+    balance rather than from us.
+
+    So: the ingredient list and the category. The ingredients are the product;
+    the category decides which rubric scores it, so the same INCI sold as a
+    serum and as a toner is genuinely two analyses.
     """
-    if not analysis_key:
+    ingredients = re.sub(r'[\s,]+', ',',
+                         (product_data.get('ingredients') or '').strip().lower())
+    category = (product_data.get('category') or '').strip().lower()
+    return hashlib.sha256(
+        ('%s|%s' % (category, ingredients)).encode('utf-8')).hexdigest()[:32]
+
+
+def _spend_reference(account_id, product_data):
+    """The idempotency key for one account and one product.
+
+    None when there is nothing to fingerprint - a spend with no reference is
+    never deduplicated, which is the safe direction: the customer is charged
+    once for this call rather than possibly twice for one product.
+    """
+    if not product_data or not (product_data.get('ingredients') or '').strip():
         return None
-    return "analysis:%s:%s" % (account_id, analysis_key)
+    return "product:%s:%s" % (account_id, _product_fingerprint(product_data))
+
+
+class CompareRequest(BaseModel):
+    products: List[dict] = Field(default_factory=list)
+
+
+@api_router.post("/compare")
+@limiter.limit("6/minute")
+async def compare_endpoint(req: CompareRequest, request: Request):
+    """Two to four products side by side.
+
+    Free, and deliberately so: it compares formulation scores, and formulation
+    analysis is the free tier. Charging to put two free numbers next to each
+    other would be charging for arithmetic.
+    """
+    products = req.products or []
+    if len(products) > MAX_PRODUCTS:
+        return JSONResponse(status_code=400, content={
+            "error": "Up to %d products at a time." % MAX_PRODUCTS})
+
+    cleaned = []
+    for item in products:
+        ingredients = _sanitize(item.get('ingredients') or '')
+        if len(ingredients) > 5000:
+            return JSONResponse(status_code=400, content={
+                "error": "One of those ingredient lists is too long."})
+        category = (_sanitize(item.get('category') or '') or 'serum').lower()
+        if category not in VALID_CATEGORIES:
+            category = 'serum'
+        skin_type = (_sanitize(item.get('skin_type') or '') or 'normal').lower()
+        if skin_type not in VALID_SKIN_TYPES:
+            skin_type = 'normal'
+        cleaned.append({
+            'ingredients': ingredients,
+            'price': max(0.0, float(item.get('price') or 0)),
+            'size_ml': max(0.0, float(item.get('size_ml') or 0)) or 30.0,
+            'category': category.title(),
+            'country': _sanitize(item.get('country') or '') or 'India',
+            'currency': _sanitize(item.get('currency') or '') or 'INR',
+            'skin_type': skin_type,
+            'skin_concerns': [],
+            'product_name': _sanitize(item.get('product_name') or '')[:200],
+            'brand': _sanitize(item.get('brand') or '')[:120],
+        })
+
+    try:
+        return compare_products(cleaned, analyze_product)
+    except CompareError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}
@@ -335,7 +413,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
             # cached object directly would hand a free caller the paid data
             # whenever anyone had analysed the same product before them, which
             # is precisely how a paywall leaks without anyone noticing.
-            _entitled = _resolve_entitlement(request, cache_key)
+            _entitled = _resolve_entitlement(request, product_data)
             _out = filter_for_entitlement(cached, _entitled)
             if not _entitled:
                 audit_no_paid_leakage(_out)
@@ -394,7 +472,24 @@ async def analyze(req: AnalyzeRequest, request: Request):
         # editable field. Until accounts and credits exist this resolves to
         # False, so the free payload is what ships and the gate is exercised in
         # production from day one rather than bolted on later.
-        entitled = _resolve_entitlement(request, cache_key)
+        entitled = _resolve_entitlement(request, product_data)
+
+        # Saved for signed-in accounts so a product can be re-opened later.
+        # record() swallows its own failures: history is a convenience, and a
+        # storage hiccup must not turn a successful analysis into an error.
+        _account = current_account(request)
+        if _account:
+            # product_data is the cache key's input, so it deliberately omits
+            # fields that do not change the score - brand is one. History needs
+            # them for display, so they are added here rather than widened into
+            # the cache key, where brand would split the cache for two
+            # identically formulated products.
+            history.record(_account, cache_key, result, dict(
+                product_data,
+                brand=_sanitize(req.brand or ''),
+                skin_concerns=product_data['concerns'],
+            ), entitled)
+
         result = filter_for_entitlement(result, entitled)
         if not entitled:
             # Last line of defence before serialisation - if a future change

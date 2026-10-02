@@ -77,7 +77,9 @@ class DeterministicExplainer(Explainer):
     def explain(self, analysis, audience=None):
         out = {}
 
+        # score_title is the engine's own spelling for this sentence.
         summary = (analysis.get('formulation_summary')
+                   or analysis.get('score_title')
                    or (analysis.get('formulation') or {}).get('summary'))
         if summary:
             out['summary'] = summary
@@ -134,6 +136,9 @@ class DeterministicExplainer(Explainer):
         confidence = analysis.get('confidence') or {}
         if isinstance(confidence, dict) and confidence.get('note'):
             notes.append(confidence['note'])
+        note = analysis.get('formulation_confidence_note')
+        if note and note not in notes:
+            notes.append(note)
         unknown = analysis.get('unknown_ingredients') or []
         if unknown:
             notes.append(

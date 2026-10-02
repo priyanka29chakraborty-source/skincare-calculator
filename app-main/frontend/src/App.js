@@ -7,6 +7,8 @@ import ResultCards from "./components/ResultCards";
 import PersonaliseCard from "./components/PersonaliseCard";
 import AccountBar from "./components/AccountBar";
 import UnlockModal from "./components/UnlockModal";
+import HistoryCard from "./components/HistoryCard";
+import CompareCard from "./components/CompareCard";
 import useAccount from "./hooks/useAccount";
 
 function App() {
@@ -35,6 +37,7 @@ function App() {
   const [alternatives, setAlternatives] = useState(null);
   const account = useAccount();
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [pendingReopen, setPendingReopen] = useState(false);
   // Read through a ref inside handleAnalyze: adding `account` to its dependency
   // list would rebuild the callback on every balance change and re-trigger the
   // effects that depend on it.
@@ -167,6 +170,41 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, brand, activeConcentrations, fetchAlts, fetchBestPrice]);
 
+  /**
+   * Re-open a saved analysis.
+   *
+   * Restores the inputs and re-runs the engine rather than replaying a stored
+   * result: the score depends on the engine, and the engine changes. Showing a
+   * saved 91 beside a freshly computed 87 is how a tool loses a reader, so
+   * there is only ever one number - today's.
+   *
+   * The analysis is scheduled on the next tick because handleAnalyze reads
+   * these values from the closure it was built with, which has not yet seen
+   * the state we just set.
+   */
+  const reopenSaved = useCallback((entry) => {
+    setProductName(entry.product_name || "");
+    setBrand(entry.brand || "");
+    setCategory(entry.category || "Serum");
+    setPrice(entry.price ? String(entry.price) : "");
+    setSize(entry.size_ml ? String(entry.size_ml) : "");
+    setIngredients(entry.ingredients || "");
+    setSkinType(entry.skin_type ? entry.skin_type.charAt(0).toUpperCase()
+                                  + entry.skin_type.slice(1) : "");
+    setConcerns(entry.concerns || []);
+    setResult(null);
+    setPendingReopen(true);
+  }, []);
+
+  // Runs once the restored inputs have been committed, so handleAnalyze sees
+  // them. Re-running costs no credit: the ledger is keyed on the product.
+  useEffect(() => {
+    if (!pendingReopen) return;
+    setPendingReopen(false);
+    handleAnalyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingReopen]);
+
   // Input debouncing - clear error after typing
   useEffect(() => {
     if (error && ingredients.trim()) {
@@ -274,6 +312,8 @@ function App() {
       </header>
 
       <main className="sc-main">
+        <HistoryCard account={account} onReopen={reopenSaved} />
+
         <InputForm
           fetchInput={fetchInput} setFetchInput={setFetchInput}
           fetchLoading={fetchLoading} fetchMsg={fetchMsg} fetchStatus={fetchStatus} fetchError={fetchError} handleFetch={handleFetch}
@@ -312,6 +352,23 @@ function App() {
               fetchInput={fetchInput}
               category={category}
               onUnlock={() => setUnlockOpen(true)}
+            />
+
+            <div className="export-row no-print">
+              <button className="export-btn" onClick={() => window.print()}
+                      data-testid="export-btn">
+                <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
+              </button>
+            </div>
+
+            {/* Seeded with the product just analysed, so comparing it against
+                something else does not mean typing it in again. */}
+            <CompareCard
+              currency={currency}
+              seed={{
+                product_name: productName, brand, category,
+                price: price || "", size_ml: size || "", ingredients,
+              }}
             />
           </section>
         )}

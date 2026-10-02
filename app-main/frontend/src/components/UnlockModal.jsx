@@ -170,8 +170,9 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
         {step === "packs" && (
           <>
             <p className="modal-lede">
-              One credit per new product. Re-opening a product you have already
-              analysed costs nothing, however many times you come back to it.
+              One credit per product, once. Re-opening it, answering the
+              personalisation questions, or correcting a price costs nothing —
+              you have already paid for that product.
             </p>
 
             {packs && !packs.payments_enabled && (

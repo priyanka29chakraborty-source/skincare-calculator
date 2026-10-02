@@ -378,3 +378,160 @@ def test_readiness_reports_dev_unlock(client, monkeypatch):
     body = client.get('/api/readiness').json()
     assert body['dev_unlock_all'] is True
     assert any('DEV_UNLOCK_ALL' in w for w in body['warnings'])
+
+
+# ---------------------------------------------------------------------------
+# Saved history, through the API
+# ---------------------------------------------------------------------------
+
+def test_an_analysis_is_saved_with_its_brand_and_concerns(client, funded):
+    """product_data is the cache key's input and deliberately omits fields that
+    do not change the score, so brand was arriving empty and the saved list read
+    "Serum - 549" with no maker. The display fields are added at the call site
+    rather than widened into the cache key, where brand would split the cache
+    for two identically formulated products."""
+    body = analysis_body()
+    body['brand'] = 'Minimalist'
+    body['product_name'] = 'Niacinamide 10%'
+    client.post('/api/analyze', json=body)
+
+    entries = client.get('/api/history').json()['entries']
+    assert len(entries) == 1
+    assert entries[0]['brand'] == 'Minimalist'
+    assert entries[0]['product_name'] == 'Niacinamide 10%'
+    assert entries[0]['concerns'] == ['Acne & Oily Skin']
+    assert entries[0]['tier']
+
+
+def test_history_requires_a_session(client):
+    assert client.get('/api/history').status_code == 401
+
+
+def test_a_signed_out_analysis_is_not_saved(client, signed_in):
+    """Checked against storage rather than by signing back in: the signed_in
+    fixture pins issue_code to one value, which is already spent."""
+    import history
+    client.post('/api/auth/signout')
+    client.post('/api/analyze', json=analysis_body())
+    assert history.recent(signed_in) == []
+
+
+def test_a_saved_entry_can_be_re_opened_through_the_api(client, funded):
+    body = analysis_body()
+    client.post('/api/analyze', json=body)
+    entry_id = client.get('/api/history').json()['entries'][0]['entry_id']
+    entry = client.get('/api/history/%s' % entry_id).json()
+    assert entry['ingredients'] == body['ingredients']
+
+
+def test_forgetting_an_entry_through_the_api(client, funded):
+    client.post('/api/analyze', json=analysis_body())
+    entry_id = client.get('/api/history').json()['entries'][0]['entry_id']
+    assert client.post('/api/history/%s/forget' % entry_id).json()['forgotten'] is True
+    assert client.get('/api/history').json()['entries'] == []
+
+
+def test_comparison_is_free_and_needs_no_session(client):
+    """It compares formulation scores, and those are the free tier. Charging to
+    put two free numbers side by side would be charging for arithmetic."""
+    resp = client.post('/api/compare', json={'products': [
+        {'product_name': 'A', 'category': 'Serum', 'price': 549, 'size_ml': 30,
+         'ingredients': 'Aqua, Niacinamide, Zinc PCA, Glycerin, Phenoxyethanol'},
+        {'product_name': 'B', 'category': 'Serum', 'price': 1200, 'size_ml': 30,
+         'ingredients': 'Aqua, Phenoxyethanol'},
+    ]})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['verdict']['best_formulation'] == 'A'
+    assert all(p['formulation_tier'] for p in data['products'])
+
+
+def test_comparison_rejects_more_than_four(client):
+    resp = client.post('/api/compare', json={'products': [
+        {'product_name': str(i), 'category': 'Serum',
+         'ingredients': 'Aqua, Glycerin'} for i in range(5)]})
+    assert resp.status_code == 400
+
+
+def test_comparison_spends_no_credit(client, funded):
+    before = client.get('/api/auth/me').json()['balance']
+    client.post('/api/compare', json={'products': [
+        {'product_name': 'A', 'category': 'Serum',
+         'ingredients': 'Aqua, Niacinamide, Glycerin'},
+        {'product_name': 'B', 'category': 'Serum',
+         'ingredients': 'Aqua, Glycerin'},
+    ]})
+    assert client.get('/api/auth/me').json()['balance'] == before
+
+
+# ---------------------------------------------------------------------------
+# What "one credit per new product" actually means
+# ---------------------------------------------------------------------------
+
+def test_personalising_a_product_does_not_cost_a_second_credit(client, funded):
+    """Personalisation is the thing the credit buys. Charging again the moment
+    someone answers the three questions would be charging twice for one
+    purchase - and they would discover it from their balance, not from us."""
+    body = analysis_body()
+    client.post('/api/analyze', json=body)
+    after_first = client.get('/api/auth/me').json()['balance']
+
+    body['user_profile'] = {'fitzpatrick': 'IV', 'climate': 'humid_subtropical'}
+    resp = client.post('/api/analyze', json=body).json()
+
+    assert resp['access']['tier'] == 'full'
+    assert client.get('/api/auth/me').json()['balance'] == after_first
+
+
+def test_correcting_the_price_does_not_cost_a_second_credit(client, funded):
+    body = analysis_body()
+    client.post('/api/analyze', json=body)
+    after_first = client.get('/api/auth/me').json()['balance']
+
+    body['price'] = 599  # a typo fixed
+    client.post('/api/analyze', json=body)
+    assert client.get('/api/auth/me').json()['balance'] == after_first
+
+
+def test_changing_skin_type_or_concerns_does_not_cost_a_second_credit(client, funded):
+    """It is the same tube of serum. Re-opening a saved product with a concern
+    unticked used to read as a new product because the billing key was the
+    cache key, which includes everything that changes the output."""
+    body = analysis_body()
+    client.post('/api/analyze', json=body)
+    after_first = client.get('/api/auth/me').json()['balance']
+
+    body['skin_type'] = 'dry'
+    body['skin_concerns'] = ['Dullness']
+    client.post('/api/analyze', json=body)
+    assert client.get('/api/auth/me').json()['balance'] == after_first
+
+
+def test_a_different_ingredient_list_is_a_different_product(client, funded):
+    before = client.get('/api/auth/me').json()['balance']
+    client.post('/api/analyze', json=analysis_body())
+    client.post('/api/analyze', json=analysis_body())
+    assert client.get('/api/auth/me').json()['balance'] == before - 2
+
+
+def test_the_same_inci_in_a_different_category_is_a_different_analysis(client, funded):
+    """The category chooses the rubric, so the same list scored as a serum and
+    as a toner is genuinely two pieces of work."""
+    body = analysis_body()
+    client.post('/api/analyze', json=body)
+    after_first = client.get('/api/auth/me').json()['balance']
+
+    body['category'] = 'Toner'
+    client.post('/api/analyze', json=body)
+    assert client.get('/api/auth/me').json()['balance'] == after_first - 1
+
+
+def test_whitespace_and_case_do_not_make_a_new_product(client, funded):
+    """A list pasted with different spacing is the same product."""
+    body = analysis_body()
+    client.post('/api/analyze', json=body)
+    after_first = client.get('/api/auth/me').json()['balance']
+
+    body['ingredients'] = body['ingredients'].upper().replace(', ', ',  ')
+    client.post('/api/analyze', json=body)
+    assert client.get('/api/auth/me').json()['balance'] == after_first

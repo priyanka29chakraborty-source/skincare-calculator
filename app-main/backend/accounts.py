@@ -29,6 +29,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+import history
 import identity
 import mailer
 import payments
@@ -357,6 +358,48 @@ async def webhook(request: Request):
 
     _deliver(event['order_id'], event['payment_id'], 'webhook')
     return {'received': True, 'handled': True}
+
+
+@accounts_router.get('/history')
+async def saved_analyses(request: Request):
+    """What this account has analysed before."""
+    account_id = _require_account(request)
+    if not account_id:
+        return _unauthenticated()
+    return {'entries': history.recent(account_id)}
+
+
+@accounts_router.get('/history/{entry_id}')
+async def saved_analysis(entry_id: str, request: Request):
+    """One saved analysis, with the inputs needed to re-open it.
+
+    Scoped by account in the query itself, so an entry id copied from someone
+    else's list matches nothing rather than being checked afterwards.
+    """
+    account_id = _require_account(request)
+    if not account_id:
+        return _unauthenticated()
+    entry = history.get(account_id, entry_id)
+    if not entry:
+        return JSONResponse(status_code=404, content={'error': 'Not found.'})
+    return entry
+
+
+@accounts_router.post('/history/{entry_id}/forget')
+async def forget_analysis(entry_id: str, request: Request):
+    account_id = _require_account(request)
+    if not account_id:
+        return _unauthenticated()
+    return {'forgotten': history.forget(account_id, entry_id)}
+
+
+@accounts_router.post('/history/forget-all')
+async def forget_all_analyses(request: Request):
+    """Empty the history. Someone asking to be forgotten gets that."""
+    account_id = _require_account(request)
+    if not account_id:
+        return _unauthenticated()
+    return {'forgotten': history.forget_all(account_id)}
 
 
 @accounts_router.get('/credits/history')
