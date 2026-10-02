@@ -41,7 +41,11 @@ const ALLERGENS = [
 ];
 
 export default function PersonaliseCard({ profile, onApply, loading, level,
-                                         locked, onUnlock }) {
+                                         locked, onUnlock, skinType }) {
+  // Named rather than implied: "scored for your skin type and nothing else" is
+  // abstract, "scored for oily skin and nothing else" is a fact the reader can
+  // check against what they picked.
+  const typeLabel = String(skinType || "").trim().toLowerCase() || "your skin type";
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({
     fitzpatrick: profile?.fitzpatrick || "",
@@ -106,8 +110,8 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
           <i className="fa-solid fa-wand-magic-sparkles" style={{ color: "var(--dusty-rose-dark)" }}></i>
           <strong style={{ fontSize: 14 }}>
             {level === "none"
-              ? "Want a more accurate result?"
-              : "Refine your result further"}
+              ? `This has been scored for ${typeLabel} skin and nothing else`
+              : "Two answers in - the rest sharpens it further"}
           </strong>
           <button
             className="btn btn-secondary btn-sm"
@@ -115,13 +119,13 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
             onClick={() => setOpen(true)}
             data-testid="personalise-open"
           >
-            {level === "none" ? "Answer 4 questions" : "Edit answers"}
+            {level === "none" ? "Tune it to me" : "Edit answers"}
           </button>
         </div>
         <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--text-sub)", lineHeight: 1.5 }}>
           {level === "none"
-            ? "Your skin tone, climate, sensitivities and current routine change how well this suits you — not how well it is made. The score above stays the same either way."
-            : "You have answered some of these. Adding the rest sharpens the fit assessment."}
+            ? "Four answers and this stops being a general verdict. We check it against your skin tone for dark-mark risk, your climate for whether the texture will work, anything you react to, and what is already in your routine. The formulation score above is about the product, so it will not move."
+            : "Adding the rest tightens the fit score and the risk flags. The formulation score stays where it is."}
         </p>
       </div>
     );

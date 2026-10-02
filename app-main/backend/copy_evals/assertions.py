@@ -49,11 +49,19 @@ def praise_agrees_with_the_number(output, context):
     """
     out = _load(output)
     praise = re.compile(r'\b(great|excellent|strong coverage|well-made|ideal)\b', re.I)
-    for concern, score in out['concern_scores'].items():
-        if score < 50:
-            for adv in out['advisories']:
-                if concern.lower() in adv.lower() and praise.search(adv):
-                    return _fail('%s scored %s but is praised: %r' % (concern, score, adv))
+
+    # Paired by position, not by hunting for the concern's name inside the
+    # sentence. The earlier version only fired when an advisory happened to
+    # repeat the concern it was about, so rewording the copy would have
+    # silently disarmed the check. The provider builds both lists from the
+    # same dict, so index i is the same concern in each.
+    concerns = list(out['concern_scores'].items())
+    for i, (concern, score) in enumerate(concerns):
+        if score >= 50 or i >= len(out['advisories']):
+            continue
+        adv = out['advisories'][i]
+        if praise.search(adv):
+            return _fail('%s scored %s but is praised: %r' % (concern, score, adv))
     if out['score'] < 55 and re.search(r'well-made', out['summary'], re.I):
         return _fail('score %s described as well-made: %r' % (out['score'], out['summary']))
     return True
@@ -116,4 +124,26 @@ def sentences_are_readable(output, context):
             return _fail('%d-word sentence: %r' % (words, text))
         if text and words < 2:
             return _fail('fragment: %r' % text)
+    return True
+
+
+def advice_says_when_not_just_what(output, context):
+    """A time-of-use label must not contradict itself.
+
+    "Best used: PM (Sunscreen required)" reads as a mistake - if it goes on at
+    night, why sunscreen? The fact behind it is right (AHAs leave skin
+    sun-sensitive for about a week) but the label never said the sunscreen is
+    for the *next day*. Pairing a night-time instruction with a sun
+    instruction requires saying when the second one applies.
+    """
+    out = _load(output)
+    text = out.get('am_pm', '') or ''
+    if not text:
+        return True
+    mentions_night = re.search(r'\b(pm|night)\b', text, re.I)
+    mentions_sun = re.search(r'\bsun(screen|light)?\b', text, re.I)
+    if mentions_night and mentions_sun:
+        if not re.search(r'next day|following day|while you use|daytime|during the day', text, re.I):
+            return _fail('night-time use paired with sun advice, but never says '
+                         'when the sun advice applies: %r' % text)
     return True

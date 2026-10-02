@@ -348,6 +348,7 @@ function App() {
               onApply={applyPersonalisation}
               loading={personalising}
               level={result.personalisation?.level || "none"}
+              skinType={skinType}
               locked={result.access?.tier === "free"}
               onUnlock={() => setUnlockOpen(true)}
             />

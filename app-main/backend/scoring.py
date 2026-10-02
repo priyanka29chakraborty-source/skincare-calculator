@@ -3686,10 +3686,16 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             'synergy_bonus': comp_c,
         }
 
+    # Both of these say *when to apply* and *when the sun matters*, which are
+    # not the same evening. "PM (Sunscreen required)" read as a contradiction -
+    # if it goes on at night, why sunscreen? - because it never said the
+    # sunscreen is for the next day. The sensitivity outlasts the application.
     if 'retinol' in ing_str or 'tretinoin' in ing_str or 'adapalene' in ing_str or 'retinal' in ing_str:
-        am_pm = "Best used: PM Only"
+        am_pm = ("Best used at night - retinoids break down in daylight. "
+                 "Wear sunscreen the next day.")
     elif 'glycolic' in ing_str or 'lactic' in ing_str or 'mandelic' in ing_str:
-        am_pm = "Best used: PM (Sunscreen required)"
+        am_pm = ("Best used at night. AHAs leave skin more sun-sensitive for "
+                 "about a week, so daily sunscreen matters while you use this.")
 
     return {'concerns': results, 'am_pm': am_pm}
 
