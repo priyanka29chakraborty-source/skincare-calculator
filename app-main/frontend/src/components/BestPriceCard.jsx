@@ -1,3 +1,4 @@
+import { money, currencyAffix } from "../constants";
 export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, fetchInput }) {
   const userUrl = bestPrice?.user_url || (fetchInput?.trim().startsWith('http') ? fetchInput.trim() : null);
 
@@ -52,9 +53,9 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, f
           <i className="fa-solid fa-piggy-bank" style={{ color: "#267C36", fontSize: "1.1rem" }}></i>
           <div>
             <strong>Better price found on {displaySource(bestPrice.best_price.source)}!</strong>
-            {" "}{currency} {bestPrice.best_price.price}
+            {" "}{money(currency, bestPrice.best_price.price)}
             {bestPrice.savings > 0 && (
-              <span className="savings-tag"> — Save {currency} {bestPrice.savings}</span>
+              <span className="savings-tag"> — Save {money(currency, bestPrice.savings)}</span>
             )}
             {bestPrice.best_price.link && (
               <div style={{ marginTop: "8px" }}>
@@ -108,7 +109,7 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, f
                   Platform
                 </th>
                 <th style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, color: "var(--text-sub)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  Price ({currency})
+                  Price ({currencyAffix(currency)})
                 </th>
                 <th style={{ padding: "7px 10px", textAlign: "center", fontWeight: 700, color: "var(--text-sub)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.4px" }}>
                   Action
@@ -136,7 +137,7 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, f
                       </span>
                       {saving && (
                         <span style={{ fontSize: "0.7rem", color: "#267C36", marginLeft: "6px", fontWeight: 600 }}>
-                          Save {currency} {saving}
+                          Save {money(currency, saving)}
                         </span>
                       )}
                     </td>

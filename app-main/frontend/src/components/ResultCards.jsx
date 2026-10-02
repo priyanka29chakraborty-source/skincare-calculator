@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { getBarColor } from "../constants";
+import { getBarColor, money } from "../constants";
 import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
 import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
 import LockedCard from "./LockedCard";
@@ -662,10 +662,10 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             {productName && <h3 className="result-name">{productName}</h3>}
             {(() => {
               const bits = [];
-              if (price) bits.push(`${currency} ${price}`);
+              if (price) bits.push(money(currency, price));
               if (size) bits.push(`${size} ${sizeUnit || 'ml'}`);
               const ppm = result.price_analysis?.price_per_ml;
-              if (ppm) bits.push(`${currency} ${ppm} per ${sizeUnit === 'g' ? 'g' : 'ml'}`);
+              if (ppm) bits.push(`${money(currency, ppm)} per ${sizeUnit === 'g' ? 'g' : 'ml'}`);
               if (skinType) bits.push(`analysed for ${String(skinType).toLowerCase()} skin`);
               return bits.length ? <div className="result-meta">{bits.join(' · ')}</div> : null;
             })()}

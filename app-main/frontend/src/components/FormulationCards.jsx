@@ -1,4 +1,5 @@
 import React from "react";
+import { money } from "../constants";
 import { ProgressBar } from "./ScoreComponents";
 
 /**
@@ -150,7 +151,7 @@ export function ValueCard({ value, currency }) {
         <strong style={{ color: t.fg, fontSize: 14 }}>Price check</strong>
         {value.available && (
           <span style={{ marginLeft: "auto", fontSize: 12.5, color: t.fg, fontWeight: 600 }}>
-            {currency} {value.price_per_ml}/ml
+            {money(currency, value.price_per_ml)}/ml
             {value.ratio ? ` · ${value.ratio}× category average` : ""}
           </span>
         )}

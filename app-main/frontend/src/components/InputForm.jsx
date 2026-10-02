@@ -1,4 +1,4 @@
-import { CONCERNS_LIST, SKIN_TYPES, CATEGORIES, COUNTRIES, SIZE_UNITS, CURRENCY_MAP } from "../constants";
+import { CONCERNS_LIST, SKIN_TYPES, CATEGORIES, COUNTRIES, SIZE_UNITS, CURRENCY_MAP, currencyAffix } from "../constants";
 
 
 // Keyboard support for the custom radio chips. They carry role="radio", which
@@ -110,7 +110,7 @@ export default function InputForm({
             <label className="field-label">Price</label>
             <div className="inline-row">
               <input className="field-input" data-testid="price-input" type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="599" min="0" />
-              <div className="currency-tag">{currency}</div>
+              <div className="currency-tag" aria-label={currency}>{currencyAffix(currency)}</div>
             </div>
           </div>
           <div className="field-group">
@@ -144,7 +144,7 @@ export default function InputForm({
 
       <div className="card" data-testid="skin-profile-card">
         <div className="card-label">Your Skin Profile</div>
-        <div className="field-label" style={{ marginBottom: 12 }}>Skin Type</div>
+        <div className="field-sublabel">Skin Type</div>
         <div className="skin-type-row" role="radiogroup" aria-label="Skin type">
           {SKIN_TYPES.map(t => (
             <div key={t} role="radio" aria-checked={skinType === t} data-testid={`skin-type-${t.toLowerCase()}`}
@@ -153,7 +153,9 @@ export default function InputForm({
               className={`skin-chip ${skinType === t ? "active" : ""}`} onClick={() => setSkinType(t)}>{t}</div>
           ))}
         </div>
-        <div className="field-label" style={{ marginBottom: 12 }}>Select up to 3 Skin Concerns</div>
+        <div className="field-sublabel">
+          Skin Concerns <span className="field-hint">choose up to 3</span>
+        </div>
         <div className="concerns-grid" role="group" aria-label="Skin concerns">
           {CONCERNS_LIST.map(c => (
             <div key={c.key} data-testid={`concern-${c.key.replace(/\s+/g, "-").toLowerCase()}`}

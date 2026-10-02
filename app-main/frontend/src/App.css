@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Playfair+Display:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
 
 :root {
   --cream: #FFF8F8;
@@ -19,6 +19,10 @@
   --yellow: #eab308;
   --orange: #f97316;
   --red: #ef4444;
+  /* One focus treatment for every control. Focus used to be signalled by
+     a border-colour change alone, which is a 1px cue on a pale border. */
+  --focus-ring: 0 0 0 3px rgba(191,136,136,0.13);
+  --focus-ring-strong: 0 0 0 3px rgba(191,136,136,0.30);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -83,20 +87,33 @@ body::before {
 /* URL Row */
 .url-row { display: flex; gap: 12px; margin-bottom: 12px; }
 .url-input {
-  flex: 1; padding: 14px 18px; border: 1.5px solid var(--border); border-radius: 12px;
+  flex: 1; min-width: 0; padding: 14px 18px;
+  border: 1px solid var(--border); border-radius: 12px;
   font-family: 'DM Sans', sans-serif; font-size: 14px;
-  background: var(--cream); color: var(--charcoal); transition: all 0.2s;
+  background: var(--warm-white); color: var(--charcoal);
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
-.url-input:focus { outline: none; border-color: var(--dusty-rose); background: white; }
-.url-input::placeholder { color: var(--text-sub); }
+.url-input:hover { border-color: var(--dusty-rose-light); }
+.url-input:focus { outline: none; border-color: var(--dusty-rose); box-shadow: var(--focus-ring); }
+/* A placeholder at full --text-sub reads as a real value. Dimming it keeps
+   "nothing entered" visually distinct from "entered". */
+.url-input::placeholder { color: var(--text-sub); opacity: 0.62; }
 .fetch-btn {
   padding: 14px 22px; background: var(--rose); color: var(--dusty-rose-dark);
-  border: 1.5px solid var(--dusty-rose-light); border-radius: 12px;
+  border: 1px solid var(--dusty-rose-light); border-radius: 12px;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-  cursor: pointer; white-space: nowrap; transition: all 0.2s;
+  cursor: pointer; white-space: nowrap;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
   display: flex; align-items: center; gap: 6px;
 }
-.fetch-btn:hover { background: var(--dusty-rose-light); color: white; }
+/* Hover used to swap to white text on --dusty-rose-light - about 2:1
+   contrast, so the label vanished under the cursor. Deepening the border
+   and lifting the button keeps the dark-rose text readable. */
+.fetch-btn:hover:not(:disabled) {
+  border-color: var(--dusty-rose);
+  box-shadow: 0 2px 10px rgba(191,136,136,0.22);
+  transform: translateY(-1px);
+}
 .fetch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .fetch-msg { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #166534; margin-bottom: 12px; }
@@ -110,48 +127,105 @@ body::before {
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .field-group { display: flex; flex-direction: column; gap: 6px; }
 .field-group.full { grid-column: 1 / -1; }
-.field-label { font-size: 12px; font-weight: 500; color: var(--text-sub); letter-spacing: 0.3px; }
-.field-input, .field-select {
-  padding: 12px 16px; border: 1.5px solid var(--border); border-radius: 10px;
+/* The same micro-label as the result card's brand eyebrow, so the form and
+   the result read as one typographic system. */
+.field-label {
+  font-family: 'DM Sans', sans-serif; font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub);
+}
+/* A heading for a group of controls (Skin Type, Skin Concerns) rather than
+   one field's label: same type, but it owns the space below it. */
+.field-sublabel {
+  font-family: 'DM Sans', sans-serif; font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub);
+  margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+.field-hint {
+  font-size: 0.68rem; font-weight: 400; letter-spacing: 0; text-transform: none;
+  color: var(--text-sub); opacity: 0.8;
+}
+.field-input, .field-select, .field-textarea {
+  padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px;
   font-family: 'DM Sans', sans-serif; font-size: 14px;
-  background: var(--cream); color: var(--charcoal); transition: all 0.2s;
+  /* Cream (#FFF8F8) on a white card is a ~1.02:1 difference, so the field
+     edge was carried entirely by its border. White fields with a hairline
+     border actually read as fields. */
+  background: var(--warm-white); color: var(--charcoal);
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
-.field-input:focus, .field-select:focus { outline: none; border-color: var(--dusty-rose); background: white; }
 .field-textarea {
-  padding: 14px 16px; border: 1.5px solid var(--border); border-radius: 10px;
-  font-family: 'DM Sans', sans-serif; font-size: 13px;
-  background: var(--cream); color: var(--charcoal); resize: vertical; min-height: 120px; width: 100%; transition: all 0.2s;
+  padding: 14px 16px; font-size: 13px; line-height: 1.65;
+  resize: vertical; min-height: 120px; width: 100%;
 }
-.field-textarea:focus { outline: none; border-color: var(--dusty-rose); background: white; }
+.field-input:hover, .field-select:hover, .field-textarea:hover { border-color: var(--dusty-rose-light); }
+.field-input:focus, .field-select:focus, .field-textarea:focus {
+  outline: none; border-color: var(--dusty-rose); box-shadow: var(--focus-ring);
+}
+.field-input::placeholder, .field-textarea::placeholder { color: var(--text-sub); opacity: 0.62; }
+/* The three selects rendered as OS widgets beside custom-styled inputs. A
+   rose chevron puts them in the same family. */
+.field-select {
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 38px;
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23BF8888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
 .full-w { width: 100%; }
 .inline-row { display: flex; gap: 10px; }
-.inline-row .field-input { flex: 1; }
-.inline-row .field-select { width: 110px; flex-shrink: 0; }
-.currency-tag { padding: 12px 14px; background: var(--rose); border: 1.5px solid var(--dusty-rose-light); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--dusty-rose-dark); display: flex; align-items: center; }
+.inline-row .field-input { flex: 1; min-width: 0; }
+.inline-row .field-select { width: 108px; flex-shrink: 0; }
+/* Neutral, not rose: this is a unit affix, not an action, and in rose it
+   competed with the Fetch button for attention. */
+.currency-tag {
+  padding: 12px 16px; background: var(--border-light); border: 1px solid var(--border);
+  border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  color: var(--dusty-rose-dark); display: flex; align-items: center; justify-content: center;
+  min-width: 52px;
+}
 
 /* Skin Type */
 .skin-type-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
 .skin-chip {
-  padding: 10px 20px; border: 1.5px solid var(--border); border-radius: 50px;
-  font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
-  background: var(--cream); color: var(--charcoal);
+  padding: 10px 20px; border: 1px solid var(--border); border-radius: 50px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, color 0.18s, box-shadow 0.18s;
+  background: var(--warm-white); color: var(--text-sub);
   user-select: none; -webkit-user-select: none;
 }
-.skin-chip:hover, .skin-chip.active { border-color: var(--dusty-rose); background: var(--rose); color: var(--dusty-rose-dark); }
+/* Hover and .active were one shared rule, so hovering an unselected chip
+   made it look selected - you could not tell what you had picked without
+   moving the mouse away. They are now distinct states. */
+.skin-chip:hover { border-color: var(--dusty-rose-light); color: var(--charcoal); }
+.skin-chip.active {
+  border-color: var(--dusty-rose); background: var(--rose); color: var(--dusty-rose-dark);
+  font-weight: 600; box-shadow: var(--focus-ring);
+}
+.skin-chip:focus-visible { outline: none; border-color: var(--dusty-rose); box-shadow: var(--focus-ring-strong); }
 
 /* Concern Cards Grid - 5 columns */
 .concerns-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
 .concern-card {
-  border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 8px;
-  cursor: pointer; text-align: center; transition: all 0.2s; background: var(--cream);
+  border: 1px solid var(--border); border-radius: 14px; padding: 16px 10px;
+  cursor: pointer; text-align: center; background: var(--warm-white);
+  transition: border-color 0.18s, background 0.18s, transform 0.18s, box-shadow 0.18s;
   user-select: none; -webkit-user-select: none;
 }
-.concern-card:hover { border-color: var(--dusty-rose); background: var(--rose); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139,94,107,0.12); }
-.concern-card.selected { border-color: var(--dusty-rose); background: var(--rose); box-shadow: 0 0 0 3px rgba(139,94,107,0.15); }
-.concern-icon { font-size: 22px; display: block; margin-bottom: 6px; color: var(--dusty-rose); }
+/* rgba(139,94,107,...) is not any token in :root - it is a leftover from an
+   earlier rose. These now use the real --dusty-rose RGB. */
+.concern-card:hover {
+  border-color: var(--dusty-rose-light); transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(191,136,136,0.14);
+}
+.concern-card.selected {
+  border-color: var(--dusty-rose); background: var(--rose); box-shadow: var(--focus-ring);
+}
+.concern-card:focus-visible { outline: none; border-color: var(--dusty-rose); box-shadow: var(--focus-ring-strong); }
+/* Unselected icons sit back at --dusty-rose-light so a selected card is the
+   only saturated thing in the grid. */
+.concern-icon { font-size: 20px; display: block; margin-bottom: 8px; color: var(--dusty-rose-light); transition: color 0.18s; }
+.concern-card:hover .concern-icon { color: var(--dusty-rose); }
 .concern-card.selected .concern-icon { color: var(--dusty-rose-dark); }
-.concern-name { font-size: 11px; font-weight: 600; color: var(--charcoal); display: block; }
-.concern-desc { font-size: 10px; color: var(--text-sub); margin-top: 2px; display: block; }
+.concern-name { font-family: 'DM Sans', sans-serif; font-size: 0.74rem; font-weight: 600; color: var(--charcoal); display: block; line-height: 1.3; }
+.concern-desc { font-size: 0.66rem; color: var(--text-sub); margin-top: 3px; display: block; line-height: 1.35; }
 
 /* Analyze Button - full width Playfair */
 .action-row { margin-top: 8px; margin-bottom: 8px; }
@@ -166,6 +240,9 @@ body::before {
 .analyze-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent); }
 .analyze-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(107,64,80,0.35); }
 .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.analyze-btn:focus-visible, .fetch-btn:focus-visible, .clear-btn-solo:focus-visible {
+  outline: none; box-shadow: var(--focus-ring-strong);
+}
 .clear-btn-solo {
   display: block; width: fit-content; margin: 8px auto 16px;
   padding: 8px 20px; background: transparent; color: var(--text-sub);
