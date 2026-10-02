@@ -92,7 +92,20 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
             <p className="upgrade-why-title">Why It Helps:</p>
             <ul className="upgrade-reasons">
               <li>{sug.reason}</li>
-              {sug.active && <li>Key active ingredient: <strong>{sug.active}</strong></li>}
+              {/* Two different ingredients, and the card used to print the
+                  wrong one under "Key active ingredient": the CSV's `active`
+                  was what your product already has, not what is being
+                  suggested, so "Add-On: Adapalene / Key active ingredient:
+                  Niacinamide" was the result. */}
+              {sug.suggested_active && (
+                <li>Active to look for: <strong>{sug.suggested_active}</strong></li>
+              )}
+              {sug.builds_on && (
+                <li>
+                  Steps up from the <strong>{sug.builds_on}</strong> already in
+                  your product
+                </li>
+              )}
             </ul>
             <p style={{ fontSize: "0.74rem", color: "var(--text-sub)", marginTop: "6px", fontStyle: "italic" }}>
               <i className="fa-solid fa-circle-info" style={{ marginRight: "4px" }}></i>
