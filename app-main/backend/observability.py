@@ -95,9 +95,13 @@ def init_error_monitoring(app=None):
             environment=os.environ.get('ENVIRONMENT', 'production'),
             release=os.environ.get('RENDER_GIT_COMMIT', '')[:12] or None,
             integrations=[StarletteIntegration(), FastApiIntegration()],
-            # Performance sampling is off by default: it is billed by volume and
-            # this app's value is in knowing about errors, not latency traces.
-            traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0')),
+            # Tracing at 10% of requests. The Sentry SDK treats tracing as part
+            # of its recommended default init, and on this app it answers a
+            # question errors cannot: which analysis is slow, and whether it is
+            # our scoring or a third-party scrape. Sampled rather than full
+            # because traces are billed by volume and 10% is plenty to see a
+            # pattern. SENTRY_TRACES_SAMPLE_RATE overrides it; 0 turns it off.
+            traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
             send_default_pii=False,
             before_send=_scrub,
             max_breadcrumbs=25,
