@@ -43,11 +43,12 @@ def test_the_database_has_no_internal_contradictions(findings):
 def test_dose_ranges_are_satisfiable(records):
     """min <= optimal <= max, or the engine can state an impossible dose.
 
-    Cyclopentasiloxane and Cyclohexasiloxane held min 1.0 against max 0.1: the
-    efficacy fields carried a formulator's use level while Max_Safe_% carried
-    the EU 2024/1328 restriction, which is a regulatory cap and not the same
-    kind of number. Both are inert functionals with no effective dose, so the
-    efficacy fields were cleared rather than the cap being raised to fit.
+    Cyclopentasiloxane and Cyclohexasiloxane held min 1.0 against max 0.1,
+    because Max_Safe_% was carrying two meanings at once: a toxicological
+    ceiling for most records and a legal cap for these. D5 is not toxic at 5%;
+    it is simply not permitted above 0.1% under EU 2024/1328, for persistence
+    rather than toxicity. The cap moved to Max_Allowed_EU_% and the efficacy
+    figures went back to describing efficacy.
     """
     from scripts.audit_database import _num
 
@@ -145,3 +146,40 @@ def test_the_engine_reports_both_actives_separately():
     acne = next(s for s in suggestions if s['concern'].lower().startswith('acne'))
     assert acne['suggested_active'] == 'Adapalene'
     assert acne['builds_on'] == 'Niacinamide'
+
+
+def test_a_legal_cap_never_exceeds_the_safety_ceiling(records):
+    """The law does not permit more of something than is safe.
+
+    The reverse is ordinary and expected: D5 is safe at 5% and capped at 0.1%
+    for environmental persistence, so Max_Allowed_EU_% below Max_Safe_% is the
+    normal shape.
+    """
+    from scripts.audit_database import _num
+
+    bad = []
+    for key, entry in records.items():
+        eu, safe = _num(entry.get('Max_Allowed_EU_%')), _num(entry.get('Max_Safe_%'))
+        if eu is not None and safe is not None and eu > safe:
+            bad.append('%s: EU %s > safe %s' % (entry.get('INCI_Name') or key, eu, safe))
+    assert not bad, bad
+
+
+def test_every_record_carries_the_eu_field(records):
+    """Present everywhere, so an empty value means "not restricted" rather
+    than "nobody has looked"."""
+    missing = [k for k, v in records.items() if 'Max_Allowed_EU_%' not in v]
+    assert not missing, '%d records without the field' % len(missing)
+
+
+def test_the_restricted_silicones_keep_their_effective_dose(records):
+    """Regression on the first attempt at this, which cleared Min_Effective_%
+    and Optimal_% to make the ranges satisfiable. That removed real
+    information - these silicones do have a working level - instead of
+    separating the two kinds of limit."""
+    for key in ('cyclopentasiloxane', 'cyclohexasiloxane'):
+        entry = records[key]
+        assert entry['Min_Effective_%'], '%s lost its effective dose' % key
+        assert entry['Optimal_%'], '%s lost its optimal dose' % key
+        assert float(entry['Max_Allowed_EU_%']) == 0.1
+        assert float(entry['Max_Safe_%']) == 100.0

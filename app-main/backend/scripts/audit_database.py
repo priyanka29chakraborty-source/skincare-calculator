@@ -59,6 +59,14 @@ def audit(records):
             findings['dose range: optimal above maximum'].append(
                 '%s: optimal %s > max %s' % (name, opt, hi))
 
+        # 1b. A legal cap above the toxicological ceiling makes no sense: the
+        #     law does not permit more than is safe. The reverse is ordinary -
+        #     D5 is safe at 5% and capped at 0.1% for persistence, not toxicity.
+        eu = _num(entry.get('Max_Allowed_EU_%'))
+        if eu is not None and hi is not None and eu > hi:
+            findings['EU cap above the safety ceiling'].append(
+                '%s: EU %s > safe %s' % (name, eu, hi))
+
         # 2. An ingredient listed as working synergistically with itself.
         partners = [p.strip().lower() for p in
                     str(entry.get('Synergistic_Ingredients') or '').split(';') if p.strip()]
