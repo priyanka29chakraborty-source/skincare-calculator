@@ -329,6 +329,82 @@ def _spend_reference(account_id, product_data):
     return "product:%s:%s" % (account_id, _product_fingerprint(product_data))
 
 
+
+# Sections of a comparison that depend on the reader rather than the products.
+COMPARISON_PAID_SECTIONS = ('actives', 'concerns', 'tolerability', 'together')
+
+
+def _comparison_reference(account_id, products):
+    """One credit per comparison, keyed on the set of products.
+
+    Sorted, so comparing A against B and B against A is the same comparison
+    and is not charged twice. Built from the same per-product fingerprint the
+    single-product path bills on, so a price typo or a changed skin type does
+    not read as a new comparison.
+    """
+    if not products:
+        return None
+    prints = sorted(_product_fingerprint(p) for p in products)
+    digest = hashlib.sha256('|'.join(prints).encode('utf-8')).hexdigest()[:32]
+    return "comparison:%s:%s" % (account_id, digest)
+
+
+def _resolve_comparison_entitlement(request: Request, products) -> bool:
+    """Whether this caller has paid for the personal half of a comparison.
+
+    Same shape as _resolve_entitlement and the same rules: server-side only,
+    nothing in the request body is believed, and running out falls back to the
+    free half rather than erroring.
+    """
+    if not _PAYWALL_ENABLED or _DEV_UNLOCK:
+        return True
+
+    account_id = current_account(request)
+    if not account_id:
+        return False
+
+    try:
+        wallet.spend(account_id,
+                     reference=_comparison_reference(account_id, products))
+        return True
+    except wallet.InsufficientCredits:
+        return False
+    except Exception:
+        logger.exception("comparison credit spend failed; serving the free half")
+        return False
+
+
+def _filter_comparison(out, entitled):
+    """Strip the personal sections unless they have been paid for.
+
+    Removed, not blanked: a key that is absent cannot be read out of the
+    response by editing client code, which is the whole point of doing this
+    here rather than hiding sections in the interface.
+    """
+    if entitled:
+        out['access'] = {'tier': 'full'}
+        return out
+
+    for key in COMPARISON_PAID_SECTIONS:
+        out.pop(key, None)
+
+    # The verdict is mixed: better-made and better-value come from the free
+    # scoreboard, "choose X if" is built from concerns and unique actives.
+    verdict = out.get('verdict') or {}
+    verdict.pop('choose_if', None)
+
+    out['access'] = {
+        'tier': 'free',
+        'locked_sections': list(COMPARISON_PAID_SECTIONS),
+        'message': (
+            "How well each of these is made, and what each costs per ml, is "
+            "free. What is locked is the part that depends on you - which one "
+            "treats your concerns, what each has that the others do not, "
+            "irritation risk for your skin, and whether you could use both."),
+    }
+    return out
+
+
 class CompareRequest(BaseModel):
     products: List[dict] = Field(default_factory=list)
     # One profile across every product: a comparison is "which of these for
@@ -382,9 +458,11 @@ async def compare_endpoint(req: CompareRequest, request: Request):
         })
 
     try:
-        return compare_products(cleaned, analyze_product)
+        out = compare_products(cleaned, analyze_product)
     except CompareError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
+
+    return _filter_comparison(out, _resolve_comparison_entitlement(request, cleaned))
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}

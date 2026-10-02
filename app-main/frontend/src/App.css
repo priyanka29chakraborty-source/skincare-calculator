@@ -1245,3 +1245,24 @@ body::before {
 }
 .suit-waiting-cta:hover { border-color: var(--dusty-rose); box-shadow: 0 2px 10px rgba(191,136,136,0.22); transform: translateY(-1px); }
 .suit-waiting-cta:focus-visible { outline: none; box-shadow: var(--focus-ring-strong); }
+
+/* ---- print report: free vs full ---- */
+.print-report .pr-tier-badge {
+  display: inline-block; margin-bottom: 5px; padding: 2px 8px;
+  border: 1px solid #d8c4c4; border-radius: 50px;
+  font-size: 7pt; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #A87373; font-weight: 700;
+}
+.print-report .pr-upgrade {
+  background: #faf6f6; border: 1px solid #e8dcdc; border-radius: 8px;
+  padding: 12px 14px;
+}
+.print-report .pr-upgrade h2 { border-bottom: none; margin-bottom: 7px; }
+
+/* ---- comparison, locked half ---- */
+.compare-locked { background: var(--border-light); border-radius: 14px; padding: 16px 18px; }
+.compare-locked .compare-block-head { border-bottom-color: var(--border); }
+.compare-locked-lede { font-size: 0.8rem; line-height: 1.6; color: var(--text-sub); margin-bottom: 10px; }
+.compare-locked-list { margin: 0 0 14px; padding-left: 18px; }
+.compare-locked-list li { font-size: 0.78rem; line-height: 1.6; color: var(--text-sub); margin-bottom: 4px; }
+.compare-locked-list strong { color: var(--charcoal); }

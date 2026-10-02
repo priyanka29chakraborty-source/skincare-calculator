@@ -391,6 +391,7 @@ function App() {
               currency={currency}
               skinType={skinType}
               concerns={concerns}
+              onUnlock={() => setUnlockOpen(true)}
               seed={{
                 product_name: productName, brand, category,
                 price: price || "", size_ml: size || "", ingredients,
