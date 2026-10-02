@@ -3682,7 +3682,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             'supporting_ingredients': present_supporters[:4],
             'explanation': explanation[:4],
             'advisory': _concern_advisory(
-                _norm['category_score'], concern, missing_actives),
+                _norm['category_score'], concern, missing_actives, category),
             'synergy_bonus': comp_c,
         }
 
@@ -4131,7 +4131,20 @@ def get_upgrade_suggestions(ingredient_list, concerns):
 
 
 
-def _concern_advisory(score, concern, missing_actives):
+# Products that are not meant to treat a skin concern. Telling someone to
+# "look for Salicylic Acid" in a sunscreen or a cleanser is advice no person
+# would give - the honest message is that the job belongs to another product.
+_NOT_A_TREATMENT = {
+    'sunscreen': 'a sunscreen',
+    'cleanser': 'a cleanser',
+    'moisturizer': 'a moisturiser',
+    'moisturiser': 'a moisturiser',
+    'toner': 'a toner',
+    'mask': 'a mask',
+}
+
+
+def _concern_advisory(score, concern, missing_actives, category=None):
     """One line of advice that agrees with the score above it.
 
     This used to open with "Great formula" on every concern regardless of the
@@ -4145,6 +4158,13 @@ def _concern_advisory(score, concern, missing_actives):
         options = missing_actives[0]
         if len(missing_actives) > 1:
             options += ' or %s' % missing_actives[1]
+
+    kind = _NOT_A_TREATMENT.get(str(category or '').strip().lower())
+    if kind and score < 50:
+        return ("This is %s, so treating %s is not what it is for. That job "
+                "belongs to a separate treatment product%s."
+                % (kind, concern_l,
+                   (" - such as one built around %s" % options) if options else ""))
 
     if score >= 75:
         if not options:

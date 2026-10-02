@@ -99,3 +99,6 @@ backend/__pycache__/
 backend/wallet.db
 backend/wallet.db-shm
 backend/wallet.db-wal
+
+# promptfoo output
+app-main/backend/copy_evals/last-run.json
