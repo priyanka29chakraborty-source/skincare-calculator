@@ -340,20 +340,12 @@ body::before {
 .concern-left i { color: var(--dusty-rose); font-size: 0.88rem; }
 .concern-cname { font-weight: 600; font-size: 0.9rem; }
 .concern-pct { font-weight: 700; font-size: 0.95rem; font-family: 'Playfair Display', serif; }
-.info-toggle { color: var(--text-sub); font-size: 0.88rem; cursor: pointer; transition: transform 0.2s, color 0.2s; }
-.info-toggle.open { color: var(--dusty-rose); transform: rotate(180deg); }
+/* The reasoning behind a concern score is always visible. It used to be
+   behind a click on an info icon, which hid the part that justifies the
+   number behind an affordance most people never notice. No collapse
+   machinery, and no max-height - the explanations are longer now and a
+   600px clamp would have quietly cut them off. */
 .concern-detail {
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-  transition: max-height 0.35s ease, opacity 0.3s ease, margin-top 0.3s ease, padding-top 0.3s ease;
-}
-.concern-detail.open {
-  max-height: 600px;
-  opacity: 1;
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
@@ -1238,3 +1230,18 @@ body::before {
 .personalise-locked-list li { font-size: 12.5px; line-height: 1.6; color: var(--text-sub); margin-bottom: 3px; }
 .personalise-locked-list strong { color: var(--charcoal); }
 .personalise-locked .locked-cta { margin-top: 0; }
+
+/* ---- suitability, unlocked but unanswered ---- */
+.suit-waiting-lede { font-size: 0.84rem; line-height: 1.65; color: var(--text-sub); margin-bottom: 12px; }
+.suit-waiting-list { margin: 0 0 16px; padding-left: 18px; }
+.suit-waiting-list li { font-size: 0.8rem; line-height: 1.6; color: var(--text-sub); margin-bottom: 3px; }
+.suit-waiting-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 22px; border-radius: 12px; cursor: pointer;
+  background: var(--rose); color: var(--dusty-rose-dark);
+  border: 1px solid var(--dusty-rose-light);
+  font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 600;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+.suit-waiting-cta:hover { border-color: var(--dusty-rose); box-shadow: 0 2px 10px rgba(191,136,136,0.22); transform: translateY(-1px); }
+.suit-waiting-cta:focus-visible { outline: none; box-shadow: var(--focus-ring-strong); }

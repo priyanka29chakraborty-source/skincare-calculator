@@ -590,12 +590,16 @@ function TreatmentIntensityBanner({ result, concerns }) {
 }
 
 // ── Main ResultCards Component ────────────────────────────────────────────────
-export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput, category, onUnlock,
+export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput, category, onUnlock, personalisePrompt, onAnswerQuestions,
   productName, brand, price, size, sizeUnit }) {
   // Paid sections are stripped server-side, so the UI must branch on the
   // tier the server reported rather than on whether a field happens to be
   // truthy - an absent field is a locked state, not a zero.
   const isLocked = result?.access?.tier === "free";
+  // Unlocked is not the same as answered. Without the four answers this
+  // section can only go on the skin type picked from a dropdown, which the
+  // reader already knows - so it says what it is waiting for instead.
+  const hasAnswers = (result?.personalisation?.level || "none") !== "none";
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   const cat = (category || '').toLowerCase();
@@ -799,6 +803,11 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         )}
       </div>
 
+      {/* The invitation sits directly under the score it would sharpen.
+          It used to be the first thing in the results section - four questions
+          in front of the answer the reader came for. */}
+      {personalisePrompt}
+
       {/* CARD 2: SUITABILITY — paid.
           Previously two cards, "Skin Concern Fit" and "<Type> Skin
           Compatibility", which read as the same card because their content
@@ -824,7 +833,30 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           onUnlock={onUnlock}
         />
       )}
-      {!isLocked && <SuitabilityCard result={result} skinType={skinType} />}
+      {!isLocked && !hasAnswers && (
+        <div className="sc-card result-card suitability-waiting"
+             data-testid="suitability-waiting">
+          <h2 className="card-title">
+            <i className="fa-solid fa-user-check"></i> How this suits you
+          </h2>
+          <p className="suit-waiting-lede">
+            Unlocked, and waiting on the four answers above. Without them this
+            section can only go on the skin type you picked from a dropdown,
+            which is the same thing we already told you.
+          </p>
+          <ul className="suit-waiting-list">
+            <li>Dark-mark risk needs your skin tone</li>
+            <li>Whether the texture will work needs your climate</li>
+            <li>Ingredients to avoid need to know what you react to</li>
+            <li>Clashes and duplication need your current routine</li>
+          </ul>
+          <button className="btn btn-primary suit-waiting-cta"
+                  onClick={onAnswerQuestions} data-testid="suitability-answer">
+            <i className="fa-solid fa-wand-magic-sparkles"></i> Answer them now
+          </button>
+        </div>
+      )}
+      {!isLocked && hasAnswers && <SuitabilityCard result={result} skinType={skinType} />}
 
       {/* CARD 2B: SUNSCREEN ANALYSIS — shown when Sun Protection selected OR category is sunscreen */}
       {!isLocked && result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
@@ -837,16 +869,28 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       {/* CARD 4B: BEST PRICE */}
       <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading} currency={currency} fetchInput={fetchInput} />
 
-      <div className="disclaimer" data-testid="disclaimer">
-        <div className="disclaimer-title"><i className="fa-solid fa-circle-info"></i> How scores are calculated</div>
-        <ul className="disclaimer-list">
-          <li><strong>Scores are estimates</strong> based on INCI ingredient position and clinical evidence — not lab measurements.</li>
-          <li><strong>Concentrations are inferred</strong> from list order. EU/US law requires ingredients above 1% in descending order. Confirmed % values (shown in green) come from the product page only.</li>
-          <li><strong>pH is directional</strong>, not a lab measurement. Inferred from buffering ingredients in the formula.</li>
-          <li><strong>Ingredient conflicts</strong> are within the single formula only — always patch test new products.</li>
-          <li><strong>Not medical advice.</strong> This tool is for educational use only. Consult a dermatologist for personalised skin concerns.</li>
-        </ul>
-      </div>
     </>
+  );
+}
+
+/**
+ * How the scoring works.
+ *
+ * Exported separately so it can be placed last on the page, after the
+ * comparison. It is reference material: useful once someone has read a result
+ * and wants to know how much weight to put on it, and in the way before that.
+ */
+export function MethodCard() {
+  return (
+    <div className="disclaimer" data-testid="disclaimer">
+      <div className="disclaimer-title"><i className="fa-solid fa-circle-info"></i> How scores are calculated</div>
+      <ul className="disclaimer-list">
+        <li><strong>Scores are estimates</strong> based on INCI ingredient position and clinical evidence.</li>
+        <li><strong>Concentrations are inferred</strong> from list order. EU/US law requires ingredients above 1% to be listed in descending order. Confirmed percentages come from the product page only.</li>
+        <li><strong>pH is directional</strong>, inferred from the buffering ingredients in the formula.</li>
+        <li><strong>Ingredient conflicts</strong> are within the single formula only — always patch test new products.</li>
+        <li><strong>Not medical advice.</strong> This tool is for educational use only. Consult a dermatologist for personalised skin concerns.</li>
+      </ul>
+    </div>
   );
 }
