@@ -41,11 +41,16 @@ const ALLERGENS = [
 ];
 
 export default function PersonaliseCard({ profile, onApply, loading, level,
-                                         locked, onUnlock, skinType }) {
+                                         locked, onUnlock, skinType,
+                                         personalisation }) {
   // Named rather than implied: "scored for your skin type and nothing else" is
   // abstract, "scored for oily skin and nothing else" is a fact the reader can
   // check against what they picked.
   const typeLabel = String(skinType || "").trim().toLowerCase() || "your skin type";
+  const checks = personalisation?.checks || [];
+  const answeredChecks = checks.filter((c) => c.status !== "unanswered");
+  const allClear = answeredChecks.length > 0
+    && answeredChecks.every((c) => c.status === "clear");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({
     fitzpatrick: profile?.fitzpatrick || "",
@@ -102,16 +107,16 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
     );
   }
 
-  // Collapsed state: a single honest invitation, not a nag.
-  if (!open) {
+  // Collapsed only before the first answer. Once there are answers the card
+  // stays open and shows what they produced, rather than folding back into a
+  // second prompt that asks the same thing again.
+  if (!open && level === "none") {
     return (
       <div className="personalise-prompt" data-testid="personalise-prompt">
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <i className="fa-solid fa-wand-magic-sparkles" style={{ color: "var(--dusty-rose-dark)" }}></i>
           <strong style={{ fontSize: 14 }}>
-            {level === "none"
-              ? `This has been scored for ${typeLabel} skin and nothing else`
-              : "Two answers in - the rest sharpens it further"}
+            This has been scored for {typeLabel} skin and nothing else
           </strong>
           <button
             className="btn btn-secondary btn-sm"
@@ -119,13 +124,15 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
             onClick={() => setOpen(true)}
             data-testid="personalise-open"
           >
-            {level === "none" ? "Tune it to me" : "Edit answers"}
+            Tune it to me
           </button>
         </div>
         <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--text-sub)", lineHeight: 1.5 }}>
-          {level === "none"
-            ? "Four answers and this stops being a general verdict. We check it against your skin tone for dark-mark risk, your climate for whether the texture will work, anything you react to, and what is already in your routine. The formulation score above is about the product, so it will not move."
-            : "Adding the rest tightens the fit score and the risk flags. The formulation score stays where it is."}
+          Four answers and this stops being a general verdict. We check it
+          against your skin tone for dark-mark risk, your climate for whether
+          the texture will work, anything you react to, and what is already in
+          your routine. The formulation score above is about the product, so it
+          will not move.
         </p>
       </div>
     );
@@ -265,6 +272,41 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
         />
       </div>
 
+      {/* What the answers produced, including the checks that found nothing.
+          Without this, answering a question about a clean product changed
+          nothing on screen - which is indistinguishable from not having
+          looked. A negative result is the reassurance someone answered to
+          get. */}
+      {checks.length > 0 && (
+        <div className="personal-checks" data-testid="personal-checks">
+          <h4>What your answers changed</h4>
+          <ul>
+            {checks.map((c) => (
+              <li key={c.key} className={`personal-check personal-check-${c.status}`}>
+                <i className={
+                  c.status === "flagged" ? "fa-solid fa-triangle-exclamation"
+                  : c.status === "clear" ? "fa-solid fa-circle-check"
+                  : "fa-regular fa-circle"}></i>
+                <span>
+                  <strong>{c.label}</strong>
+                  {c.answer ? ` — ${c.answer}. ` : " — not answered yet. "}
+                  {c.finding
+                    || (c.status === "unanswered"
+                        ? "Answer it and we will check this one too."
+                        : "")}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {allClear && (
+            <p className="personal-checks-foot">
+              Nothing to flag. That is the result, not a blank — this formula
+              came through every check you answered.
+            </p>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
         <button
           className="btn btn-primary"
@@ -277,15 +319,12 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
               <i className="fa-solid fa-spinner fa-spin"></i> Updating…
             </>
           ) : (
-            <>Update my result {answered > 0 && `(${answered})`}</>
+            <>Update my result</>
           )}
         </button>
         <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={loading}>
           Not now
         </button>
-        <span style={{ fontSize: 11.5, color: "var(--text-sub)" }}>
-          Answers stay on this device.
-        </span>
       </div>
     </div>
   );

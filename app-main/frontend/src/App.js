@@ -360,6 +360,7 @@ function App() {
                   loading={personalising}
                   level={result.personalisation?.level || "none"}
                   skinType={skinType}
+                  personalisation={result.personalisation}
                   locked={result.access?.tier === "free"}
                   onUnlock={() => setUnlockOpen(true)}
                 />

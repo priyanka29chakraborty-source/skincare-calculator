@@ -4357,6 +4357,10 @@ def analyze_product(product_data):
             'climate': personal['climate'],
             'climate_label': personal['climate_label'],
             'fitzpatrick': personal['fitzpatrick'],
+            # One row per question, including the ones that found nothing.
+            # Answering used to change nothing visible when a product was
+            # clean, which is indistinguishable from not having looked.
+            'checks': personal.get('checks') or [],
             'routine_conflicts': [f for f in personal['flags']
                                   if f['type'] in ('routine_conflict', 'routine_redundant')],
             'product_active_families': personal['product_active_families'],

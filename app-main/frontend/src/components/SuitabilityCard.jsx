@@ -50,6 +50,96 @@ function dedupeAgainst(lines, alreadyShown) {
   return out;
 }
 
+/** Everything in a line after the ingredient it is about. */
+function remainderOf(line) {
+  const text = String(line || "").replace(/^warning:\s*/i, "").trim();
+  // Drop the leading proper-noun run, then whatever joins it to the rest: a
+  // parenthetical rating that belongs to the subject, then a dash or colon.
+  return text
+    .replace(/^(?:contains\s+)?[A-Z][A-Za-z0-9-]*(?:\s+[A-Z][A-Za-z0-9-]*)*/, "")
+    .replace(/^\s*\([^)]*\)/, "")
+    .replace(/^[\s—–:;,-]+/, "")
+    .trim() || text;
+}
+
+/** The ingredient name on its own, for use as a label. */
+function labelOf(line) {
+  const text = String(line || "").replace(/^warning:\s*/i, "").trim();
+  const match = text.match(/^(?:contains\s+)?[A-Z][A-Za-z0-9-]*(?:\s+[A-Z][A-Za-z0-9-]*)*/);
+  return match ? match[0].replace(/^contains\s+/i, "").trim() : text;
+}
+
+/**
+ * One line per ingredient, with its reasons joined.
+ *
+ * The engine emits a separate note per reason, so a fragranced product
+ * produced three consecutive lines all opening with "Parfum" - comedogenic
+ * rating, fragrance component, contact allergen. Reading the same ingredient
+ * three times running makes a formula look worse than the analysis found, and
+ * makes the card look like it is padding itself.
+ *
+ * Deduplicating one list against another was not enough: these three all came
+ * from the same list, so nothing compared them to each other.
+ */
+
+/**
+ * Which kind of problem a note describes.
+ *
+ * The engine says the same thing in several wordings - "moderate pore-clogging
+ * potential", "moderately comedogenic", "(comedogenic rating 4/5)" are one
+ * fact in three voices - so matching on exact text leaves all three. Bucketing
+ * by theme and keeping the best phrasing in each is what actually removes the
+ * repetition.
+ */
+function themeOf(part) {
+  const text = part.toLowerCase();
+  if (/comedogenic|pore[- ]clog|clog pores|breakout/.test(text)) return "pores";
+  if (/allergen|sensitiser|sensitizer|fragrance-sensitive|contact aller/.test(text)) return "allergen";
+  if (/irritat|sting|drying|alcohol/.test(text)) return "irritation";
+  return "other";
+}
+
+function mergeBySubject(lines) {
+  const order = [];
+  const bySubject = new Map();
+
+  for (const line of lines || []) {
+    if (!line) continue;
+    const key = subjectOf(line);
+    if (!bySubject.has(key)) {
+      bySubject.set(key, { label: labelOf(line), themes: new Map() });
+      order.push(key);
+    }
+    const { themes } = bySubject.get(key);
+    const part = remainderOf(line).replace(/\s*\.\s*$/, "");
+    if (!part) continue;
+
+    const theme = themeOf(part);
+    const existing = themes.get(theme);
+    // Keep one phrasing per theme: prefer the one carrying a rating, then the
+    // one that reads as a full clause rather than a fragment left behind by
+    // stripping the ingredient name ("is highly pore-clogging").
+    const score = (/\d/.test(part) ? 2 : 0) + (/^[a-z]*\s*(is|are|may|can)\b/.test(part) ? -1 : 1);
+    if (!existing || score > existing.score) {
+      themes.set(theme, { part, score });
+    }
+  }
+
+  return order.map((key) => {
+    const { label, themes } = bySubject.get(key);
+    const parts = [...themes.values()].map((t) => t.part);
+    if (!parts.length) return label;
+    // Some notes read as a continuation of the ingredient name ("is highly
+    // pore-clogging"), because stripping the name is what left them. A dash in
+    // front of those produces "Coconut Oil — is highly pore-clogging"; a space
+    // produces the sentence the engine originally wrote.
+    if (parts.length === 1 && /^(is|are|may|can|has|have|appears)\b/i.test(parts[0])) {
+      return `${label} ${parts[0]}.`;
+    }
+    return `${label} — ${parts.join("; ")}.`;
+  });
+}
+
 const RISK_COPY = {
   low: { label: "Low irritation risk overall", tone: "good" },
   moderate: { label: "Some ingredients may not suit acne-prone or sensitive skin", tone: "warn" },
@@ -80,7 +170,10 @@ export default function SuitabilityCard({ result, skinType }) {
   const worksFor = [...positives, ...extraHelpful];
 
   const notes = details.formulation_notes || [];
-  const watchFor = [...notes, ...dedupeAgainst(whyWarnings, notes)];
+  // Merged by ingredient rather than deduplicated list-against-list: the three
+  // Parfum lines all came from `notes`, so nothing was comparing them to each
+  // other.
+  const watchFor = mergeBySubject([...notes, ...whyWarnings]);
 
   const lookFor = details.look_for || [];
   const betterSuited = result.better_suited || [];
