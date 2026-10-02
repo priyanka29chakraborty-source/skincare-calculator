@@ -1,4 +1,5 @@
 import { money } from "../constants";
+import AffiliateNotice from "./AffiliateNotice";
 export default function AlternativesCard({ result, concerns, alternatives, altLoading, currency, category }) {
   const concernFit = result.skin_concern_fit || {};
   const cat = (category || result.price_analysis?.category || '').toLowerCase();
@@ -153,6 +154,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
           </div>
         </>
       )}
+      <AffiliateNotice disclosure={alternatives?.affiliate_disclosure} />
     </div>
   );
 }

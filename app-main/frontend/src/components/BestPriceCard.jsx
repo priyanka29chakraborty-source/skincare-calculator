@@ -1,4 +1,5 @@
 import { money, currencyAffix } from "../constants";
+import AffiliateNotice from "./AffiliateNotice";
 export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, fetchInput }) {
   const userUrl = bestPrice?.user_url || (fetchInput?.trim().startsWith('http') ? fetchInput.trim() : null);
 
@@ -179,6 +180,7 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, f
           </p>
         </div>
       )}
+      <AffiliateNotice disclosure={bestPrice?.affiliate_disclosure} />
     </div>
   );
 }

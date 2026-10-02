@@ -789,3 +789,14 @@ body::before {
   .result-name { font-size: 1.35rem; }
   .result-ident .score-circle-wrap { align-self: center; }
 }
+
+/* ========== AFFILIATE DISCLOSURE ========== */
+/* Required wherever tagged links appear - Amazon's Associates agreement and
+   the FTC endorsement guides both ask for it to be clear, not buried. So it
+   is plain body text at a readable size rather than fine print. */
+.affiliate-notice {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 0.72rem; line-height: 1.6; color: var(--text-sub);
+}
+.affiliate-notice i { color: var(--dusty-rose-light); margin-top: 3px; flex-shrink: 0; }

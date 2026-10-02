@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from scoring import analyze_product
 from entitlement import filter_for_entitlement, audit_no_paid_leakage
+from affiliate import disclosure_for
 from data_loader import data_loader
 from admin import admin_router
 from admin_db import log_fetch, log_analysis, increment_credits
@@ -524,6 +525,11 @@ def _serp_shopping_search(query, country, serp_key, num=10):
 @api_router.post("/find-alternatives")
 @limiter.limit("10/minute")
 async def find_alternatives(req: FindAlternativesRequest, request: Request):
+    """See best_price: tagging happens after the alternatives are chosen."""
+    return disclosure_for(await _find_alternatives_impl(req, request))
+
+
+async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request):
     # ── Gate 1: No concerns selected → never show alternatives ──────────────
     concern_scores = req.user_concern_fit or {}
     if not concern_scores or not (req.user_concerns or []):
@@ -919,6 +925,17 @@ def _is_same_product(result_title, brand, product_name, size_ml):
 @api_router.post("/best-price")
 @limiter.limit("10/minute")
 async def best_price(req: BestPriceRequest, request: Request):
+    """Thin wrapper so every exit path from the search gets tagged.
+
+    disclosure_for runs after the result is fully assembled, which keeps
+    affiliate tagging strictly downstream of ranking: links are chosen on
+    price and product match, then tagged. It also guarantees a tagged link
+    never ships without its required disclosure.
+    """
+    return disclosure_for(await _best_price_impl(req, request))
+
+
+async def _best_price_impl(req: BestPriceRequest, request: Request):
     """Find cheapest price: DDG search → ScrapeDo/Firecrawl fetch → fallback SerpAPI.
     Returns up to 3 validated results (same brand, same size, country-specific).
     """
