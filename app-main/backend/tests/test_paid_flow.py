@@ -435,19 +435,99 @@ def test_forgetting_an_entry_through_the_api(client, funded):
     assert client.get('/api/history').json()['entries'] == []
 
 
-def test_comparison_is_free_and_needs_no_session(client):
-    """It compares formulation scores, and those are the free tier. Charging to
-    put two free numbers side by side would be charging for arithmetic."""
-    resp = client.post('/api/compare', json={'products': [
-        {'product_name': 'A', 'category': 'Serum', 'price': 549, 'size_ml': 30,
-         'ingredients': 'Aqua, Niacinamide, Zinc PCA, Glycerin, Phenoxyethanol'},
-        {'product_name': 'B', 'category': 'Serum', 'price': 1200, 'size_ml': 30,
-         'ingredients': 'Aqua, Phenoxyethanol'},
-    ]})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data['verdict']['best_formulation'] == 'A'
+def compare_body(**kw):
+    body = {
+        'skin_type': 'oily',
+        'skin_concerns': ['Acne & Oily Skin'],
+        'products': [
+            {'product_name': 'A', 'category': 'Serum', 'price': 549, 'size_ml': 30,
+             'ingredients': 'Aqua, Salicylic Acid, Niacinamide, Glycerin, Phenoxyethanol'},
+            {'product_name': 'B', 'category': 'Serum', 'price': 1200, 'size_ml': 30,
+             'ingredients': 'Aqua, Retinol, Squalane, Tocopherol, Phenoxyethanol'},
+        ],
+    }
+    body.update(kw)
+    return body
+
+
+def test_the_comparison_scoreboard_is_free(client):
+    """How well each is made, and what each costs per ml, is formulation
+    analysis - free everywhere else in the app, and the half that makes the
+    feature worth finding."""
+    data = client.post('/api/compare', json=compare_body()).json()
+    assert data['access']['tier'] == 'free'
     assert all(p['formulation_tier'] for p in data['products'])
+    assert all(p['price_per_ml'] for p in data['products'])
+    assert data['components']
+    assert data['verdict']['best_value']
+
+
+def test_the_personal_half_of_a_comparison_is_withheld(client):
+    """Removed, not blanked. A key that is absent cannot be read out of the
+    response by editing client code."""
+    data = client.post('/api/compare', json=compare_body()).json()
+    for section in ('actives', 'concerns', 'tolerability', 'together'):
+        assert section not in data, '%s leaked to a free caller' % section
+    assert 'choose_if' not in data['verdict']
+
+
+def test_a_signed_in_caller_with_credits_gets_the_whole_comparison(client, funded):
+    data = client.post('/api/compare', json=compare_body()).json()
+    assert data['access']['tier'] == 'full'
+    assert data['actives']['shared'] or data['actives']['unique']
+    assert data['concerns']
+    assert data['together']['checked'] is True
+    assert data['verdict']['choose_if']
+
+
+def test_a_comparison_costs_one_credit_not_one_per_product(client, funded):
+    """Per-product would make a four-way comparison cost four credits, which
+    nobody would expect from a button labelled "Compare"."""
+    before = client.get('/api/auth/me').json()['balance']
+    client.post('/api/compare', json=compare_body())
+    assert client.get('/api/auth/me').json()['balance'] == before - 1
+
+
+def test_re_running_the_same_comparison_is_free(client, funded):
+    before = client.get('/api/auth/me').json()['balance']
+    for _ in range(3):
+        client.post('/api/compare', json=compare_body())
+    assert client.get('/api/auth/me').json()['balance'] == before - 1
+
+
+def test_order_does_not_make_it_a_new_comparison(client, funded):
+    """A against B and B against A are the same comparison."""
+    body = compare_body()
+    client.post('/api/compare', json=body)
+    after_first = client.get('/api/auth/me').json()['balance']
+
+    body['products'] = list(reversed(body['products']))
+    client.post('/api/compare', json=body)
+    assert client.get('/api/auth/me').json()['balance'] == after_first
+
+
+def test_a_different_pair_is_a_new_comparison(client, funded):
+    before = client.get('/api/auth/me').json()['balance']
+    client.post('/api/compare', json=compare_body())
+    body = compare_body()
+    body['products'][1]['ingredients'] = 'Aqua, Azelaic Acid, Glycerin, Phenoxyethanol'
+    client.post('/api/compare', json=body)
+    assert client.get('/api/auth/me').json()['balance'] == before - 2
+
+
+def test_running_out_falls_back_to_the_free_scoreboard(client, signed_in):
+    """Not an error. The free half is a real feature."""
+    import wallet
+    wallet.grant(signed_in, 1, reference='manual_cmp')
+    assert client.post('/api/compare', json=compare_body()).json()['access']['tier'] == 'full'
+    second = client.post('/api/compare',
+                         json=compare_body(skin_concerns=['Dullness'])).json()
+    body = compare_body()
+    body['products'][0]['ingredients'] = 'Aqua, Glycerin, Panthenol, Phenoxyethanol'
+    third = client.post('/api/compare', json=body).json()
+    assert third['access']['tier'] == 'free'
+    assert 'concerns' not in third
+    assert third['products'][0]['formulation_score'] is not None
 
 
 def test_comparison_rejects_more_than_four(client):
@@ -457,15 +537,6 @@ def test_comparison_rejects_more_than_four(client):
     assert resp.status_code == 400
 
 
-def test_comparison_spends_no_credit(client, funded):
-    before = client.get('/api/auth/me').json()['balance']
-    client.post('/api/compare', json={'products': [
-        {'product_name': 'A', 'category': 'Serum',
-         'ingredients': 'Aqua, Niacinamide, Glycerin'},
-        {'product_name': 'B', 'category': 'Serum',
-         'ingredients': 'Aqua, Glycerin'},
-    ]})
-    assert client.get('/api/auth/me').json()['balance'] == before
 
 
 # ---------------------------------------------------------------------------

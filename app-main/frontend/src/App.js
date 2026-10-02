@@ -3,7 +3,7 @@ import "@/App.css";
 import { api, describeError } from "./api";
 import { API, CURRENCY_MAP } from "./constants";
 import InputForm from "./components/InputForm";
-import ResultCards from "./components/ResultCards";
+import ResultCards, { MethodCard } from "./components/ResultCards";
 import PersonaliseCard from "./components/PersonaliseCard";
 import AccountBar from "./components/AccountBar";
 import UnlockModal from "./components/UnlockModal";
@@ -335,23 +335,6 @@ function App() {
 
         {result && (
           <section className="sc-results" ref={resultRef} data-testid="results-section">
-            {/* Shown after the result, never before it. Three questions to
-                sharpen the fit assessment is a fair trade once someone can see
-                what they are sharpening. Eight questions before any answer is
-                a wall in front of the thing they came for. */}
-            {/* Skin tone, climate, sensitivities and current routine are the
-                paid product. When locked the card collects nothing at all -
-                see PersonaliseCard. `access.tier` is the server's answer, not
-                a client guess. */}
-            <PersonaliseCard
-              profile={userProfile}
-              onApply={applyPersonalisation}
-              loading={personalising}
-              level={result.personalisation?.level || "none"}
-              skinType={skinType}
-              locked={result.access?.tier === "free"}
-              onUnlock={() => setUnlockOpen(true)}
-            />
             <ResultCards
               result={result} concerns={concerns} skinType={skinType} currency={currency}
               productName={productName} brand={brand} price={price} size={size} sizeUnit={sizeUnit}
@@ -360,6 +343,28 @@ function App() {
               fetchInput={fetchInput}
               category={category}
               onUnlock={() => setUnlockOpen(true)}
+              onAnswerQuestions={() => {
+                document.querySelector('[data-testid="personalise-open"]')?.click();
+                document.querySelector('[data-testid="personalise-prompt"]')
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              /* Rendered inside, directly under the formulation score, because
+                 that is the number these four answers sharpen. Skin tone,
+                 climate, sensitivities and routine are the paid product; when
+                 locked the card collects nothing at all. `access.tier` is the
+                 server's answer, not a client guess. */
+              personalisePrompt={
+                <PersonaliseCard
+                  profile={userProfile}
+                  onApply={applyPersonalisation}
+                  loading={personalising}
+                  level={result.personalisation?.level || "none"}
+                  skinType={skinType}
+                  personalisation={result.personalisation}
+                  locked={result.access?.tier === "free"}
+                  onUnlock={() => setUnlockOpen(true)}
+                />
+              }
             />
 
             <div className="export-row no-print">
@@ -387,11 +392,17 @@ function App() {
               currency={currency}
               skinType={skinType}
               concerns={concerns}
+              onUnlock={() => setUnlockOpen(true)}
               seed={{
                 product_name: productName, brand, category,
                 price: price || "", size_ml: size || "", ingredients,
               }}
             />
+
+            {/* Last on the page. Reference material: useful once someone has
+                read a result and wants to know how much weight to put on it,
+                and in the way before that. */}
+            <MethodCard />
           </section>
         )}
       </main>

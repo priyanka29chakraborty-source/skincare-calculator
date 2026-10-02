@@ -33,7 +33,7 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
  * plainly as a result, because a stated limit is more useful than a confident
  * guess.
  */
-export default function CompareCard({ seed, currency, skinType, concerns }) {
+export default function CompareCard({ seed, currency, skinType, concerns, onUnlock }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState(null);
   const [result, setResult] = useState(null);
@@ -168,7 +168,7 @@ export default function CompareCard({ seed, currency, skinType, concerns }) {
         {error && <p className="modal-error" role="alert" data-testid="compare-error">{error}</p>}
       </div>
 
-      {result && <CompareResult result={result} currency={currency} skinType={skinType} />}
+      {result && <CompareResult result={result} currency={currency} skinType={skinType} onUnlock={onUnlock} />}
     </div>
   );
 }
@@ -184,7 +184,11 @@ function Row({ label, children, cols }) {
   );
 }
 
-function CompareResult({ result, currency, skinType }) {
+function CompareResult({ result, currency, skinType, onUnlock }) {
+  // The server removes the personal sections rather than blanking them, so
+  // their absence is the signal - there is nothing to reveal by editing this
+  // component.
+  const locked = result.access?.tier === "free";
   const { products, components, actives, concerns, tolerability, together, verdict } = result;
   const cols = products.length;
   const names = products.map((p) => p.product_name);
@@ -403,6 +407,27 @@ function CompareResult({ result, currency, skinType }) {
         <p className="compare-muted" data-testid="compare-together-skipped">
           {together.reason}
         </p>
+      )}
+
+      {locked && (
+        <section className="compare-block compare-locked" data-testid="compare-locked">
+          <h3 className="compare-block-head">The part that depends on you</h3>
+          <p className="compare-locked-lede">{result.access?.message}</p>
+          <ul className="compare-locked-list">
+            <li><strong>What each has that the other does not</strong> — two products can score the same and do different jobs</li>
+            <li><strong>Which one treats your concerns</strong> — scored side by side</li>
+            <li><strong>Irritation risk for your skin type</strong></li>
+            <li><strong>Whether you could use both</strong> — layering clashes, and whether one makes the other redundant</li>
+          </ul>
+          <button className="locked-cta" onClick={onUnlock} data-testid="compare-unlock">
+            <span className="locked-cta-main">
+              <i className="fa-solid fa-lock-open"></i> Unlock the full comparison
+            </span>
+            <span className="locked-cta-sub">
+              One credit &middot; covers this comparison for good
+            </span>
+          </button>
+        </section>
       )}
 
       {/* --------------------------------------------------------- verdict */}

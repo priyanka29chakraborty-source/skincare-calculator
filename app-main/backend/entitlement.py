@@ -47,6 +47,10 @@ FREE_KEYS = {
     # What is in the bottle. Reading an ingredient list is not a premium
     # feature, and gating it would make the tool useless as a reference.
     'identified_actives', 'active_classes', 'ingredient_count',
+    # What to pair the product with. Derived from the product's own
+    # actives and says nothing about the person, so it sits with the
+    # rest of the free formulation analysis.
+    'pairs_well_with',
     # The legacy A-E breakdown and its detail bullets describe the FORMULATION
     # score, which is free. Stripping them left the category headline cards
     # (cleanser surfactant safety, oil lipid score, sunscreen UV stats) with a

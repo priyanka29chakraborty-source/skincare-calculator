@@ -300,6 +300,71 @@ def climate_context(climate_key, ingredient_list, category):
     return flags
 
 
+
+# Which flag types each question is responsible for, so a check can report
+# whether its own question turned anything up.
+_CHECK_FLAGS = {
+    'skin_tone': ('pih_risk', 'burn_risk'),
+    'climate': ('climate_texture',),
+    'allergens': ('declared_allergen',),
+    'routine': ('routine_conflict', 'routine_redundant'),
+}
+
+
+def _summarise_checks(profile, flags, climate_key, ingredient_list):
+    """One row per question: what was asked, and what came back.
+
+    Written so that an unanswered question, an answered question that found
+    something, and an answered question that found nothing are three visibly
+    different states. Before this they collapsed into one - an empty flag list.
+    """
+    by_type = {}
+    for flag in flags:
+        by_type.setdefault(flag.get('type'), []).append(flag)
+
+    def row(key, label, answer, clear_text):
+        found = []
+        for flag_type in _CHECK_FLAGS[key]:
+            found.extend(by_type.get(flag_type, []))
+        if not answer:
+            return {'key': key, 'label': label, 'status': 'unanswered',
+                    'answer': None, 'finding': None}
+        if found:
+            return {'key': key, 'label': label, 'status': 'flagged',
+                    'answer': answer,
+                    'finding': found[0].get('message') or found[0].get('title')}
+        return {'key': key, 'label': label, 'status': 'clear',
+                'answer': answer, 'finding': clear_text}
+
+    tone = profile.get('fitzpatrick')
+    tone_data = FITZPATRICK.get(tone) or {}
+    allergens = [a for a in (profile.get('allergens') or []) if a]
+    routine_raw = str(profile.get('current_routine') or '').strip()
+    routine_families = parse_routine(routine_raw)
+
+    allergen_names = ', '.join(
+        (ALLERGEN_GROUPS.get(a) or {}).get('label', a) for a in allergens)
+    climate_label = (CLIMATE.get(climate_key) or {}).get('label')
+
+    return [
+        row('skin_tone', 'Skin tone',
+            ('Type %s' % tone) if tone else None,
+            # FITZPATRICK['label'] is a description ("Burns minimally, tans
+            # easily"), not a name, so it reads as nonsense in this sentence.
+            'Nothing in this formula raises dark-mark risk for type %s skin.' % tone),
+        row('climate', 'Climate', climate_label,
+            'Nothing about this texture works against a %s climate.'
+            % (str(climate_label or '').lower() or 'your')),
+        row('allergens', 'Sensitivities',
+            allergen_names or None,
+            'None of the things you avoid are in this formula.'),
+        row('routine', 'Current routine',
+            (', '.join(sorted(routine_families)) or 'nothing recognised')
+            if routine_raw else None,
+            'No clash with what you already use, and nothing here duplicates it.'),
+    ]
+
+
 def build_personal_context(profile, ingredient_list, concerns, category, country=None):
     """Everything personal, in one call.
 
@@ -326,6 +391,7 @@ def build_personal_context(profile, ingredient_list, concerns, category, country
                    if profile.get(k))
     return {
         'flags': flags,
+        'checks': _summarise_checks(profile, flags, climate_key, ingredient_list),
         'fit_penalty': fit_penalty,
         'climate': climate_key,
         'climate_label': (CLIMATE.get(climate_key) or {}).get('label'),

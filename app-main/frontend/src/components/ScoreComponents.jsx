@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { getScoreColor, getBarColor, CONCERNS_LIST } from "../constants";
 
 export function ScoreCircle({ score }) {
@@ -73,7 +72,6 @@ function FitBars({ bars, color }) {
 }
 
 export function ConcernCard({ concern, data }) {
-  const [open, setOpen] = useState(false);
   const ic = CONCERNS_LIST.find(c => c.key === concern)?.icon || "fa-solid fa-circle";
 
   // Dual-score display: category-normalised score for the bar (fair comparison within
@@ -88,20 +86,16 @@ export function ConcernCard({ concern, data }) {
 
   return (
     <div className="concern-result" data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
-      <div className="concern-header" onClick={() => setOpen(!open)}>
+      <div className="concern-header">
         <div className="concern-left">
           <i className={ic}></i>
           <span className="concern-cname">{concern}</span>
           <FitBars bars={fit.bars} color={barColor} />
           <span style={{ fontSize: '0.75rem', color: barColor, fontWeight: 600, marginLeft: '4px' }}>{fit.label}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <i className={`fa-solid fa-circle-info info-toggle ${open ? "open" : ""}`}
-             title={`${displayScore}/100 — how well this formula addresses the concern you selected`}></i>
-        </div>
       </div>
       <ProgressBar pct={displayScore} label={concern} />
-      <div className={"concern-detail" + (open ? " open" : "")}>
+      <div className="concern-detail open">
 
         {/* Dual-score block — only shown when category ceiling < 100 */}
         {isCapped ? (
@@ -112,6 +106,10 @@ export function ConcernCard({ concern, data }) {
                             letterSpacing: '0.5px', marginBottom: '2px' }}>Within category</div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: barColor }}>{displayScore}/100</div>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>{fit.label}</div>
+              <div style={{ fontSize: '0.66rem', color: 'var(--text-sub)', marginTop: '4px', lineHeight: 1.45 }}>
+                Against other products of this type. This is the fair
+                comparison and the one the bar above uses.
+              </div>
             </div>
             <div style={{ flex: 1, minWidth: '120px', background: 'var(--bg-deep)', borderRadius: '8px',
                           padding: '8px 10px', border: '1px solid var(--border)' }}>
@@ -119,6 +117,11 @@ export function ConcernCard({ concern, data }) {
                             letterSpacing: '0.5px', marginBottom: '2px' }}>vs all formats</div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-sub)' }}>{absoluteScore}/100</div>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>max possible: {ceiling}/100</div>
+              <div style={{ fontSize: '0.66rem', color: 'var(--text-sub)', marginTop: '4px', lineHeight: 1.45 }}>
+                Against every product type at once. This format has a
+                realistic ceiling of {ceiling}/100 for this concern, so it is
+                not marked down for being what it is.
+              </div>
             </div>
           </div>
         ) : (

@@ -59,6 +59,11 @@ export default function PrintReport({
   const advisories = result.advisory_flags || [];
   const flags = result.formulation_flags || [];
   const compat = result.skin_type_compatibility;
+  const pairings = result.pairs_well_with || [];
+
+  // The server already withheld the personal sections; this is what the
+  // document says about that. `access.tier` is the server's answer.
+  const isFree = result.access?.tier === "free";
 
   const unit = sizeUnit === "g" ? "g" : "ml";
   const perUnit = (price && size) ? Number(price) / Number(size) : null;
@@ -75,6 +80,7 @@ export default function PrintReport({
           </div>
         </div>
         <div className="pr-score-block">
+          {isFree && <div className="pr-tier-badge">Formulation report</div>}
           <div className="pr-score">{fmt(score)}<span>/100</span></div>
           {tier && <div className="pr-tier">{tier}</div>}
         </div>
@@ -174,6 +180,29 @@ export default function PrintReport({
         </section>
       )}
 
+      {pairings.length > 0 && (
+        <section className="pr-section">
+          <h2>What to pair this with</h2>
+          <table className="pr-table">
+            <thead>
+              <tr><th>Ingredient</th><th>Works with</th><th>Where to find it</th></tr>
+            </thead>
+            <tbody>
+              {pairings.map((p, i) => (
+                <tr key={i}>
+                  <td className="pr-comp">{p.ingredient}</td>
+                  <td>{p.works_with}</td>
+                  <td>
+                    {p.look_for || "—"}
+                    {p.caution ? ` (${p.caution})` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
       {/* ------------------------------------------------------- suitability */}
       {Object.keys(concernFit).length > 0 && (
         <section className="pr-section">
@@ -241,6 +270,22 @@ export default function PrintReport({
               <p>{f.message}</p>
             </div>
           ))}
+        </section>
+      )}
+
+      {isFree && (
+        <section className="pr-section pr-upgrade">
+          <h2>Not covered in this report</h2>
+          <p>
+            Everything above is about the product itself and is the same for
+            every reader. It does not cover how this suits <em>you</em>: how
+            well it treats the concerns you selected, whether it suits your
+            skin type, what in it is likely to give you trouble, and how it
+            fits alongside what you already use.
+          </p>
+          <p className="pr-muted">
+            That part is in the full report, at urancal.com.
+          </p>
         </section>
       )}
 

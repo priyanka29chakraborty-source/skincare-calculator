@@ -4093,7 +4093,11 @@ def get_upgrade_suggestions(ingredient_list, concerns):
 
             if match_ing and match_concern:
                 suggestions.append({
-                    'active': row.get('Primary_Active'),
+                    # builds_on is what the product already contains;
+                    # suggested_active is what to add. They were both called
+                    # "active" once, and the card showed the wrong one.
+                    'builds_on': row.get('Primary_Active'),
+                    'suggested_active': row.get('Upgrade_Active'),
                     'upgrade': row.get('Upgrade_Active'),
                     'reason': row.get('Upgrade_Reason'),
                     'concern': row.get('Skin_Concern'),
@@ -4101,22 +4105,22 @@ def get_upgrade_suggestions(ingredient_list, concerns):
 
     if not suggestions and concerns:
         concern_upgrades = {
-            'acne': [{'upgrade': 'Salicylic Acid 2% Serum', 'reason': 'BHA penetrates pores to clear congestion and control oil', 'active': 'Salicylic Acid'}],
-            'pigmentation': [{'upgrade': 'Tranexamic Acid 3% Serum', 'reason': 'Strongest evidence for hyperpigmentation with minimal irritation', 'active': 'Tranexamic Acid'}],
-            'aging': [{'upgrade': 'Retinol 0.5% Treatment', 'reason': 'Gold standard for collagen synthesis and cell turnover', 'active': 'Retinol'}],
-            'barrier': [{'upgrade': 'Ceramide + Cholesterol Moisturizer', 'reason': 'Mimics skin lipid structure for optimal barrier restoration', 'active': 'Ceramides'}],
-            'sensitive': [{'upgrade': 'Centella Asiatica Serum', 'reason': 'Clinically proven to calm inflammation and strengthen skin', 'active': 'Centella Asiatica'}],
-            'hydration': [{'upgrade': 'Multi-weight Hyaluronic Acid Serum', 'reason': 'Multiple molecular weights for deep and surface hydration', 'active': 'Hyaluronic Acid'}],
-            'dry skin': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'active': 'Ceramides + Petrolatum'}],
-            'dry': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'active': 'Ceramides + Petrolatum'}],
-            'pores': [{'upgrade': 'Niacinamide 10% + Zinc PCA', 'reason': 'Tightens pores and regulates sebum production', 'active': 'Niacinamide'}],
-            'dullness': [{'upgrade': 'Vitamin C 15% Serum', 'reason': 'Potent antioxidant that boosts radiance and evens skin tone', 'active': 'Vitamin C'}],
-            'texture': [{'upgrade': 'AHA/BHA Chemical Exfoliant', 'reason': 'Removes dead cells and promotes smooth, refined texture', 'active': 'Glycolic Acid'}],
-            'dark circles': [{'upgrade': 'Caffeine + Peptide Eye Serum', 'reason': 'Constricts blood vessels and strengthens delicate under-eye skin', 'active': 'Caffeine'}],
-            'sun': [{'upgrade': 'Broad Spectrum SPF 50 with antioxidants', 'reason': 'Essential UV protection with added photoaging defense', 'active': 'UV Filters'}],
-            'uv': [{'upgrade': 'Ferulic Acid + Vitamin C + E Serum', 'reason': 'Triple antioxidant synergy for superior UV damage repair', 'active': 'Ferulic Acid'}],
-            'tanning': [{'upgrade': 'Alpha Arbutin 2% + Niacinamide', 'reason': 'Tyrosinase inhibition for effective de-tanning without irritation', 'active': 'Alpha Arbutin'}],
-            'puffiness': [{'upgrade': 'Caffeine 5% Eye Serum', 'reason': 'Reduces puffiness by improving microcirculation around eyes', 'active': 'Caffeine'}],
+            'acne': [{'upgrade': 'Salicylic Acid 2% Serum', 'reason': 'BHA penetrates pores to clear congestion and control oil', 'suggested_active': 'Salicylic Acid'}],
+            'pigmentation': [{'upgrade': 'Tranexamic Acid 3% Serum', 'reason': 'Strongest evidence for hyperpigmentation with minimal irritation', 'suggested_active': 'Tranexamic Acid'}],
+            'aging': [{'upgrade': 'Retinol 0.5% Treatment', 'reason': 'Gold standard for collagen synthesis and cell turnover', 'suggested_active': 'Retinol'}],
+            'barrier': [{'upgrade': 'Ceramide + Cholesterol Moisturizer', 'reason': 'Mimics skin lipid structure for optimal barrier restoration', 'suggested_active': 'Ceramides'}],
+            'sensitive': [{'upgrade': 'Centella Asiatica Serum', 'reason': 'Clinically proven to calm inflammation and strengthen skin', 'suggested_active': 'Centella Asiatica'}],
+            'hydration': [{'upgrade': 'Multi-weight Hyaluronic Acid Serum', 'reason': 'Multiple molecular weights for deep and surface hydration', 'suggested_active': 'Hyaluronic Acid'}],
+            'dry skin': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'suggested_active': 'Ceramides + Petrolatum'}],
+            'dry': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'suggested_active': 'Ceramides + Petrolatum'}],
+            'pores': [{'upgrade': 'Niacinamide 10% + Zinc PCA', 'reason': 'Tightens pores and regulates sebum production', 'suggested_active': 'Niacinamide'}],
+            'dullness': [{'upgrade': 'Vitamin C 15% Serum', 'reason': 'Potent antioxidant that boosts radiance and evens skin tone', 'suggested_active': 'Vitamin C'}],
+            'texture': [{'upgrade': 'AHA/BHA Chemical Exfoliant', 'reason': 'Removes dead cells and promotes smooth, refined texture', 'suggested_active': 'Glycolic Acid'}],
+            'dark circles': [{'upgrade': 'Caffeine + Peptide Eye Serum', 'reason': 'Constricts blood vessels and strengthens delicate under-eye skin', 'suggested_active': 'Caffeine'}],
+            'sun': [{'upgrade': 'Broad Spectrum SPF 50 with antioxidants', 'reason': 'Essential UV protection with added photoaging defense', 'suggested_active': 'UV Filters'}],
+            'uv': [{'upgrade': 'Ferulic Acid + Vitamin C + E Serum', 'reason': 'Triple antioxidant synergy for superior UV damage repair', 'suggested_active': 'Ferulic Acid'}],
+            'tanning': [{'upgrade': 'Alpha Arbutin 2% + Niacinamide', 'reason': 'Tyrosinase inhibition for effective de-tanning without irritation', 'suggested_active': 'Alpha Arbutin'}],
+            'puffiness': [{'upgrade': 'Caffeine 5% Eye Serum', 'reason': 'Reduces puffiness by improving microcirculation around eyes', 'suggested_active': 'Caffeine'}],
         }
         for c in concerns:
             c_lower = c.lower()
@@ -4258,6 +4262,7 @@ def analyze_product(product_data):
     # describe the USER, so they refine the Fit score and raise advisories -
     # they never touch the formulation score.
     import personalization as _personal
+    from pairings import suggest_pairings as _suggest_pairings
     personal = _personal.build_personal_context(
         product_data.get('user_profile') or {},
         ingredient_list,
@@ -4352,6 +4357,10 @@ def analyze_product(product_data):
             'climate': personal['climate'],
             'climate_label': personal['climate_label'],
             'fitzpatrick': personal['fitzpatrick'],
+            # One row per question, including the ones that found nothing.
+            # Answering used to change nothing visible when a product was
+            # clean, which is indistinguishable from not having looked.
+            'checks': personal.get('checks') or [],
             'routine_conflicts': [f for f in personal['flags']
                                   if f['type'] in ('routine_conflict', 'routine_redundant')],
             'product_active_families': personal['product_active_families'],
@@ -4360,6 +4369,11 @@ def analyze_product(product_data):
         # ── Backwards compatibility ──────────────────────────────────────────
         # Existing clients read main_worth_score. It now carries the
         # formulation score so old and new surfaces agree on one number.
+        # What to use alongside this product. Derived from the product's own
+        # actives, so it is free: it says nothing about the person. Ranked
+        # using concern fit where that exists, which only changes the order.
+        "pairs_well_with": _suggest_pairings(ingredient_list, concern_dict),
+
         "main_worth_score": formulation_result['score'],
         "main_worth_tier": _formulation.formulation_tier(
             formulation_result['score'], product_data.get("category", "Serum")),
