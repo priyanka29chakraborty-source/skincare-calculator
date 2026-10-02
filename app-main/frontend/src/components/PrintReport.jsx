@@ -179,6 +179,29 @@ export default function PrintReport({
         </section>
       )}
 
+      {pairings.length > 0 && (
+        <section className="pr-section">
+          <h2>What to pair this with</h2>
+          <table className="pr-table">
+            <thead>
+              <tr><th>Ingredient</th><th>Works with</th><th>Where to find it</th></tr>
+            </thead>
+            <tbody>
+              {pairings.map((p, i) => (
+                <tr key={i}>
+                  <td className="pr-comp">{p.ingredient}</td>
+                  <td>{p.works_with}</td>
+                  <td>
+                    {p.look_for || "—"}
+                    {p.caution ? ` (${p.caution})` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
       {/* ------------------------------------------------------- suitability */}
       {Object.keys(concernFit).length > 0 && (
         <section className="pr-section">

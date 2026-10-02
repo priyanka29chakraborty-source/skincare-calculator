@@ -4258,6 +4258,7 @@ def analyze_product(product_data):
     # describe the USER, so they refine the Fit score and raise advisories -
     # they never touch the formulation score.
     import personalization as _personal
+    from pairings import suggest_pairings as _suggest_pairings
     personal = _personal.build_personal_context(
         product_data.get('user_profile') or {},
         ingredient_list,
@@ -4360,6 +4361,11 @@ def analyze_product(product_data):
         # ── Backwards compatibility ──────────────────────────────────────────
         # Existing clients read main_worth_score. It now carries the
         # formulation score so old and new surfaces agree on one number.
+        # What to use alongside this product. Derived from the product's own
+        # actives, so it is free: it says nothing about the person. Ranked
+        # using concern fit where that exists, which only changes the order.
+        "pairs_well_with": _suggest_pairings(ingredient_list, concern_dict),
+
         "main_worth_score": formulation_result['score'],
         "main_worth_tier": _formulation.formulation_tier(
             formulation_result['score'], product_data.get("category", "Serum")),

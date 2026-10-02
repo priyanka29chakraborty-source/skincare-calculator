@@ -4,6 +4,7 @@ import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } fro
 import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
 import LockedCard from "./LockedCard";
 import SuitabilityCard from "./SuitabilityCard";
+import PairingsCard from "./PairingsCard";
 import AlternativesCard from "./AlternativesCard";
 import BestPriceCard from "./BestPriceCard";
 
@@ -862,6 +863,10 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       {!isLocked && result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
         <SunscreenAnalysisCard data={result.skin_concern_fit['Sun Protection']} />
       )}
+
+      {/* What to use alongside this one. Free: derived from the product's
+          own actives, not from the reader. */}
+      <PairingsCard pairings={result.pairs_well_with} />
 
       {/* CARD 4A: ALTERNATIVES */}
       <AlternativesCard result={result} concerns={concerns} alternatives={alternatives} altLoading={altLoading} currency={currency} category={category} />
