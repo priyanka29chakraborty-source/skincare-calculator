@@ -59,6 +59,7 @@ export default function PrintReport({
   const advisories = result.advisory_flags || [];
   const flags = result.formulation_flags || [];
   const compat = result.skin_type_compatibility;
+  const pairings = result.pairs_well_with || [];
 
   // The server already withheld the personal sections; this is what the
   // document says about that. `access.tier` is the server's answer.

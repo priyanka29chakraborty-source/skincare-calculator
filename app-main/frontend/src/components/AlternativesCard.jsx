@@ -1,6 +1,17 @@
 import { money } from "../constants";
 import AffiliateNotice from "./AffiliateNotice";
 export default function AlternativesCard({ result, concerns, alternatives, altLoading, currency, category }) {
+  // Everything this card decides rests on concern fit, which is paid and is
+  // absent from a free response. With it missing, weakConcerns came out empty
+  // and the card fell through to its "nothing worth adding - every concern
+  // already scores 75% or better" state: a confident positive claim made
+  // without sight of a single score. Same shape as the locked compatibility
+  // card that once rendered a red bar for an unknown value.
+  //
+  // So it does not render at all without the data. Free readers still get the
+  // pairings card, which works from the product's own actives.
+  if (result?.access?.tier === "free") return null;
+
   const concernFit = result.skin_concern_fit || {};
   const cat = (category || result.price_analysis?.category || '').toLowerCase();
   const isFacialOil = cat === 'facial oil' || cat === 'oil';
@@ -17,11 +28,15 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
   const isExcellent = allConcernsFit && (result.main_worth_score >= 75);
 
   // ── Card title changes for facial oils ──────────────────────────────────────
-  const cardTitle = isFacialOil ? 'Routine Add-Ons & Pairing Tips' : 'Better Alternatives';
-  const cardIcon = isFacialOil ? 'fa-solid fa-layer-group' : 'fa-solid fa-arrow-up-right-dots';
+  // One title for both. The search is not category-locked, so what comes
+  // back is a mix of formats to add alongside this product - which is what
+  // the card body always said, while the old title ("Better Alternatives")
+  // promised a replacement.
+  const cardTitle = 'Worth adding to your routine';
+  const cardIcon = 'fa-solid fa-layer-group';
 
   // ── Upgrade suggestion label: oils get "Complement" not "Add-On" ────────────
-  const upgradeLabel = isFacialOil ? 'Pair With:' : 'Add-On:';
+  const upgradeLabel = 'Add:';
   if (!hasWeakConcerns) return (
     <div className="sc-card result-card card-4" data-testid="card-alternatives-great" style={{ "--anim-delay": "0.45s" }}>
       <h2 className="card-title"><i className={cardIcon}></i> {cardTitle}</h2>
@@ -30,23 +45,27 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
           <i className="fa-solid fa-info-circle" style={{ color: '#8B7E74' }}></i>
           <div>
             <strong style={{ color: '#2C2420' }}>No skin concerns selected</strong>
-            <p style={{ color: '#8B7E74' }}>Select your skin concerns above to see personalized {isFacialOil ? 'pairing tips' : 'alternatives'}.</p>
+            <p style={{ color: '#8B7E74' }}>Select your skin concerns above to see what would help alongside this.</p>
           </div>
         </div>
       ) : isExcellent ? (
         <div className="great-value-badge" data-testid="excellent-message">
           <i className="fa-solid fa-trophy" style={{ color: '#C9A84C' }}></i>
           <div>
-            <strong>{isFacialOil ? 'Great lipid profile for your concerns!' : 'Your product is already excellent for your concerns!'}</strong>
-            <p>Worth score {result.main_worth_score}/100 and all concern fits are 75%+.</p>
+            <strong>Nothing worth adding for these concerns</strong>
+            <p>
+              This {isFacialOil ? 'oil' : 'product'} already covers everything
+              you selected &mdash; {result.main_worth_score}/100 overall, and
+              every concern scores 75% or better.
+            </p>
           </div>
         </div>
       ) : (
         <div className="great-value-badge" data-testid="great-value-message">
           <i className="fa-solid fa-circle-check"></i>
           <div>
-            <strong>{isFacialOil ? 'Good botanical coverage for your concerns!' : 'Your product targets your concerns effectively!'}</strong>
-            <p>All concern fit scores are 75% or above.</p>
+            <strong>Nothing worth adding for these concerns</strong>
+            <p>Every concern you selected already scores 75% or better here.</p>
           </div>
         </div>
       )}
@@ -57,16 +76,15 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
     <div className="sc-card result-card card-4" data-testid="card-alternatives" style={{ "--anim-delay": "0.45s" }}>
       <h2 className="card-title"><i className={cardIcon}></i> {cardTitle}</h2>
       <div className="alt-concern-msg" data-testid="weak-concerns-msg">
-        {isFacialOil
-          ? <>This oil has <strong>low botanical coverage</strong> for {weakConcerns.join(', ')}. Pair it with these targeted serums:</>
-          : <>Better options found for <strong>{weakConcerns.join(', ')}</strong> — products that target {weakConcerns.length === 1 ? 'this concern' : 'these concerns'} more effectively</>
-        }
+        This product scores lower on <strong>{weakConcerns.join(', ')}</strong>.
+        These target {weakConcerns.length === 1 ? 'that' : 'those'} more directly
+        — to use <em>alongside</em> what you have, not instead of it.
       </div>
 
       {result.upgrade_suggestions?.map((sug, i) => (
         <div key={i} className="upgrade-box" data-testid={`upgrade-suggestion-${i}`}>
           <div className="upgrade-header">
-            <i className={isFacialOil ? "fa-solid fa-plus-circle" : "fa-solid fa-arrow-trend-up"}></i>
+            <i className="fa-solid fa-plus-circle"></i>
             <span className="upgrade-name">{upgradeLabel} {sug.upgrade}</span>
             <span className="upgrade-concern-tag">{sug.concern}</span>
           </div>
@@ -80,19 +98,19 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
               <i className="fa-solid fa-circle-info" style={{ marginRight: "4px" }}></i>
               {isFacialOil
                 ? `Use this alongside your oil for ${sug.concern} — not a replacement.`
-                : `Consider as an add-on serum for ${sug.concern}, not a replacement for your current product.`}
+                : `An addition for ${sug.concern}, not a replacement for what you have.`}
             </p>
           </div>
         </div>
       ))}
 
       {altLoading && (
-        <div className="alt-loading" data-testid="alt-loading"><i className="fa-solid fa-spinner fa-spin"></i> Searching &amp; analyzing {isFacialOil ? 'complementary products' : 'alternatives'}...</div>
+        <div className="alt-loading" data-testid="alt-loading"><i className="fa-solid fa-spinner fa-spin"></i> Searching for products that cover these concerns...</div>
       )}
 
       {!altLoading && alternatives?.scored_alternatives?.length > 0 && (
         <>
-          <div className="alt-section-label">{isFacialOil ? 'Complementary Products:' : 'Alternatives'}</div>
+          <div className="alt-section-label">Products to consider</div>
           <div className="scored-alt-list" data-testid="scored-alternatives-list">
             {alternatives.scored_alternatives.slice(0, 3).map((alt, i) => (
               <div key={i} className="scored-alt-card" data-testid={`scored-alt-${i}`}>
@@ -139,7 +157,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
 
       {!altLoading && alternatives?.basic_alternatives?.length > 0 && !alternatives?.scored_alternatives?.length && (
         <>
-          <div className="alt-section-label">Found {isFacialOil ? 'Complementary Products' : 'Alternatives'}:</div>
+          <div className="alt-section-label">Products to consider</div>
           <div className="alt-grid" data-testid="basic-alternatives-list">
             {alternatives.basic_alternatives.map((alt, i) => (
               <a key={i} href={alt.link} target="_blank" rel="noopener noreferrer" className="alt-card" data-testid={`alt-card-${i}`}>
