@@ -1,0 +1,73 @@
+# Copy-quality evals for the sentences the engine writes.
+# Run from backend/:  promptfoo eval -c copy_evals/promptfooconfig.yaml  (paths below are relative to this file)
+# No LLM is called: the provider runs the real engine and the assertions are code.
+description: "Would a thoughtful person write this sentence, and does it agree with the number beside it?"
+prompts:
+  - "{{category}}: {{ingredients}}"
+providers:
+  - id: file://provider.py
+    label: engine
+defaultTest:
+  assert:
+    - type: python
+      value: file://assertions.py:no_dose_above_the_safe_maximum
+      metric: no_dose_above_the_safe_maximum
+    - type: python
+      value: file://assertions.py:praise_agrees_with_the_number
+      metric: praise_agrees_with_the_number
+    - type: python
+      value: file://assertions.py:advice_fits_the_product
+      metric: advice_fits_the_product
+    - type: python
+      value: file://assertions.py:no_machine_leakage
+      metric: no_machine_leakage
+    - type: python
+      value: file://assertions.py:no_repeated_sentences
+      metric: no_repeated_sentences
+    - type: python
+      value: file://assertions.py:confidence_talks_about_the_right_thing
+      metric: confidence_talks_about_the_right_thing
+    - type: python
+      value: file://assertions.py:sentences_are_readable
+      metric: sentences_are_readable
+tests:
+  - description: "Serum with strong actives"
+    vars:
+      category: "Serum"
+      ingredients: "Aqua, Salicylic Acid, Niacinamide, Zinc PCA, Glycerin, Phenoxyethanol"
+  - description: "Serum with nothing active"
+    vars:
+      category: "Serum"
+      ingredients: "Aqua, Glycerin, Phenoxyethanol, Parfum, Alcohol Denat"
+  - description: "Retinol serum"
+    vars:
+      category: "Serum"
+      ingredients: "Aqua, Retinol, Squalane, Niacinamide, Tocopherol, Phenoxyethanol"
+  - description: "Vitamin C serum"
+    vars:
+      category: "Serum"
+      ingredients: "Aqua, Ascorbic Acid, Ferulic Acid, Tocopherol, Propanediol, Phenoxyethanol"
+  - description: "Harsh cleanser"
+    vars:
+      category: "Cleanser"
+      ingredients: "Aqua, Sodium Lauryl Sulfate, Cocamidopropyl Betaine, Glycerin, Parfum"
+  - description: "Gentle cleanser"
+    vars:
+      category: "Cleanser"
+      ingredients: "Aqua, Cocamidopropyl Betaine, Glycerin, Panthenol, Phenoxyethanol"
+  - description: "Mineral sunscreen"
+    vars:
+      category: "Sunscreen"
+      ingredients: "Aqua, Zinc Oxide, Titanium Dioxide, Glycerin, Phenoxyethanol"
+  - description: "Plain moisturiser"
+    vars:
+      category: "Moisturizer"
+      ingredients: "Aqua, Glycerin, Ceramide NP, Squalane, Phenoxyethanol"
+  - description: "Toner"
+    vars:
+      category: "Toner"
+      ingredients: "Aqua, Glycerin, Niacinamide, Panthenol, Phenoxyethanol"
+  - description: "Facial oil"
+    vars:
+      category: "Facial Oil"
+      ingredients: "Squalane, Jojoba Oil, Tocopherol"

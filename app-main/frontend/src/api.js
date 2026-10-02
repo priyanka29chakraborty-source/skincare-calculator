@@ -21,7 +21,17 @@ import { API } from "./constants";
 // let the backend wake, short enough that a genuine outage does not hang.
 const DEFAULT_TIMEOUT_MS = 75000;
 
-export const api = axios.create({ timeout: DEFAULT_TIMEOUT_MS });
+// withCredentials on every call: the session cookie is set by the API, which
+// is on a different origin to this frontend, so the browser will not send it
+// back unless we ask. Without this the server sees every analysis as anonymous
+// and silently serves the free tier to people who have paid.
+//
+// Safe because the API's CORS configuration is a strict origin allowlist - a
+// third-party page cannot read these responses.
+export const api = axios.create({
+  timeout: DEFAULT_TIMEOUT_MS,
+  withCredentials: true,
+});
 
 /** Turn any axios failure into something a person can act on. */
 export function describeError(e) {

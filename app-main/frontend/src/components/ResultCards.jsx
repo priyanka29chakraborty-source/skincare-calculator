@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { getBarColor } from "../constants";
+import { getBarColor, money } from "../constants";
 import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
 import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
+import LockedCard from "./LockedCard";
+import SuitabilityCard from "./SuitabilityCard";
 import AlternativesCard from "./AlternativesCard";
 import BestPriceCard from "./BestPriceCard";
 
@@ -427,34 +429,62 @@ function SunscreenHeadlineStats({ result }) {
   );
 }
 
+/**
+ * Read a component from the authoritative formulation breakdown.
+ *
+ * The headline stat cards used to derive from the legacy A-E component_scores,
+ * which is now a lossy rescaling of the new rubric rather than a source of
+ * truth. For a cleanser, component_scores.A was `formula_quality * 0.45` on the
+ * old 0-100 scale, which has no fixed relationship to the new
+ * "Surfactant Mildness 38.4/40" - so the card showed 0/10 "Harsh" for a formula
+ * built entirely on gentle surfactants.
+ *
+ * formulation_breakdown carries the real per-component values and maxima, so
+ * these cards now read from it directly.
+ */
+function comp(result, key) {
+  const c = (result.formulation_breakdown || []).find((x) => x.key === key);
+  if (!c || !c.max) return null;
+  return { score: c.score, max: c.max, pct: (c.score / c.max) * 100, label: c.label };
+}
+
 function CleanserHeadlineStats({ result }) {
-  // Surfactant Safety Index: derived from formula_quality (component A) which is cleanser-specific
-  const safetyScore = result.component_scores?.A ?? 0;
-  const safetyIndex = Math.round((safetyScore / 45) * 10 * 10) / 10; // 0–10 scale
-  const safetyLabel = safetyIndex >= 8 ? 'Gentle' : safetyIndex >= 6 ? 'Mild' : safetyIndex >= 4 ? 'Moderate' : 'Harsh';
-  const safetyColor = safetyIndex >= 8 ? '#267C36' : safetyIndex >= 6 ? '#2D7FD3' : safetyIndex >= 4 ? '#C9A96E' : '#D06030';
-  // Lather profile from component details hint
-  const hasHarshSurf = (result.component_details?.A || []).some(d => d.toLowerCase().includes('harsh') || d.toLowerCase().includes('sls'));
-  const latherLabel = hasHarshSurf ? 'High foam / stripping' : 'Gentle low-foam';
+  // Surfactant mildness is its own scored component for cleansers (40 pts).
+  const surf = comp(result, 'surfactant');
+  const ph = comp(result, 'ph');
+  const safetyIndex = surf ? Math.round(surf.pct) / 10 : null;
+  const safetyLabel = safetyIndex === null ? '—'
+    : safetyIndex >= 8 ? 'Gentle' : safetyIndex >= 6 ? 'Mild'
+    : safetyIndex >= 4 ? 'Moderate' : 'Harsh';
+  const safetyColor = safetyIndex === null ? 'var(--text-sub)'
+    : safetyIndex >= 8 ? '#267C36' : safetyIndex >= 6 ? '#2D7FD3'
+    : safetyIndex >= 4 ? '#C9A96E' : '#D06030';
+  // Read the engine's own note rather than guessing from a rescaled number.
+  const surfNote = (surf && (result.formulation_breakdown || [])
+    .find((x) => x.key === 'surfactant')?.notes?.[0]) || '';
+  const latherLabel = /sulfate|soap/i.test(surfNote)
+    ? 'High foam / stripping' : 'Gentle low-foam';
 
   return (
     <div className="price-grid-sep" data-testid="cleanser-headline-stats">
-      <div className="pg-box"><div className="pg-val" style={{ color: safetyColor }}>{safetyIndex}/10</div><div className="pg-lbl">surfactant safety</div></div>
+      <div className="pg-box"><div className="pg-val" style={{ color: safetyColor }}>{safetyIndex === null ? '—' : `${safetyIndex}/10`}</div><div className="pg-lbl">surfactant safety</div></div>
       <div className="pg-box"><div className="pg-val" style={{ color: safetyColor, fontSize: '0.8rem' }}>{safetyLabel}</div><div className="pg-lbl">mildness</div></div>
       <div className="pg-box"><div className="pg-val" style={{ fontSize: '0.75rem' }}>{latherLabel}</div><div className="pg-lbl">lather profile</div></div>
       <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.price_per_ml}</div><div className="pg-lbl">per ml</div></div>
       <div className="pg-box pg-bot"><div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div><div className="pg-lbl">vs average</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.component_scores?.D?.toFixed(1)}/10</div><div className="pg-lbl">safety score</div></div>
+      <div className="pg-box pg-bot"><div className="pg-val">{ph ? `${Math.round(ph.pct)}%` : '—'}</div><div className="pg-lbl">pH suitability</div></div>
     </div>
   );
 }
 
 function MoisturizerHeadlineStats({ result }) {
   // Barrier Recovery Index: from formula_quality component A (barrier-weighted for moisturizer)
-  const barrierScore = result.component_scores?.A ?? 0;
-  const barrierIndex = Math.round((barrierScore / 45) * 100);
-  const barrierLabel = barrierIndex >= 75 ? 'Strong' : barrierIndex >= 50 ? 'Moderate' : 'Low';
-  const barrierColor = barrierIndex >= 75 ? '#267C36' : barrierIndex >= 50 ? '#2D7FD3' : '#C9A96E';
+  const barrier = comp(result, 'barrier');
+  const barrierIndex = barrier ? Math.round(barrier.pct) : null;
+  const barrierLabel = barrierIndex === null ? '—'
+    : barrierIndex >= 75 ? 'Strong' : barrierIndex >= 50 ? 'Moderate' : 'Low';
+  const barrierColor = barrierIndex === null ? 'var(--text-sub)'
+    : barrierIndex >= 75 ? '#267C36' : barrierIndex >= 50 ? '#2D7FD3' : '#C9A96E';
   // Occlusion level: from barrier_actives or active_classes
   const barrierActives = result.active_classes?.barrier_support || [];
   const occlusionLevel = barrierActives.length >= 3 ? 'Rich' : barrierActives.length >= 1 ? 'Medium' : 'Light';
@@ -560,7 +590,12 @@ function TreatmentIntensityBanner({ result, concerns }) {
 }
 
 // ── Main ResultCards Component ────────────────────────────────────────────────
-export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput, category }) {
+export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput, category, onUnlock,
+  productName, brand, price, size, sizeUnit }) {
+  // Paid sections are stripped server-side, so the UI must branch on the
+  // tier the server reported rather than on whether a field happens to be
+  // truthy - an absent field is a locked state, not a zero.
+  const isLocked = result?.access?.tier === "free";
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   const cat = (category || '').toLowerCase();
@@ -612,8 +647,34 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             : ' Formulation Score'}
         </h2>
 
-        <div className="score-header">
+        {/* Product identity leads, score sits to the right.
+            Previously the card opened with "Serum - Formulation Score" and the
+            product the user actually asked about never appeared as a heading,
+            while the plain-language verdict - the one thing no competitor
+            produces - sat underneath as small grey caption text. Name first,
+            verdict second, number alongside. */}
+        <div className="result-ident">
+          <div className="result-ident-text">
+            {(brand || category) && (
+              <div className="result-brand">
+                {[brand, category].filter(Boolean).join(' · ')}
+              </div>
+            )}
+            {productName && <h3 className="result-name">{productName}</h3>}
+            {(() => {
+              const bits = [];
+              if (price) bits.push(money(currency, price));
+              if (size) bits.push(`${size} ${sizeUnit || 'ml'}`);
+              const ppm = result.price_analysis?.price_per_ml;
+              if (ppm) bits.push(`${money(currency, ppm)} per ${sizeUnit === 'g' ? 'g' : 'ml'}`);
+              if (skinType) bits.push(`analysed for ${String(skinType).toLowerCase()} skin`);
+              return bits.length ? <div className="result-meta">{bits.join(' · ')}</div> : null;
+            })()}
+          </div>
           <ScoreCircle score={result.main_worth_score} />
+        </div>
+
+        <div className="score-header">
           <div className="score-meta">
             <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
             {/* Treatment high intensity badge — inline in score-meta */}
@@ -738,44 +799,37 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         )}
       </div>
 
-      {/* CARD 2: CONCERN FIT */}
-      {Object.keys(result.skin_concern_fit || {}).length > 0 && (
-        <div className="sc-card result-card card-2" data-testid="card-concern-fit" style={{ "--anim-delay": "0.15s" }}>
-          <h2 className="card-title"><i className="fa-solid fa-bullseye"></i> Skin Concern Fit</h2>
-          <p className="ampm-label" data-testid="ampm-label"><i className="fa-regular fa-clock"></i> {result.am_pm_recommendation}</p>
-          {Object.entries(result.skin_concern_fit).map(([concern, data]) => (
-            <ConcernCard key={concern} concern={concern} data={data} />
-          ))}
-        </div>
+      {/* CARD 2: SUITABILITY — paid.
+          Previously two cards, "Skin Concern Fit" and "<Type> Skin
+          Compatibility", which read as the same card because their content
+          largely was: the engine emits four overlapping lists and both drew
+          from them, so one ingredient could be named three times on one
+          screen. SuitabilityCard answers the two questions that are actually
+          different - does it do the job you want, and will it cause you
+          problems - and deduplicates the lists against each other.
+
+          When locked these fields are absent from the response entirely, so
+          this must be an explicit state rather than a render of undefined. */}
+      {isLocked && (
+        <LockedCard
+          title="How this suits you"
+          icon="fa-solid fa-user-check"
+          access={result.access}
+          lines={[
+            ...(result.access?.preview?.concern_names || ["Your selected concerns"])
+              .map((c) => `How well it treats ${c}`),
+            `Whether it suits ${String(skinType || "your").toLowerCase()} skin`,
+            "Irritation and pore-clogging risk",
+          ]}
+          onUnlock={onUnlock}
+        />
       )}
+      {!isLocked && <SuitabilityCard result={result} skinType={skinType} />}
 
       {/* CARD 2B: SUNSCREEN ANALYSIS — shown when Sun Protection selected OR category is sunscreen */}
-      {result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
+      {!isLocked && result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
         <SunscreenAnalysisCard data={result.skin_concern_fit['Sun Protection']} />
       )}
-
-      {/* CARD 3: SKIN TYPE COMPAT */}
-      <div className="sc-card result-card card-3" data-testid="card-skin-type" style={{ "--anim-delay": "0.3s" }}>
-        <h2 className="card-title"><i className="fa-solid fa-user-check"></i> {skinType} Skin Compatibility</h2>
-        <div className="compat-score-row">
-          <span className="compat-pct" style={{ color: getBarColor(result.skin_type_compatibility) }}>{result.skin_type_compatibility}%</span>
-          <ProgressBar pct={result.skin_type_compatibility} label="compat" />
-        </div>
-        {result.skin_type_risk_level && (
-          <div style={{ marginTop: "8px", marginBottom: "6px" }}>
-            {result.skin_type_risk_level === "low" && (
-              <span style={{ fontSize: "0.78rem", background: "#D4EDDA", color: "#155724", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>✓ Low irritation risk overall.</span>
-            )}
-            {result.skin_type_risk_level === "moderate" && (
-              <span style={{ fontSize: "0.78rem", background: "#FFF3CD", color: "#856404", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Some ingredients may not suit acne-prone or sensitive areas.</span>
-            )}
-            {result.skin_type_risk_level === "high" && (
-              <span style={{ fontSize: "0.78rem", background: "#F8D7DA", color: "#721C24", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Important: multiple acne or irritation risks detected. See notes below.</span>
-            )}
-          </div>
-        )}
-        <SkinTypeDetails details={result.skin_type_details} score={result.skin_type_compatibility} betterSuited={result.better_suited} formNotes={result.skin_type_details?.formulation_notes} riskLevel={result.skin_type_risk_level} />
-      </div>
 
       {/* CARD 4A: ALTERNATIVES */}
       <AlternativesCard result={result} concerns={concerns} alternatives={alternatives} altLoading={altLoading} currency={currency} category={category} />

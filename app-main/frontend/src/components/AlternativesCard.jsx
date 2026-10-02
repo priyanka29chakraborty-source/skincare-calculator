@@ -1,3 +1,5 @@
+import { money } from "../constants";
+import AffiliateNotice from "./AffiliateNotice";
 export default function AlternativesCard({ result, concerns, alternatives, altLoading, currency, category }) {
   const concernFit = result.skin_concern_fit || {};
   const cat = (category || result.price_analysis?.category || '').toLowerCase();
@@ -121,7 +123,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
                   </ul>
                 )}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px", flexWrap: "wrap", gap: "8px" }}>
-                  {alt.price && <div className="scored-alt-price" style={{ fontSize: "0.85rem", fontWeight: 600 }}>{currency} {alt.price}</div>}
+                  {alt.price && <div className="scored-alt-price" style={{ fontSize: "0.85rem", fontWeight: 600 }}>{money(currency, alt.price)}</div>}
                   {alt.link && (
                     <a href={alt.link} target="_blank" rel="noopener noreferrer" className="scored-alt-link buy-here-link" data-testid={`scored-alt-link-${i}`} style={{ fontSize: "0.78rem" }}>
                       <i className="fa-solid fa-store" style={{ marginRight: "4px" }}></i>
@@ -144,7 +146,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
                 {alt.thumbnail && <img src={alt.thumbnail} alt="" className="alt-thumb" />}
                 <div className="alt-info">
                   <span className="alt-name">{alt.name}</span>
-                  <span className="alt-price">{typeof alt.price === 'number' ? `${currency} ${alt.price}` : alt.price}</span>
+                  <span className="alt-price">{typeof alt.price === 'number' ? money(currency, alt.price) : alt.price}</span>
                   <span className="alt-source">{alt.source} <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.6rem" }}></i></span>
                 </div>
               </a>
@@ -152,6 +154,7 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
           </div>
         </>
       )}
+      <AffiliateNotice disclosure={alternatives?.affiliate_disclosure} />
     </div>
   );
 }

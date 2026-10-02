@@ -15,6 +15,12 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from scoring import analyze_product
 from entitlement import filter_for_entitlement, audit_no_paid_leakage
+from affiliate import disclosure_for
+import wallet
+import identity
+from accounts import accounts_router, current_account
+import history
+from compare import compare as compare_products, CompareError, MAX_PRODUCTS
 from data_loader import data_loader
 from admin import admin_router
 from admin_db import log_fetch, log_analysis, increment_credits
@@ -33,6 +39,25 @@ from product_fetcher import fetch_multiple_products, fetch_product_data
 # startup failures are captured too. No-op unless SENTRY_DSN is set.
 from observability import init_error_monitoring, capture
 init_error_monitoring()
+
+# Development override: unlock the paid tier without accounts or payment.
+# Server-side only - never settable from a request. Logged at startup because a
+# paywall silently disabled in production would be the worst kind of bug.
+_DEV_UNLOCK = os.environ.get('DEV_UNLOCK_ALL', '').strip().lower() in ('1', 'true', 'yes')
+
+# The paywall is opt-in. Everything is visible unless PAYWALL_ENABLED is set.
+#
+# The gate, the ledger, the entitlement filter and their tests are all still
+# here and still exercised - this flag decides whether any of it applies to a
+# request. Keeping the machinery live but switched off is the point: a paywall
+# that is written later, against a UI that never had one, is a paywall that
+# leaks. This one has been built and tested against real traffic shapes and is
+# waiting on one variable.
+_PAYWALL_ENABLED = os.environ.get('PAYWALL_ENABLED', '').strip().lower() in ('1', 'true', 'yes')
+if _DEV_UNLOCK:
+    logging.getLogger(__name__).warning(
+        "DEV_UNLOCK_ALL is set - every caller receives the FULL paid result. "
+        "This must never be set in production.")
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
@@ -172,18 +197,194 @@ async def health():
     return PlainTextResponse("ok")
 
 
-def _resolve_entitlement(request: Request) -> bool:
+@api_router.get("/readiness")
+async def readiness():
+    """Configuration that is safe locally and wrong in production.
+
+    These are the settings whose failure is invisible until it costs
+    something: credits on an ephemeral disk vanish on the next restart,
+    and an ephemeral session secret signs everyone out on every deploy.
+    Reported rather than merely logged so a deploy check can fail on them.
+    """
+    import payments
+    ledger_durable = wallet.storage_is_durable()
+    paywall_on = _PAYWALL_ENABLED
+    session_persistent = identity.secret_is_persistent()
+    warnings = []
+    if not ledger_durable:
+        warnings.append(
+            "The credit ledger is on SQLite. On an ephemeral filesystem a "
+            "restart deletes credits customers paid for. Set AIVEN_PG_URL.")
+    if not session_persistent:
+        warnings.append(
+            "SESSION_SECRET is unset, so sessions do not survive a restart. "
+            "Set SESSION_SECRET.")
+    if _DEV_UNLOCK:
+        warnings.append(
+            "DEV_UNLOCK_ALL is on - every caller receives the paid analysis "
+            "for free.")
+    if not paywall_on:
+        warnings.append(
+            "PAYWALL_ENABLED is off, so every section is visible to everyone "
+            "and no credit is ever spent. This is the intended state while the "
+            "product is being reviewed; set PAYWALL_ENABLED=1 to start "
+            "charging.")
+    return {
+        "ledger_durable": ledger_durable,
+        "session_secret_persistent": session_persistent,
+        "payments_configured": payments.is_configured(),
+        "paywall_enabled": paywall_on,
+        "dev_unlock_all": _DEV_UNLOCK,
+        "ready_to_charge": (ledger_durable and session_persistent
+                            and payments.is_configured() and not _DEV_UNLOCK),
+        "currently_charging": (paywall_on and not _DEV_UNLOCK),
+        "warnings": warnings,
+    }
+
+
+def _resolve_entitlement(request: Request, product_data: dict = None) -> bool:
     """Whether this caller has paid for the personal analysis.
 
-    Resolved entirely server-side. When the credit ledger lands this reads a
-    verified session and decrements a balance; until then it returns False so
-    the free path is the one actually exercised in production.
+    Resolved entirely server-side from a signed session cookie and the credit
+    ledger. Deliberately ignores everything in the request body: a header,
+    cookie or JSON field claiming entitlement is a request to be trusted, not
+    proof of payment, and the session cookie is only believed after its HMAC
+    verifies.
 
-    Deliberately ignores anything in the request body. A header, cookie or JSON
-    field claiming entitlement is a request to be trusted, not proof of
-    payment.
+    *product_data* is fingerprinted to the ledger's idempotency reference, so
+    one account pays once per product and never again - a page refresh, a retry
+    after a dropped connection, answering the personalisation questions, fixing
+    a typo in the price, or coming back to it next month all reuse the credit
+    already spent. See _product_fingerprint for why that is narrower than the
+    cache key. "Every new product costs a credit" is the promise; anything else
+    is something the customer finds out from their balance rather than from us.
+
+    Returning False is not an error. It is the free tier: the caller gets the
+    formulation analysis and the paid sections are stripped before
+    serialisation.
+
+    While PAYWALL_ENABLED is unset the answer is always True and nothing is
+    charged - every section is visible to everyone. The rest of this function
+    is what runs the moment that variable is set, and it is covered by tests
+    today so that switching it on is a configuration change rather than a
+    development project.
+
+    DEV_UNLOCK_ALL does the same thing for a single environment and predates
+    the flag above; both are reported by /api/readiness.
     """
-    return False
+    if not _PAYWALL_ENABLED or _DEV_UNLOCK:
+        return True
+
+    account_id = current_account(request)
+    if not account_id:
+        return False
+
+    try:
+        wallet.spend(account_id, reference=_spend_reference(account_id, product_data))
+        return True
+    except wallet.InsufficientCredits:
+        return False
+    except Exception:
+        # A ledger failure must not hand out the paid analysis for free, and
+        # must not 500 a request that has a perfectly good free answer.
+        logger.exception("credit spend failed; serving the free analysis")
+        return False
+
+
+def _product_fingerprint(product_data):
+    """What makes this *the same product*, for billing purposes.
+
+    Deliberately narrower than the cache key. The cache key includes everything
+    that changes the output - skin type, concerns, personal profile, price -
+    because a different output needs a different cache entry. Billing is a
+    different question: those are all the same tube of serum.
+
+    Keying the charge on the full cache key meant that answering the
+    personalisation questions, correcting a typo in the price, or re-opening a
+    saved product with a concern unticked all produced a "new" product and took
+    another credit. That is not what "one credit per new product" means to the
+    person paying, and it is the kind of thing they would find out from their
+    balance rather than from us.
+
+    So: the ingredient list and the category. The ingredients are the product;
+    the category decides which rubric scores it, so the same INCI sold as a
+    serum and as a toner is genuinely two analyses.
+    """
+    ingredients = re.sub(r'[\s,]+', ',',
+                         (product_data.get('ingredients') or '').strip().lower())
+    category = (product_data.get('category') or '').strip().lower()
+    return hashlib.sha256(
+        ('%s|%s' % (category, ingredients)).encode('utf-8')).hexdigest()[:32]
+
+
+def _spend_reference(account_id, product_data):
+    """The idempotency key for one account and one product.
+
+    None when there is nothing to fingerprint - a spend with no reference is
+    never deduplicated, which is the safe direction: the customer is charged
+    once for this call rather than possibly twice for one product.
+    """
+    if not product_data or not (product_data.get('ingredients') or '').strip():
+        return None
+    return "product:%s:%s" % (account_id, _product_fingerprint(product_data))
+
+
+class CompareRequest(BaseModel):
+    products: List[dict] = Field(default_factory=list)
+    # One profile across every product: a comparison is "which of these for
+    # me", so scoring each against a different skin type would answer a
+    # question nobody asked.
+    skin_type: Optional[str] = None
+    skin_concerns: List[str] = Field(default_factory=list)
+
+
+@api_router.post("/compare")
+@limiter.limit("6/minute")
+async def compare_endpoint(req: CompareRequest, request: Request):
+    """Two to four products side by side.
+
+    Free, and deliberately so: it compares formulation scores, and formulation
+    analysis is the free tier. Charging to put two free numbers next to each
+    other would be charging for arithmetic.
+    """
+    products = req.products or []
+    if len(products) > MAX_PRODUCTS:
+        return JSONResponse(status_code=400, content={
+            "error": "Up to %d products at a time." % MAX_PRODUCTS})
+
+    shared_skin_type = (_sanitize(req.skin_type or '') or 'normal').lower()
+    if shared_skin_type not in VALID_SKIN_TYPES:
+        shared_skin_type = 'normal'
+    shared_concerns = [c for c in (_sanitize(x) for x in (req.skin_concerns or [])[:3])
+                       if not VALID_CONCERNS or c in VALID_CONCERNS]
+
+    cleaned = []
+    for item in products:
+        ingredients = _sanitize(item.get('ingredients') or '')
+        if len(ingredients) > 5000:
+            return JSONResponse(status_code=400, content={
+                "error": "One of those ingredient lists is too long."})
+        category = (_sanitize(item.get('category') or '') or 'serum').lower()
+        if category not in VALID_CATEGORIES:
+            category = 'serum'
+        cleaned.append({
+            'ingredients': ingredients,
+            'price': max(0.0, float(item.get('price') or 0)),
+            'size_ml': max(0.0, float(item.get('size_ml') or 0)) or 30.0,
+            'category': category.title(),
+            'country': _sanitize(item.get('country') or '') or 'India',
+            'currency': _sanitize(item.get('currency') or '') or 'INR',
+            'skin_type': shared_skin_type,
+            'concerns': shared_concerns,
+            'skin_concerns': shared_concerns,
+            'product_name': _sanitize(item.get('product_name') or '')[:200],
+            'brand': _sanitize(item.get('brand') or '')[:120],
+        })
+
+    try:
+        return compare_products(cleaned, analyze_product)
+    except CompareError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}
@@ -234,6 +435,20 @@ async def analyze(req: AnalyzeRequest, request: Request):
             'user_profile': req.user_profile or {},
         }
 
+        # Resolved once, here, because it decides two things: whether the
+        # personal profile is used at all, and what is serialised at the end.
+        # The fingerprint it bills on is the ingredient list and category, so
+        # moving this above the profile does not change what is charged.
+        entitled = _resolve_entitlement(request, product_data)
+
+        if not entitled:
+            # Skin tone, climate, declared allergies and the products someone
+            # already uses are the paid product. Dropping them here rather than
+            # stripping the results later means we do not accept, process or
+            # cache health-adjacent data we have already decided to discard -
+            # and it keeps free and paid callers off the same cache entry.
+            product_data['user_profile'] = {}
+
         # Check cache
         cache_key = _make_cache_key(product_data)
         cached = _cache_get(cache_key)
@@ -244,9 +459,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
             # cached object directly would hand a free caller the paid data
             # whenever anyone had analysed the same product before them, which
             # is precisely how a paywall leaks without anyone noticing.
-            _entitled = _resolve_entitlement(request)
-            _out = filter_for_entitlement(cached, _entitled)
-            if not _entitled:
+            _out = filter_for_entitlement(cached, entitled)
+            if not entitled:
                 audit_no_paid_leakage(_out)
             return _out
 
@@ -303,7 +517,22 @@ async def analyze(req: AnalyzeRequest, request: Request):
         # editable field. Until accounts and credits exist this resolves to
         # False, so the free payload is what ships and the gate is exercised in
         # production from day one rather than bolted on later.
-        entitled = _resolve_entitlement(request)
+        # Saved for signed-in accounts so a product can be re-opened later.
+        # record() swallows its own failures: history is a convenience, and a
+        # storage hiccup must not turn a successful analysis into an error.
+        _account = current_account(request)
+        if _account:
+            # product_data is the cache key's input, so it deliberately omits
+            # fields that do not change the score - brand is one. History needs
+            # them for display, so they are added here rather than widened into
+            # the cache key, where brand would split the cache for two
+            # identically formulated products.
+            history.record(_account, cache_key, result, dict(
+                product_data,
+                brand=_sanitize(req.brand or ''),
+                skin_concerns=product_data['concerns'],
+            ), entitled)
+
         result = filter_for_entitlement(result, entitled)
         if not entitled:
             # Last line of defence before serialisation - if a future change
@@ -508,6 +737,11 @@ def _serp_shopping_search(query, country, serp_key, num=10):
 @api_router.post("/find-alternatives")
 @limiter.limit("10/minute")
 async def find_alternatives(req: FindAlternativesRequest, request: Request):
+    """See best_price: tagging happens after the alternatives are chosen."""
+    return disclosure_for(await _find_alternatives_impl(req, request))
+
+
+async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request):
     # ── Gate 1: No concerns selected → never show alternatives ──────────────
     concern_scores = req.user_concern_fit or {}
     if not concern_scores or not (req.user_concerns or []):
@@ -903,6 +1137,17 @@ def _is_same_product(result_title, brand, product_name, size_ml):
 @api_router.post("/best-price")
 @limiter.limit("10/minute")
 async def best_price(req: BestPriceRequest, request: Request):
+    """Thin wrapper so every exit path from the search gets tagged.
+
+    disclosure_for runs after the result is fully assembled, which keeps
+    affiliate tagging strictly downstream of ranking: links are chosen on
+    price and product match, then tagged. It also guarantees a tagged link
+    never ships without its required disclosure.
+    """
+    return disclosure_for(await _best_price_impl(req, request))
+
+
+async def _best_price_impl(req: BestPriceRequest, request: Request):
     """Find cheapest price: DDG search → ScrapeDo/Firecrawl fetch → fallback SerpAPI.
     Returns up to 3 validated results (same brand, same size, country-specific).
     """
@@ -1033,6 +1278,7 @@ async def best_price(req: BestPriceRequest, request: Request):
         }
 
 
+api_router.include_router(accounts_router)
 app.include_router(api_router)
 
 # Production: locked to urancal.com only

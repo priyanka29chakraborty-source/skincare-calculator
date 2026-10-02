@@ -245,6 +245,40 @@ def _has_preservative_booster(ingredient_list):
 # Each returns (points, explanations, flags). Explanations are user-facing.
 
 
+def _dose_sentence(name, estimate, contribution):
+    """Describe an estimated dose without ever contradicting the database.
+
+    The wording used to depend on how well the active scored, not on its range,
+    so a position-based estimate of 15% salicylic acid was reported as "within
+    its evidenced effective range" when the database's own ceiling is 2%. The
+    estimate comes from label position, which can only say "high on the list";
+    it knows nothing about regulatory or safe limits. So the claim is checked
+    against the ingredient's range, and an estimate above the maximum is not
+    quoted at all - a number nobody could have formulated is not information.
+    """
+    data = data_loader.get_ingredient_data(name) or {}
+
+    def _num(key):
+        try:
+            return float(str(data.get(key, '')).strip())
+        except ValueError:
+            return None
+
+    lo, hi = _num('Min_Effective_%'), _num('Max_Safe_%')
+
+    if hi is not None and estimate > hi:
+        return ("{} is listed high enough that it is likely at or near its "
+                "usual ceiling of about {:g}%. The label cannot say exactly "
+                "where.".format(name, hi))
+    if lo is not None and estimate < lo:
+        return ("{} at an estimated {:.1f}% (below the {:g}% generally shown "
+                "to be effective)".format(name, estimate, lo))
+    if lo is not None and hi is not None:
+        return ("{} at an estimated {:.1f}% (within its evidenced range of "
+                "{:g}-{:g}%)".format(name, estimate, lo, hi))
+    return "{} at an estimated {:.1f}%".format(name, estimate)
+
+
 def _score_actives(ingredient_list, concentrations, max_pts, category,
                    known_concentrations=None):
     """Active efficacy: are actives present at concentrations with evidence?
@@ -321,12 +355,7 @@ def _score_actives(ingredient_list, concentrations, max_pts, category,
             "rather than percentage is what matters.".format(top[0])
         )
     elif top[2] > 0:
-        explanations.append(
-            "{} at an estimated {:.1f}%{}".format(
-                top[0], top[2],
-                " (within its evidenced effective range)" if top[1] > 0.6
-                else " (below the concentration shown to be effective)")
-        )
+        explanations.append(_dose_sentence(top[0], top[2], top[1]))
     else:
         explanations.append("{} identified.".format(top[0]))
 
@@ -1075,8 +1104,7 @@ CATEGORY_RUBRICS = {
         ],
         'rationale': "A cleanser is on your skin for under a minute and is then "
                      "rinsed off. What matters is how gently it cleans - not "
-                     "what actives it claims. Actives are deliberately not "
-                     "scored in this category.",
+                     "what actives it claims.",
     },
     'sunscreen': {
         'label': 'Sunscreen',
@@ -1318,9 +1346,17 @@ def score_formulation(ingredient_list, concentrations, category,
                 .format(ingredient_list[cutoff]))
     else:
         confidence = 'low'
-        note = ("No concentrations are declared and the ingredient list gives "
-                "few positional clues, so active doses are inferred and may be "
-                "wrong.")
+        if any(c['key'] == 'actives' for c in components):
+            note = ("No concentrations are declared and the ingredient list "
+                    "gives few positional clues, so active doses are inferred "
+                    "and may be wrong.")
+        else:
+            # Categories that do not score actives (cleansers, sunscreens) have
+            # no dose to be wrong about; what is uncertain there is the
+            # formulation detail a label cannot show.
+            note = ("The ingredient list gives few positional clues, and a "
+                    "label cannot show pH or the exact surfactant ratios, so "
+                    "treat this assessment as an informed estimate.")
 
     return {
         'score': int(round(total)),
@@ -1533,7 +1569,12 @@ def formulation_summary(score, category, components, confidence):
     else:
         sentence += "."
 
-    if confidence == 'low':
+    # Dose uncertainty only matters where actives are scored. A cleanser is
+    # judged on its surfactant system and a sunscreen on its filters, so telling
+    # either that "active doses are inferred" is a caveat about something that
+    # category does not measure.
+    actives_scored = any(c.get('key') == 'actives' for c in components)
+    if confidence == 'low' and actives_scored:
         sentence += (" Confidence is low here: no concentrations are declared, "
                      "so active doses are inferred from ingredient order.")
     return sentence

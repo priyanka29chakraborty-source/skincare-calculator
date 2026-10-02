@@ -5,6 +5,12 @@ import { API, CURRENCY_MAP } from "./constants";
 import InputForm from "./components/InputForm";
 import ResultCards from "./components/ResultCards";
 import PersonaliseCard from "./components/PersonaliseCard";
+import AccountBar from "./components/AccountBar";
+import UnlockModal from "./components/UnlockModal";
+import HistoryCard from "./components/HistoryCard";
+import CompareCard from "./components/CompareCard";
+import PrintReport from "./components/PrintReport";
+import useAccount from "./hooks/useAccount";
 
 function App() {
   const [ingredients, setIngredients] = useState("");
@@ -30,6 +36,14 @@ function App() {
   const [fetchMsg, setFetchMsg] = useState("");
   const [fetchStatus, setFetchStatus] = useState(""); // "success" | "partial" | "failed"
   const [alternatives, setAlternatives] = useState(null);
+  const account = useAccount();
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [pendingReopen, setPendingReopen] = useState(false);
+  // Read through a ref inside handleAnalyze: adding `account` to its dependency
+  // list would rebuild the callback on every balance change and re-trigger the
+  // effects that depend on it.
+  const accountRef = useRef(account);
+  accountRef.current = account;
   const [altLoading, setAltLoading] = useState(false);
   const [bestPrice, setBestPrice] = useState(null);
   const [bestPriceLoading, setBestPriceLoading] = useState(false);
@@ -141,6 +155,11 @@ function App() {
         user_profile: userProfile,
       });
       setResult(data);
+      // An analysis may have spent a credit, so the counter in the header is
+      // now stale. Leaving it stale means someone watches their balance sit
+      // still while it is quietly going down, which is exactly the kind of
+      // thing that makes a paid product feel untrustworthy.
+      if (accountRef.current.signedIn) accountRef.current.refresh();
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
       const concernFit = data.skin_concern_fit || {};
       const weakConcerns = Object.entries(concernFit).filter(([, v]) => typeof v === 'object' ? v.score < 75 : v < 75);
@@ -151,6 +170,41 @@ function App() {
     finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput, productName, brand, activeConcentrations, fetchAlts, fetchBestPrice]);
+
+  /**
+   * Re-open a saved analysis.
+   *
+   * Restores the inputs and re-runs the engine rather than replaying a stored
+   * result: the score depends on the engine, and the engine changes. Showing a
+   * saved 91 beside a freshly computed 87 is how a tool loses a reader, so
+   * there is only ever one number - today's.
+   *
+   * The analysis is scheduled on the next tick because handleAnalyze reads
+   * these values from the closure it was built with, which has not yet seen
+   * the state we just set.
+   */
+  const reopenSaved = useCallback((entry) => {
+    setProductName(entry.product_name || "");
+    setBrand(entry.brand || "");
+    setCategory(entry.category || "Serum");
+    setPrice(entry.price ? String(entry.price) : "");
+    setSize(entry.size_ml ? String(entry.size_ml) : "");
+    setIngredients(entry.ingredients || "");
+    setSkinType(entry.skin_type ? entry.skin_type.charAt(0).toUpperCase()
+                                  + entry.skin_type.slice(1) : "");
+    setConcerns(entry.concerns || []);
+    setResult(null);
+    setPendingReopen(true);
+  }, []);
+
+  // Runs once the restored inputs have been committed, so handleAnalyze sees
+  // them. Re-running costs no credit: the ledger is keyed on the product.
+  useEffect(() => {
+    if (!pendingReopen) return;
+    setPendingReopen(false);
+    handleAnalyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingReopen]);
 
   // Input debouncing - clear error after typing
   useEffect(() => {
@@ -240,6 +294,18 @@ function App() {
     <div className="sc-app" data-testid="skincare-app">
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
+      <AccountBar account={account} onOpenUnlock={() => setUnlockOpen(true)} />
+
+      <UnlockModal
+        open={unlockOpen}
+        onClose={() => setUnlockOpen(false)}
+        account={account}
+        /* Re-run the analysis straight after a purchase. The user pressed
+           unlock on a result that is already on screen; making them press
+           Analyze again to see what they just paid for would be a poor joke. */
+        onPurchased={() => { setUnlockOpen(false); handleAnalyze(); }}
+      />
+
       <header className="sc-header" data-testid="app-header">
         <div className="eyebrow">Skincare Analysis Tool</div>
         <h1 className="sc-title"><i className="fa-solid fa-flask-vial"></i> Analyze Your Skincare Product</h1>
@@ -247,6 +313,8 @@ function App() {
       </header>
 
       <main className="sc-main">
+        <HistoryCard account={account} onReopen={reopenSaved} />
+
         <InputForm
           fetchInput={fetchInput} setFetchInput={setFetchInput}
           fetchLoading={fetchLoading} fetchMsg={fetchMsg} fetchStatus={fetchStatus} fetchError={fetchError} handleFetch={handleFetch}
@@ -271,18 +339,57 @@ function App() {
                 sharpen the fit assessment is a fair trade once someone can see
                 what they are sharpening. Eight questions before any answer is
                 a wall in front of the thing they came for. */}
+            {/* Skin tone, climate, sensitivities and current routine are the
+                paid product. When locked the card collects nothing at all -
+                see PersonaliseCard. `access.tier` is the server's answer, not
+                a client guess. */}
             <PersonaliseCard
               profile={userProfile}
               onApply={applyPersonalisation}
               loading={personalising}
               level={result.personalisation?.level || "none"}
+              locked={result.access?.tier === "free"}
+              onUnlock={() => setUnlockOpen(true)}
             />
             <ResultCards
               result={result} concerns={concerns} skinType={skinType} currency={currency}
+              productName={productName} brand={brand} price={price} size={size} sizeUnit={sizeUnit}
               alternatives={alternatives} altLoading={altLoading}
               bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
               fetchInput={fetchInput}
               category={category}
+              onUnlock={() => setUnlockOpen(true)}
+            />
+
+            <div className="export-row no-print">
+              <button className="export-btn" onClick={() => window.print()}
+                      data-testid="export-btn">
+                <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
+              </button>
+            </div>
+
+            {/* The document that actually prints. Hidden on screen; @media
+                print hides the app and shows only this. It is a standalone
+                report rather than a picture of the page, because a saved PDF
+                is read weeks later by someone who was not here when it was
+                made. */}
+            <PrintReport
+              result={result}
+              productName={productName} brand={brand} category={category}
+              price={price} size={size} sizeUnit={sizeUnit}
+              currency={currency} skinType={skinType} concerns={concerns}
+            />
+
+            {/* Seeded with the product just analysed, so comparing it against
+                something else does not mean typing it in again. */}
+            <CompareCard
+              currency={currency}
+              skinType={skinType}
+              concerns={concerns}
+              seed={{
+                product_name: productName, brand, category,
+                price: price || "", size_ml: size || "", ingredients,
+              }}
             />
           </section>
         )}

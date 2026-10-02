@@ -25,6 +25,30 @@ export const COUNTRIES = ["India", "USA", "UK", "UAE", "Singapore", "Australia",
 export const CURRENCY_MAP = { India:"INR", USA:"USD", UK:"GBP", UAE:"AED", Singapore:"SGD", Australia:"AUD", Canada:"CAD", "South Korea":"KRW", Japan:"JPY", France:"EUR", Germany:"EUR", Brazil:"BRL" };
 export const SIZE_UNITS = ["ml", "g", "oz", "fl oz"];
 
+// Display glyphs for the codes in CURRENCY_MAP. CURRENCY_MAP itself must
+// keep returning ISO codes - that value is sent to the API as `currency`,
+// and the backend matches on "INR", not on a symbol.
+export const CURRENCY_SYMBOL = {
+  INR: "\u20B9", USD: "$", GBP: "\u00A3", EUR: "\u20AC", JPY: "\u00A5",
+  KRW: "\u20A9", BRL: "R$", AUD: "A$", CAD: "C$", SGD: "S$",
+};
+
+/**
+ * Format an amount for display: "\u20B9549", "$12.5", or "AED 45" where no
+ * single-glyph symbol is in common use. Returns "" for a missing amount so
+ * callers can test it directly instead of printing a bare symbol.
+ */
+export function money(currency, amount) {
+  if (amount === null || amount === undefined || amount === "") return "";
+  const sym = CURRENCY_SYMBOL[currency];
+  return sym ? `${sym}${amount}` : `${currency} ${amount}`;
+}
+
+/** Just the affix, for the price field's unit tag. */
+export function currencyAffix(currency) {
+  return CURRENCY_SYMBOL[currency] || currency;
+}
+
 export function getScoreColor(s) {
   if (s >= 75) return "#22c55e";
   if (s >= 60) return "#eab308";
