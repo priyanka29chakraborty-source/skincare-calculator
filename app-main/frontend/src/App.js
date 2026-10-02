@@ -339,11 +339,17 @@ function App() {
                 sharpen the fit assessment is a fair trade once someone can see
                 what they are sharpening. Eight questions before any answer is
                 a wall in front of the thing they came for. */}
+            {/* Skin tone, climate, sensitivities and current routine are the
+                paid product. When locked the card collects nothing at all -
+                see PersonaliseCard. `access.tier` is the server's answer, not
+                a client guess. */}
             <PersonaliseCard
               profile={userProfile}
               onApply={applyPersonalisation}
               loading={personalising}
               level={result.personalisation?.level || "none"}
+              locked={result.access?.tier === "free"}
+              onUnlock={() => setUnlockOpen(true)}
             />
             <ResultCards
               result={result} concerns={concerns} skinType={skinType} currency={currency}

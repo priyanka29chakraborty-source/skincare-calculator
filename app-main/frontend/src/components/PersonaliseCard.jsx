@@ -40,7 +40,8 @@ const ALLERGENS = [
   { key: "lanolin", label: "Lanolin" },
 ];
 
-export default function PersonaliseCard({ profile, onApply, loading, level }) {
+export default function PersonaliseCard({ profile, onApply, loading, level,
+                                         locked, onUnlock }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({
     fitzpatrick: profile?.fitzpatrick || "",
@@ -60,6 +61,43 @@ export default function PersonaliseCard({ profile, onApply, loading, level }) {
   const answered = ["fitzpatrick", "climate", "current_routine"].filter((k) => draft[k]).length
     + (draft.allergens.length ? 1 : 0);
 
+  // Locked: the four steps are the paid product, so the card does not collect
+  // them. It describes what they do and offers to unlock, and deliberately
+  // asks for nothing - taking someone's allergies and then returning no
+  // warning would leave them believing we had checked, which is worse than
+  // never asking. The server drops a profile from an unentitled request for
+  // the same reason.
+  if (locked) {
+    return (
+      <div className="personalise-prompt personalise-locked"
+           data-testid="personalise-locked">
+        <div className="personalise-locked-head">
+          <i className="fa-solid fa-wand-magic-sparkles"></i>
+          <strong>Tune this to your skin</strong>
+          <span className="personalise-locked-pill">Locked</span>
+        </div>
+        <p className="personalise-locked-lede">
+          Four things change how well a product suits <em>you</em> — none of
+          them change how well it is made, so the score above stays as it is.
+        </p>
+        <ul className="personalise-locked-list">
+          <li><strong>Skin tone</strong> — dark-mark and burn risk</li>
+          <li><strong>Climate</strong> — whether the texture will suit where you live</li>
+          <li><strong>Sensitivities</strong> — flags anything you react to</li>
+          <li><strong>Current routine</strong> — clashes and duplication with what you already use</li>
+        </ul>
+        <button className="locked-cta" onClick={onUnlock} data-testid="personalise-unlock">
+          <span className="locked-cta-main">
+            <i className="fa-solid fa-lock-open"></i> Unlock this section
+          </span>
+          <span className="locked-cta-sub">
+            One credit &middot; covers this product for good
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   // Collapsed state: a single honest invitation, not a nag.
   if (!open) {
     return (
@@ -77,12 +115,12 @@ export default function PersonaliseCard({ profile, onApply, loading, level }) {
             onClick={() => setOpen(true)}
             data-testid="personalise-open"
           >
-            {level === "none" ? "Answer 3 questions" : "Edit answers"}
+            {level === "none" ? "Answer 4 questions" : "Edit answers"}
           </button>
         </div>
         <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--text-sub)", lineHeight: 1.5 }}>
           {level === "none"
-            ? "Your skin tone, climate and any sensitivities change how well this suits you — not how well it is made. The score above stays the same either way."
+            ? "Your skin tone, climate, sensitivities and current routine change how well this suits you — not how well it is made. The score above stays the same either way."
             : "You have answered some of these. Adding the rest sharpens the fit assessment."}
         </p>
       </div>

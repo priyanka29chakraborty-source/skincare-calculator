@@ -1221,3 +1221,20 @@ body::before {
 }
 .compare-choose-item h4 { color: var(--dusty-rose-dark); margin-top: 0; }
 .compare-choose-item li { font-size: 0.78rem; color: var(--text-sub); }
+
+/* ---- personalisation, locked ---- */
+.personalise-locked { border-left: 3px solid var(--dusty-rose-light); }
+.personalise-locked-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.personalise-locked-head i { color: var(--dusty-rose-dark); }
+.personalise-locked-head strong { font-size: 14px; }
+.personalise-locked-pill {
+  margin-left: auto; padding: 3px 10px; border-radius: 50px;
+  background: var(--border-light); border: 1px solid var(--border);
+  font-family: 'DM Sans', sans-serif; font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub);
+}
+.personalise-locked-lede { margin: 0 0 10px; font-size: 12.5px; line-height: 1.55; color: var(--text-sub); }
+.personalise-locked-list { margin: 0 0 14px; padding-left: 18px; }
+.personalise-locked-list li { font-size: 12.5px; line-height: 1.6; color: var(--text-sub); margin-bottom: 3px; }
+.personalise-locked-list strong { color: var(--charcoal); }
+.personalise-locked .locked-cta { margin-top: 0; }

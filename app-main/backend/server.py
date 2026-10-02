@@ -435,6 +435,20 @@ async def analyze(req: AnalyzeRequest, request: Request):
             'user_profile': req.user_profile or {},
         }
 
+        # Resolved once, here, because it decides two things: whether the
+        # personal profile is used at all, and what is serialised at the end.
+        # The fingerprint it bills on is the ingredient list and category, so
+        # moving this above the profile does not change what is charged.
+        entitled = _resolve_entitlement(request, product_data)
+
+        if not entitled:
+            # Skin tone, climate, declared allergies and the products someone
+            # already uses are the paid product. Dropping them here rather than
+            # stripping the results later means we do not accept, process or
+            # cache health-adjacent data we have already decided to discard -
+            # and it keeps free and paid callers off the same cache entry.
+            product_data['user_profile'] = {}
+
         # Check cache
         cache_key = _make_cache_key(product_data)
         cached = _cache_get(cache_key)
@@ -445,9 +459,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
             # cached object directly would hand a free caller the paid data
             # whenever anyone had analysed the same product before them, which
             # is precisely how a paywall leaks without anyone noticing.
-            _entitled = _resolve_entitlement(request, product_data)
-            _out = filter_for_entitlement(cached, _entitled)
-            if not _entitled:
+            _out = filter_for_entitlement(cached, entitled)
+            if not entitled:
                 audit_no_paid_leakage(_out)
             return _out
 
@@ -504,8 +517,6 @@ async def analyze(req: AnalyzeRequest, request: Request):
         # editable field. Until accounts and credits exist this resolves to
         # False, so the free payload is what ships and the gate is exercised in
         # production from day one rather than bolted on later.
-        entitled = _resolve_entitlement(request, product_data)
-
         # Saved for signed-in accounts so a product can be re-opened later.
         # record() swallows its own failures: history is a convenience, and a
         # storage hiccup must not turn a successful analysis into an error.

@@ -156,13 +156,44 @@ def test_pregnancy_advisory_is_never_paywalled(client):
     assert "pregnancy" in types
 
 
-def test_declared_allergy_warning_is_never_paywalled(client):
-    """If a user tells us they react to something and it is in the product,
-    withholding that behind a paywall would be indefensible."""
+def test_a_free_callers_allergies_are_not_processed_at_all(client):
+    """The honest version of "never paywall a safety warning".
+
+    Skin tone, climate, allergies and current routine are the paid product, so
+    a free caller is never asked for them - the locked card collects nothing.
+    If one is sent anyway, it is dropped before scoring rather than used and
+    then stripped on the way out. That matters more than it looks: accepting an
+    allergy declaration and returning no warning would leave someone believing
+    we had checked. Not collecting it is the safer failure.
+
+    The guarantee that a *declared* allergy is never withheld is unchanged and
+    is asserted in test_a_declared_allergy_is_never_withheld_from_its_owner.
+    """
+    body = client.post("/api/analyze", json=_unique(
+        user_profile={"allergens": ["fragrance"]})).json()
+    types = {f["type"] for f in body.get("advisory_flags", [])}
+    assert "declared_allergen" not in types
+    assert not (types - ALWAYS_FREE_ADVISORIES)
+    # Pregnancy guidance comes from the product alone and needs no profile, so
+    # it is unaffected by any of this.
+    assert "personalisation" not in body
+
+
+def test_a_declared_allergy_is_never_withheld_from_its_owner(monkeypatch, client):
+    """Once the profile is accepted, the warning is not a paid extra.
+
+    This is the guarantee that actually matters: charging someone to learn a
+    product contains the thing they told us they react to would be
+    indefensible, so declared_allergen stays in ALWAYS_FREE_ADVISORIES and is
+    never stripped from a caller whose profile we used.
+    """
+    monkeypatch.setattr(server, "_resolve_entitlement",
+                        lambda request, product_data=None: True)
     body = client.post("/api/analyze", json=_unique(
         user_profile={"allergens": ["fragrance"]})).json()
     types = {f["type"] for f in body.get("advisory_flags", [])}
     assert "declared_allergen" in types
+    assert "declared_allergen" in ALWAYS_FREE_ADVISORIES
 
 
 def test_formulation_safety_flags_stay_free(client):
