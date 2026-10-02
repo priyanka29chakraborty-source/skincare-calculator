@@ -44,6 +44,16 @@ init_error_monitoring()
 # Server-side only - never settable from a request. Logged at startup because a
 # paywall silently disabled in production would be the worst kind of bug.
 _DEV_UNLOCK = os.environ.get('DEV_UNLOCK_ALL', '').strip().lower() in ('1', 'true', 'yes')
+
+# The paywall is opt-in. Everything is visible unless PAYWALL_ENABLED is set.
+#
+# The gate, the ledger, the entitlement filter and their tests are all still
+# here and still exercised - this flag decides whether any of it applies to a
+# request. Keeping the machinery live but switched off is the point: a paywall
+# that is written later, against a UI that never had one, is a paywall that
+# leaks. This one has been built and tested against real traffic shapes and is
+# waiting on one variable.
+_PAYWALL_ENABLED = os.environ.get('PAYWALL_ENABLED', '').strip().lower() in ('1', 'true', 'yes')
 if _DEV_UNLOCK:
     logging.getLogger(__name__).warning(
         "DEV_UNLOCK_ALL is set - every caller receives the FULL paid result. "
@@ -198,6 +208,7 @@ async def readiness():
     """
     import payments
     ledger_durable = wallet.storage_is_durable()
+    paywall_on = _PAYWALL_ENABLED
     session_persistent = identity.secret_is_persistent()
     warnings = []
     if not ledger_durable:
@@ -212,13 +223,21 @@ async def readiness():
         warnings.append(
             "DEV_UNLOCK_ALL is on - every caller receives the paid analysis "
             "for free.")
+    if not paywall_on:
+        warnings.append(
+            "PAYWALL_ENABLED is off, so every section is visible to everyone "
+            "and no credit is ever spent. This is the intended state while the "
+            "product is being reviewed; set PAYWALL_ENABLED=1 to start "
+            "charging.")
     return {
         "ledger_durable": ledger_durable,
         "session_secret_persistent": session_persistent,
         "payments_configured": payments.is_configured(),
+        "paywall_enabled": paywall_on,
         "dev_unlock_all": _DEV_UNLOCK,
-        "ready_to_charge": ledger_durable and session_persistent
-                           and payments.is_configured() and not _DEV_UNLOCK,
+        "ready_to_charge": (ledger_durable and session_persistent
+                            and payments.is_configured() and not _DEV_UNLOCK),
+        "currently_charging": (paywall_on and not _DEV_UNLOCK),
         "warnings": warnings,
     }
 
@@ -244,12 +263,16 @@ def _resolve_entitlement(request: Request, product_data: dict = None) -> bool:
     formulation analysis and the paid sections are stripped before
     serialisation.
 
-    DEV_UNLOCK_ALL exists so the paid experience can be developed and tested.
-    It is read from the server environment, which the client cannot influence,
-    is logged loudly at startup, and is reported by /api/readiness so it cannot
-    be left on in production unnoticed.
+    While PAYWALL_ENABLED is unset the answer is always True and nothing is
+    charged - every section is visible to everyone. The rest of this function
+    is what runs the moment that variable is set, and it is covered by tests
+    today so that switching it on is a configuration change rather than a
+    development project.
+
+    DEV_UNLOCK_ALL does the same thing for a single environment and predates
+    the flag above; both are reported by /api/readiness.
     """
-    if _DEV_UNLOCK:
+    if not _PAYWALL_ENABLED or _DEV_UNLOCK:
         return True
 
     account_id = current_account(request)
@@ -308,6 +331,11 @@ def _spend_reference(account_id, product_data):
 
 class CompareRequest(BaseModel):
     products: List[dict] = Field(default_factory=list)
+    # One profile across every product: a comparison is "which of these for
+    # me", so scoring each against a different skin type would answer a
+    # question nobody asked.
+    skin_type: Optional[str] = None
+    skin_concerns: List[str] = Field(default_factory=list)
 
 
 @api_router.post("/compare")
@@ -324,6 +352,12 @@ async def compare_endpoint(req: CompareRequest, request: Request):
         return JSONResponse(status_code=400, content={
             "error": "Up to %d products at a time." % MAX_PRODUCTS})
 
+    shared_skin_type = (_sanitize(req.skin_type or '') or 'normal').lower()
+    if shared_skin_type not in VALID_SKIN_TYPES:
+        shared_skin_type = 'normal'
+    shared_concerns = [c for c in (_sanitize(x) for x in (req.skin_concerns or [])[:3])
+                       if not VALID_CONCERNS or c in VALID_CONCERNS]
+
     cleaned = []
     for item in products:
         ingredients = _sanitize(item.get('ingredients') or '')
@@ -333,9 +367,6 @@ async def compare_endpoint(req: CompareRequest, request: Request):
         category = (_sanitize(item.get('category') or '') or 'serum').lower()
         if category not in VALID_CATEGORIES:
             category = 'serum'
-        skin_type = (_sanitize(item.get('skin_type') or '') or 'normal').lower()
-        if skin_type not in VALID_SKIN_TYPES:
-            skin_type = 'normal'
         cleaned.append({
             'ingredients': ingredients,
             'price': max(0.0, float(item.get('price') or 0)),
@@ -343,8 +374,9 @@ async def compare_endpoint(req: CompareRequest, request: Request):
             'category': category.title(),
             'country': _sanitize(item.get('country') or '') or 'India',
             'currency': _sanitize(item.get('currency') or '') or 'INR',
-            'skin_type': skin_type,
-            'skin_concerns': [],
+            'skin_type': shared_skin_type,
+            'concerns': shared_concerns,
+            'skin_concerns': shared_concerns,
             'product_name': _sanitize(item.get('product_name') or '')[:200],
             'brand': _sanitize(item.get('brand') or '')[:120],
         })

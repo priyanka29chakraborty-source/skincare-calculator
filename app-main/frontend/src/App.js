@@ -9,6 +9,7 @@ import AccountBar from "./components/AccountBar";
 import UnlockModal from "./components/UnlockModal";
 import HistoryCard from "./components/HistoryCard";
 import CompareCard from "./components/CompareCard";
+import PrintReport from "./components/PrintReport";
 import useAccount from "./hooks/useAccount";
 
 function App() {
@@ -361,10 +362,24 @@ function App() {
               </button>
             </div>
 
+            {/* The document that actually prints. Hidden on screen; @media
+                print hides the app and shows only this. It is a standalone
+                report rather than a picture of the page, because a saved PDF
+                is read weeks later by someone who was not here when it was
+                made. */}
+            <PrintReport
+              result={result}
+              productName={productName} brand={brand} category={category}
+              price={price} size={size} sizeUnit={sizeUnit}
+              currency={currency} skinType={skinType} concerns={concerns}
+            />
+
             {/* Seeded with the product just analysed, so comparing it against
                 something else does not mean typing it in again. */}
             <CompareCard
               currency={currency}
+              skinType={skinType}
+              concerns={concerns}
               seed={{
                 product_name: productName, brand, category,
                 price: price || "", size_ml: size || "", ingredients,

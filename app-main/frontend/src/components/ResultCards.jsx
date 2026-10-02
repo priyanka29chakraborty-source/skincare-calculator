@@ -3,6 +3,7 @@ import { getBarColor, money } from "../constants";
 import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
 import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
 import LockedCard from "./LockedCard";
+import SuitabilityCard from "./SuitabilityCard";
 import AlternativesCard from "./AlternativesCard";
 import BestPriceCard from "./BestPriceCard";
 
@@ -798,74 +799,36 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         )}
       </div>
 
-      {/* CARD 2: CONCERN FIT — paid. When locked the fields are absent from
-          the response entirely, so this must be an explicit state rather than
-          a render of undefined. */}
+      {/* CARD 2: SUITABILITY — paid.
+          Previously two cards, "Skin Concern Fit" and "<Type> Skin
+          Compatibility", which read as the same card because their content
+          largely was: the engine emits four overlapping lists and both drew
+          from them, so one ingredient could be named three times on one
+          screen. SuitabilityCard answers the two questions that are actually
+          different - does it do the job you want, and will it cause you
+          problems - and deduplicates the lists against each other.
+
+          When locked these fields are absent from the response entirely, so
+          this must be an explicit state rather than a render of undefined. */}
       {isLocked && (
         <LockedCard
-          title="Skin Concern Fit"
-          icon="fa-solid fa-bullseye"
-          access={result.access}
-          lines={(result.access?.preview?.concern_names || ["Your selected concerns"])
-            .map((c) => `How well this suits: ${c}`)}
-          onUnlock={onUnlock}
-        />
-      )}
-      {!isLocked && Object.keys(result.skin_concern_fit || {}).length > 0 && (
-        <div className="sc-card result-card card-2" data-testid="card-concern-fit" style={{ "--anim-delay": "0.15s" }}>
-          <h2 className="card-title"><i className="fa-solid fa-bullseye"></i> Skin Concern Fit</h2>
-          <p className="ampm-label" data-testid="ampm-label"><i className="fa-regular fa-clock"></i> {result.am_pm_recommendation}</p>
-          {Object.entries(result.skin_concern_fit).map(([concern, data]) => (
-            <ConcernCard key={concern} concern={concern} data={data} />
-          ))}
-        </div>
-      )}
-
-      {/* CARD 2B: SUNSCREEN ANALYSIS — shown when Sun Protection selected OR category is sunscreen */}
-      {result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
-        <SunscreenAnalysisCard data={result.skin_concern_fit['Sun Protection']} />
-      )}
-
-      {/* CARD 3: SKIN TYPE COMPAT — paid.
-          This card used to render unconditionally. With the field stripped it
-          printed a bare "%" with no number, and getBarColor(undefined) fell
-          through every threshold to red, so a locked section looked like a
-          catastrophic score. */}
-      {isLocked && (
-        <LockedCard
-          title={`${skinType} Skin Compatibility`}
+          title="How this suits you"
           icon="fa-solid fa-user-check"
           access={result.access}
           lines={[
-            `How this suits ${String(skinType).toLowerCase()} skin`,
-            "Irritation and congestion risk",
-            "Which skin types it suits better",
+            ...(result.access?.preview?.concern_names || ["Your selected concerns"])
+              .map((c) => `How well it treats ${c}`),
+            `Whether it suits ${String(skinType || "your").toLowerCase()} skin`,
+            "Irritation and pore-clogging risk",
           ]}
           onUnlock={onUnlock}
         />
       )}
-      {!isLocked && (
-      <div className="sc-card result-card card-3" data-testid="card-skin-type" style={{ "--anim-delay": "0.3s" }}>
-        <h2 className="card-title"><i className="fa-solid fa-user-check"></i> {skinType} Skin Compatibility</h2>
-        <div className="compat-score-row">
-          <span className="compat-pct" style={{ color: getBarColor(result.skin_type_compatibility) }}>{result.skin_type_compatibility}%</span>
-          <ProgressBar pct={result.skin_type_compatibility} label="compat" />
-        </div>
-        {result.skin_type_risk_level && (
-          <div style={{ marginTop: "8px", marginBottom: "6px" }}>
-            {result.skin_type_risk_level === "low" && (
-              <span style={{ fontSize: "0.78rem", background: "#D4EDDA", color: "#155724", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>✓ Low irritation risk overall.</span>
-            )}
-            {result.skin_type_risk_level === "moderate" && (
-              <span style={{ fontSize: "0.78rem", background: "#FFF3CD", color: "#856404", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Some ingredients may not suit acne-prone or sensitive areas.</span>
-            )}
-            {result.skin_type_risk_level === "high" && (
-              <span style={{ fontSize: "0.78rem", background: "#F8D7DA", color: "#721C24", padding: "3px 10px", borderRadius: "12px", fontWeight: 600 }}>⚠ Important: multiple acne or irritation risks detected. See notes below.</span>
-            )}
-          </div>
-        )}
-        <SkinTypeDetails details={result.skin_type_details} score={result.skin_type_compatibility} betterSuited={result.better_suited} formNotes={result.skin_type_details?.formulation_notes} riskLevel={result.skin_type_risk_level} />
-      </div>
+      {!isLocked && <SuitabilityCard result={result} skinType={skinType} />}
+
+      {/* CARD 2B: SUNSCREEN ANALYSIS — shown when Sun Protection selected OR category is sunscreen */}
+      {!isLocked && result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
+        <SunscreenAnalysisCard data={result.skin_concern_fit['Sun Protection']} />
       )}
 
       {/* CARD 4A: ALTERNATIVES */}

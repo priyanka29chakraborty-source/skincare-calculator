@@ -58,8 +58,17 @@ export default function LockedCard({ title, icon, access, lines, onUnlock }) {
 
         <p className="locked-msg">{access?.message}</p>
 
-        <button className="btn btn-primary locked-cta" onClick={onUnlock} data-testid="unlock-cta">
-          <i className="fa-solid fa-unlock"></i> Unlock personal analysis
+        {/* Deliberately the loudest thing on the card. The previous button was
+            styled like every other secondary action, so it read as a label
+            rather than the one thing to press - people were looking at a
+            locked card with no idea it was theirs to open. */}
+        <button className="locked-cta" onClick={onUnlock} data-testid="unlock-cta">
+          <span className="locked-cta-main">
+            <i className="fa-solid fa-lock-open"></i> Unlock this section
+          </span>
+          <span className="locked-cta-sub">
+            One credit &middot; covers this product for good
+          </span>
         </button>
 
         <p className="locked-safety">

@@ -126,9 +126,14 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
         {step === "email" && (
           <form onSubmit={sendCode}>
             <p className="modal-lede">
-              Your formulation score stays free, always. A credit unlocks the
-              part that depends on you - how this product fits your skin type,
-              your concerns, and what is already in your routine.
+              The formulation score is free and always will be &mdash; how well
+              this product is <em>made</em> is the same for everyone. What costs
+              a credit is the part that is about <em>you</em>: whether it treats
+              the concerns you picked, whether it suits your skin type, and what
+              in it is likely to cause you trouble.
+            </p>
+            <p className="modal-lede modal-lede-tight">
+              Sign in with your email so your credits follow you to a new phone.
             </p>
             <div className="field-group">
               <label className="field-label" htmlFor="unlock-email">Email</label>
@@ -138,11 +143,13 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
                      data-testid="unlock-email" />
             </div>
             <p className="modal-fineprint">
-              We use this only to keep your credits if you change device. No
-              password to remember, and no marketing email.
+              We store your address to hold your credit balance against it, and
+              send you a six-digit code to sign in. That is all it is used for:
+              no password to remember, no marketing, and we do not pass it on.
+              You can have it deleted whenever you ask.
             </p>
             <button className="analyze-btn modal-cta" disabled={busy} type="submit">
-              {busy ? "Sending..." : "Email me a code"}
+              {busy ? "Sending..." : "Send me a sign-in code"}
             </button>
           </form>
         )}
@@ -160,6 +167,10 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
             <button className="analyze-btn modal-cta" disabled={busy} type="submit">
               {busy ? "Checking..." : "Sign in"}
             </button>
+            <p className="modal-fineprint">
+              Not arrived after a minute? Check your spam folder, then request a
+              fresh one &mdash; each code lasts ten minutes and works once.
+            </p>
             <button type="button" className="clear-btn-solo"
                     onClick={() => { setStep("email"); setError(""); }}>
               Use a different email
@@ -170,15 +181,17 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
         {step === "packs" && (
           <>
             <p className="modal-lede">
-              One credit per product, once. Re-opening it, answering the
-              personalisation questions, or correcting a price costs nothing —
-              you have already paid for that product.
+              <strong>One credit per product, once.</strong> Re-opening it,
+              answering the personalisation questions, exporting the report or
+              correcting a price all cost nothing &mdash; you have already paid
+              for that product, and that does not expire.
             </p>
 
             {packs && !packs.payments_enabled && (
               <p className="modal-fineprint" data-testid="payments-off">
-                Payments are not switched on yet. Your account is saved - come
-                back shortly.
+                Card and UPI payments are not connected yet, so these packs
+                cannot be bought today. Your account and any credits on it are
+                saved.
               </p>
             )}
 
@@ -198,9 +211,10 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
             </div>
 
             <p className="modal-fineprint">
-              Signed in as {account.signedIn ? "your account" : email}. Balance:{" "}
-              <strong data-testid="modal-balance">{account.balance}</strong>.
-              {" "}Credits do not expire.
+              Signed in{email ? ` as ${email}` : ""}. Balance:{" "}
+              <strong data-testid="modal-balance">{account.balance}</strong>{" "}
+              {account.balance === 1 ? "credit" : "credits"}. Credits never
+              expire, and unused ones are refundable.
             </p>
             {notice && <p className="modal-notice" data-testid="unlock-notice">{notice}</p>}
           </>

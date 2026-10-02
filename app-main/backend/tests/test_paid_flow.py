@@ -33,6 +33,10 @@ def env(monkeypatch):
     monkeypatch.setenv('WALLET_DB_PATH', os.path.join(tmp, 'wallet.db'))
     monkeypatch.delenv('AIVEN_PG_URL', raising=False)
     monkeypatch.delenv('DEV_UNLOCK_ALL', raising=False)
+    # These tests are the paywall's tests, so they run with it switched on.
+    # In the shipped configuration PAYWALL_ENABLED is unset and every section
+    # is visible; see test_paywall_off.py for that state.
+    monkeypatch.setenv('PAYWALL_ENABLED', '1')
     monkeypatch.setenv('SESSION_SECRET', 'flow-test-secret')
     monkeypatch.setenv('RAZORPAY_KEY_ID', 'rzp_test_flow')
     monkeypatch.setenv('RAZORPAY_KEY_SECRET', KEY_SECRET)

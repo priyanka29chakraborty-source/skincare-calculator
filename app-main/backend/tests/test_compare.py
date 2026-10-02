@@ -244,3 +244,154 @@ def test_the_real_engine_fills_every_column():
     # A serum of actives against water should clear the confidence margin.
     assert out['verdict']['best_formulation'] == 'Niacinamide 10%'
     assert out['verdict']['best_value'] == 'Niacinamide 10%'
+
+
+# ---------------------------------------------------------------------------
+# What the comparison says beyond the scores
+# ---------------------------------------------------------------------------
+#
+# Two scores side by side is a scoreboard. These cover the parts that make it a
+# comparison: what is in one and not the other, which treats what, whether they
+# can be layered, and whether buying both is buying the same thing twice.
+
+@pytest.fixture
+def engine():
+    from scoring import analyze_product
+    return analyze_product
+
+
+def real(name, ingredients, price=549, size=30, category='Serum',
+         concerns=('Acne & Oily Skin', 'Large Pores')):
+    return {'product_name': name, 'category': category, 'price': price,
+            'size_ml': size, 'country': 'India', 'currency': 'INR',
+            'skin_type': 'oily', 'concerns': list(concerns),
+            'ingredients': ingredients}
+
+
+SALICYLIC = 'Aqua, Salicylic Acid, Niacinamide, Zinc PCA, Glycerin, Phenoxyethanol'
+RETINOL = 'Aqua, Retinol, Squalane, Niacinamide, Tocopherol, Phenoxyethanol'
+PLAIN_NIA = 'Aqua, Niacinamide, Squalane, Tocopherol, Phenoxyethanol'
+
+
+def test_shared_actives_are_separated_from_unique_ones(engine):
+    """The single most useful line, and the one a scoreboard cannot give you:
+    two products can score the same and do entirely different jobs."""
+    out = compare([real('A', SALICYLIC), real('B', RETINOL)], engine)
+    shared = [a['name'] for a in out['actives']['shared']]
+    unique = [[a['name'] for a in u] for u in out['actives']['unique']]
+
+    assert 'Niacinamide' in shared
+    assert 'Salicylic Acid' in unique[0]
+    assert 'Retinol' in unique[1]
+    assert 'Salicylic Acid' not in shared
+
+
+def test_a_shared_active_reports_each_products_level(engine):
+    """The same active at two very different label positions is not the same
+    thing, so a shared row is not just a tick."""
+    out = compare([real('A', SALICYLIC), real('B', PLAIN_NIA)], engine)
+    nia = next(a for a in out['actives']['shared'] if a['name'] == 'Niacinamide')
+    assert len(nia['levels']) == 2
+    assert all('position' in lvl for lvl in nia['levels'])
+
+
+def test_concern_scores_are_compared_per_concern(engine):
+    out = compare([real('A', SALICYLIC), real('B', PLAIN_NIA)], engine)
+    acne = next(c for c in out['concerns'] if c['concern'] == 'Acne & Oily Skin')
+    assert acne['scores'][0] > acne['scores'][1]
+    assert acne['best_index'] == 0
+
+
+def test_a_close_concern_gap_is_called_too_close(engine):
+    """Concern scores move in coarse steps, so a small gap is not a result."""
+    out = compare([real('A', PLAIN_NIA), real('B', PLAIN_NIA + ', Glycerin')], engine)
+    undecided = [e for e in out['concerns'] if e['best_index'] is None]
+    assert undecided, 'two near-identical formulas produced a winner on every concern'
+    assert undecided[0]['note'] == 'Too close to call on this concern.'
+
+
+def test_only_concerns_scored_for_every_product_are_compared(engine):
+    """A concern selected for one product and not another would otherwise
+    produce a phantom win."""
+    out = compare([real('A', SALICYLIC, concerns=('Acne & Oily Skin',)),
+                   real('B', PLAIN_NIA, concerns=('Dullness',))], engine)
+    assert out['concerns'] == []
+
+
+def test_layering_a_retinoid_with_a_bha_is_flagged(engine):
+    """The advice someone buying both actually needs, and the question a
+    scoreboard never asks."""
+    out = compare([real('A', SALICYLIC), real('B', RETINOL)], engine)
+    together = out['together']
+    assert together['checked'] is True
+    assert together['clear'] is False
+    families = {f for c in together['conflicts'] for f in c['families']}
+    assert 'retinoids' in families and 'BHA exfoliants' in families
+
+
+def test_the_conflict_copy_is_rephrased_for_a_comparison(engine):
+    """The stored message is written for a routine the user typed in. Left
+    as-is it would tell someone they are "already using" a product they are
+    still deciding whether to buy."""
+    out = compare([real('A', SALICYLIC), real('B', RETINOL)], engine)
+    for conflict in out['together']['conflicts']:
+        assert 'You are already using' not in conflict['message']
+
+
+def test_two_products_in_the_same_family_are_called_redundant(engine):
+    """Buying the same job twice adds irritation and cost, not results."""
+    out = compare([real('A', SALICYLIC),
+                   real('B', 'Aqua, Salicylic Acid, Glycerin, Phenoxyethanol')],
+                  engine)
+    families = [r['family'] for r in out['together']['redundant']]
+    assert 'BHA exfoliants' in families
+
+
+def test_unrelated_products_are_reported_as_clear_to_layer(engine):
+    out = compare([real('A', PLAIN_NIA),
+                   real('B', 'Aqua, Glycerin, Ceramide NP, Phenoxyethanol')], engine)
+    assert out['together']['clear'] is True
+    assert out['together']['conflicts'] == []
+
+
+def test_layering_advice_is_withheld_for_more_than_two(engine):
+    """A pairwise matrix across four products is not something anyone reads."""
+    out = compare([real(n, PLAIN_NIA) for n in ('A', 'B', 'C')], engine)
+    assert out['together']['checked'] is False
+    assert 'two products at a time' in out['together']['reason']
+
+
+def test_choose_if_names_the_trade_rather_than_a_winner(engine):
+    """The honest answer usually depends on which trade the reader wants, so
+    the verdict names it instead of hiding it behind one recommendation."""
+    out = compare([real('A', SALICYLIC), real('B', RETINOL)], engine)
+    by_name = {c['product_name']: c['reasons'] for c in out['verdict']['choose_if']}
+    assert 'A' in by_name and 'B' in by_name
+    assert any('Salicylic Acid' in r for r in by_name['A'])
+    assert any('Retinol' in r for r in by_name['B'])
+
+
+def test_a_product_with_nothing_distinguishing_gets_no_manufactured_reason(engine):
+    out = compare([real('A', SALICYLIC, price=200), real('B', SALICYLIC, price=900)],
+                  engine)
+    by_name = {c['product_name']: c['reasons'] for c in out['verdict']['choose_if']}
+    # Identical formulas: the only honest difference is price.
+    assert 'B' not in by_name
+    assert by_name['A'] == ['cost per ml is what matters most to you']
+
+
+def test_tolerability_is_reported_per_product_not_ranked(engine):
+    """A single "gentler" label would flatten a formula with no known irritants
+    and one whose irritants are simply not in our database."""
+    out = compare([real('A', SALICYLIC), real('B', RETINOL)], engine)
+    assert len(out['tolerability']) == 2
+    for entry in out['tolerability']:
+        assert 'tolerability_pct' in entry
+        assert 'risk_level' in entry
+    assert 'best_tolerability' not in out
+
+
+def test_component_rows_carry_the_reason_not_just_the_number(engine):
+    out = compare([real('A', SALICYLIC), real('B', RETINOL)], engine)
+    actives_row = next(c for c in out['components'] if c['key'] == 'actives')
+    assert any(v and v['notes'] for v in actives_row['values'])

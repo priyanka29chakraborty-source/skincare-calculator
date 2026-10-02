@@ -1075,8 +1075,7 @@ CATEGORY_RUBRICS = {
         ],
         'rationale': "A cleanser is on your skin for under a minute and is then "
                      "rinsed off. What matters is how gently it cleans - not "
-                     "what actives it claims. Actives are deliberately not "
-                     "scored in this category.",
+                     "what actives it claims.",
     },
     'sunscreen': {
         'label': 'Sunscreen',

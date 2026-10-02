@@ -733,7 +733,27 @@ body::before {
   line-height: 1.5;
 }
 .locked-msg { font-size: 0.86rem; color: var(--text-sub); line-height: 1.55; margin: 0 0 14px; }
-.locked-cta { width: auto; }
+/* The one thing to press on a locked card. It was styled like every other
+   secondary action, so it read as a label and people did not realise the
+   section was theirs to open. */
+.locked-cta {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 100%; padding: 15px 20px; margin-top: 4px;
+  background: linear-gradient(135deg, #C18888 0%, #A87373 60%, #9A6B6B 100%);
+  color: #fff; border: none; border-radius: 14px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(107,64,80,0.22);
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.locked-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(107,64,80,0.32); }
+.locked-cta:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(191,136,136,0.55); }
+.locked-cta-main {
+  font-family: 'Playfair Display', serif; font-size: 1.02rem; font-weight: 600;
+  letter-spacing: 0.3px; display: flex; align-items: center; gap: 9px;
+}
+.locked-cta-sub {
+  font-family: 'DM Sans', sans-serif; font-size: 0.68rem; opacity: 0.88;
+  letter-spacing: 0.02em;
+}
 .locked-safety {
   font-size: 0.74rem;
   color: var(--text-sub);
@@ -897,57 +917,112 @@ body::before {
 }
 
 /* ========== PRINT / PDF EXPORT ========== */
-/* Export is the browser's own "Save as PDF" rather than a generated file.
-   That choice is deliberate: it needs no PDF library on the server, no render
-   job, and no round trip, it works offline, and the output is selectable text
-   rather than a picture of a result. What it costs is control over pagination,
-   which these rules recover most of. */
-@media print {
-  @page { margin: 14mm; }
+/* Export is the browser's own "Save as PDF", which needs no PDF library, no
+   render job and no round trip, works offline, and produces selectable text
+   rather than a picture of a result.
 
-  body {
-    background: #fff !important;
-    color: #000;
-  }
+   What prints is PrintReport, a separate document - not the app. Printing the
+   page produced a picture of an interface: collapsed accordions stayed
+   collapsed, empty states printed as empty boxes, and nothing identified the
+   product once the header had scrolled away. */
+.print-report { display: none; }
+
+@media print {
+  @page { margin: 16mm 14mm; }
+
+  /* The interface does not print at all. */
+  body > *, .sc-app { display: none !important; }
   body::before { display: none !important; }
 
-  .sc-app { max-width: 100% !important; padding: 0 !important; }
-
-  /* Interface, not content. None of it means anything on paper. */
-  .account-bar,
-  .modal-backdrop,
-  .no-print,
-  .card[data-testid="product-details-card"],
-  .card[data-testid="skin-profile-card"],
-  .action-row,
-  .clear-btn-solo,
-  .personalise-card,
-  .locked-cta,
-  .export-btn {
-    display: none !important;
+  body {
+    background: #fff !important; color: #111;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 10.5pt; line-height: 1.5;
   }
 
-  /* Cards become flat blocks. Shadows and translucency print as grey mush. */
-  .sc-card, .card {
-    background: #fff !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-    border: 1px solid #ddd !important;
-    border-radius: 10px !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
-    margin-bottom: 12px !important;
-    animation: none !important;
-  }
-
-  /* Bars and rings are information here, so force them to print. Without
-     this, print-colour-adjust strips them and every score bar comes out
-     blank. */
+  .print-report { display: block !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  a[href]:after { content: ''; }
+}
 
-  a[href]:after { content: ''; }  /* URLs after links make the text unreadable */
-  .sc-header { margin-bottom: 20px !important; }
-  .sc-title { font-size: 28px !important; }
+/* Rendered the same way on screen and on paper, so the layout can be checked
+   without a print dialog - see .print-preview below. */
+.print-report .pr-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 24px; padding-bottom: 14px; border-bottom: 2px solid #1E293B;
+}
+.print-report .pr-eyebrow {
+  font-size: 8pt; letter-spacing: 0.18em; text-transform: uppercase;
+  color: #A87373; font-weight: 700; margin-bottom: 5px;
+}
+.print-report .pr-product {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 20pt; font-weight: 600; line-height: 1.15; color: #111;
+}
+.print-report .pr-sub { font-size: 9.5pt; color: #555; margin-top: 4px; }
+.print-report .pr-score-block { text-align: right; flex-shrink: 0; }
+.print-report .pr-score {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 30pt; font-weight: 700; line-height: 1; color: #111;
+}
+.print-report .pr-score span { font-size: 12pt; font-weight: 400; color: #666; }
+.print-report .pr-tier { font-size: 9pt; color: #A87373; font-weight: 600; margin-top: 3px; }
+
+.print-report .pr-facts {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px 20px; margin: 14px 0 0; padding-bottom: 14px;
+  border-bottom: 1px solid #ddd;
+}
+.print-report .pr-facts dt {
+  font-size: 7.5pt; letter-spacing: 0.1em; text-transform: uppercase; color: #888;
+}
+.print-report .pr-facts dd { font-size: 10pt; margin: 1px 0 0; color: #111; }
+
+.print-report .pr-summary {
+  font-size: 11.5pt; line-height: 1.55; margin: 16px 0 0;
+  padding-left: 12px; border-left: 3px solid #D4AAAA; color: #222;
+}
+
+.print-report .pr-section { margin-top: 22px; break-inside: avoid; page-break-inside: avoid; }
+.print-report .pr-section h2 {
+  font-size: 9pt; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #A87373; font-weight: 700;
+  padding-bottom: 5px; margin-bottom: 10px; border-bottom: 1px solid #e4d8d8;
+}
+.print-report .pr-section h3 { font-size: 10pt; font-weight: 700; margin: 12px 0 5px; color: #111; }
+.print-report .pr-section p { margin-bottom: 7px; }
+.print-report .pr-rationale { color: #555; font-style: italic; margin-bottom: 10px; }
+.print-report .pr-muted { color: #777; font-size: 9.5pt; }
+
+.print-report .pr-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+.print-report .pr-table th {
+  text-align: left; font-size: 7.5pt; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #888; font-weight: 600; padding: 0 8px 5px 0; border-bottom: 1px solid #ddd;
+}
+.print-report .pr-table td {
+  padding: 6px 8px 6px 0; vertical-align: top; border-bottom: 1px solid #f0f0f0;
+}
+.print-report .pr-table .pr-comp { font-weight: 600; color: #111; white-space: nowrap; }
+.print-report .pr-table .pr-num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.print-report .pr-list { margin: 4px 0 8px 16px; }
+.print-report .pr-list li { margin-bottom: 3px; }
+.print-report .pr-advisory { margin-bottom: 12px; }
+.print-report .pr-limits p { color: #555; font-size: 9.5pt; }
+.print-report .pr-foot {
+  margin-top: 26px; padding-top: 12px; border-top: 1px solid #ddd;
+  font-size: 8pt; color: #777; line-height: 1.5;
+}
+.print-report .pr-foot p { margin-bottom: 5px; }
+
+/* On-screen preview of the printed document, so the layout can be checked
+   without opening a print dialog every time. */
+.print-preview .print-report {
+  display: block; background: #fff; color: #111;
+  font-family: 'DM Sans', sans-serif; font-size: 10.5pt; line-height: 1.5;
+  max-width: 760px; margin: 0 auto; padding: 42px 46px;
+  border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(107,64,80,0.14);
 }
 
 .export-btn {
@@ -1065,3 +1140,84 @@ body::before {
   .compare-cell { flex-direction: row; align-items: baseline; gap: 8px; }
   .compare-component-bar { flex: 1; }
 }
+
+/* ========== SUITABILITY (merged concern fit + skin type) ========== */
+.suit-section { margin-top: 26px; }
+.suit-section:first-of-type { margin-top: 18px; }
+.suit-head {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  font-family: 'DM Sans', sans-serif; font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--dusty-rose-dark);
+  padding-bottom: 9px; margin-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.suit-head-note {
+  font-size: 0.68rem; font-weight: 400; letter-spacing: 0; text-transform: none;
+  color: var(--text-sub); font-style: italic;
+}
+.suit-risk {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin: 10px 0 4px; padding: 6px 13px; border-radius: 50px;
+  font-size: 0.76rem; font-weight: 600;
+}
+.suit-risk-good { background: #D4EDDA; color: #155724; }
+.suit-risk-warn { background: #FFF3CD; color: #856404; }
+.suit-risk-bad  { background: #F8D7DA; color: #721C24; }
+.suit-list { margin-top: 16px; }
+.suit-list h4 {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'DM Sans', sans-serif; font-size: 0.74rem; font-weight: 700;
+  color: var(--charcoal); margin-bottom: 7px;
+}
+.suit-list-good h4 i { color: var(--sage); }
+.suit-list-watch h4 i { color: var(--orange); }
+.suit-list-clean h4 i { color: var(--sage); }
+.suit-list-next h4 i { color: var(--gold); }
+.suit-list ul { margin: 0; padding-left: 18px; }
+.suit-list li { font-size: 0.8rem; line-height: 1.6; color: var(--text-sub); margin-bottom: 4px; }
+.suit-list p { font-size: 0.8rem; line-height: 1.6; color: var(--text-sub); }
+.suit-list-lede { font-size: 0.74rem !important; margin-bottom: 7px; opacity: 0.9; }
+
+.modal-lede-tight { margin-top: -8px; font-size: 0.8rem; color: var(--text-sub); }
+
+/* ---- comparison: the sections beyond the scoreboard ---- */
+.compare-block { margin-top: 26px; }
+.compare-block-head {
+  font-family: 'DM Sans', sans-serif; font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--dusty-rose-dark);
+  padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border);
+}
+.compare-block h4 {
+  font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 700;
+  color: var(--charcoal); margin: 12px 0 5px;
+}
+.compare-block ul { margin: 0; padding-left: 17px; }
+.compare-block li { font-size: 0.8rem; line-height: 1.65; color: var(--charcoal); margin-bottom: 4px; }
+.compare-evidence { color: var(--text-sub); font-size: 0.74rem; }
+.compare-levels { display: block; font-size: 0.7rem; color: var(--text-sub); margin-top: 1px; }
+.compare-levels span + span::before { content: ' · '; }
+.compare-actives-unique { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 4px 20px; }
+.compare-muted { font-size: 0.74rem; line-height: 1.6; color: var(--text-sub); margin-top: 8px; }
+.compare-component-note { display: block; font-size: 0.66rem; line-height: 1.45; color: var(--text-sub); margin-top: 2px; }
+.compare-cell-best strong { color: var(--sage); }
+.compare-cell-best::after {
+  content: 'better here'; font-size: 0.6rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--sage); font-weight: 700;
+}
+.compare-risk { font-size: 0.66rem; text-transform: capitalize; }
+.compare-risk-low { color: var(--sage); }
+.compare-risk-moderate { color: var(--orange); }
+.compare-risk-high { color: var(--red); }
+.compare-together-clear, .compare-together-warn {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: 0.82rem; line-height: 1.6; margin-bottom: 9px;
+}
+.compare-together-clear { color: var(--sage); }
+.compare-together-clear i { margin-top: 3px; }
+.compare-together-warn { color: var(--charcoal); }
+.compare-together-warn i { color: var(--orange); margin-top: 3px; flex-shrink: 0; }
+.compare-choose {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 6px 20px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+.compare-choose-item h4 { color: var(--dusty-rose-dark); margin-top: 0; }
+.compare-choose-item li { font-size: 0.78rem; color: var(--text-sub); }

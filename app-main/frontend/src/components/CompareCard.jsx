@@ -10,6 +10,9 @@ const EMPTY = {
   price: "", size_ml: "", ingredients: "",
 };
 
+const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
+  "Eye Cream", "Mask", "Treatment", "Facial Oil"];
+
 /**
  * Two to four products side by side.
  *
@@ -17,14 +20,20 @@ const EMPTY = {
  * analysis is the free tier. Charging to put two free numbers next to each
  * other would be charging for arithmetic.
  *
- * The verdict is shown as two separate answers - better made, better value -
- * because they are different questions and the right product depends on which
- * one the reader is asking. The server refuses to rank across categories and
- * refuses to call a winner on a gap smaller than the method can resolve; this
- * component renders those refusals as plainly as it renders a result, since a
- * stated limit is more useful than a confident guess.
+ * The first version of this was a scoreboard - two numbers and a winner. That
+ * tells you which number is bigger and nothing about what you would be giving
+ * up. What someone holding two bottles is actually asking is what is in one
+ * that is not in the other, which one treats the thing they care about,
+ * whether they could just use both, and whether buying both means buying the
+ * same job twice. Those are the sections below, in that order, with the
+ * verdict last because it depends on all of them.
+ *
+ * The server refuses to rank across categories and refuses to call a winner on
+ * a gap smaller than the method can resolve. Those refusals are rendered as
+ * plainly as a result, because a stated limit is more useful than a confident
+ * guess.
  */
-export default function CompareCard({ seed, currency }) {
+export default function CompareCard({ seed, currency, skinType, concerns }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState(null);
   const [result, setResult] = useState(null);
@@ -52,6 +61,11 @@ export default function CompareCard({ seed, currency }) {
     setBusy(true); setError(""); setResult(null);
     try {
       const { data } = await api.post(`${API}/compare`, {
+        // One profile across every product: a comparison is "which of these
+        // for me", so scoring each against a different skin type would answer
+        // a question nobody asked.
+        skin_type: (skinType || "").toLowerCase() || undefined,
+        skin_concerns: concerns || [],
         products: rows.map((r) => ({
           product_name: r.product_name,
           brand: r.brand,
@@ -74,9 +88,9 @@ export default function CompareCard({ seed, currency }) {
         <div>
           <div className="card-label">Compare products</div>
           <p className="compare-lede">
-            Put two to four products side by side and see where the difference
-            actually comes from. Free — it compares formulation scores, and
-            those are free.
+            Two to four products side by side: what each has that the others do
+            not, which one treats your concerns, whether they can be layered,
+            and whether buying both means buying the same job twice.
           </p>
         </div>
         <button className="btn btn-primary compare-start" onClick={start}
@@ -114,9 +128,7 @@ export default function CompareCard({ seed, currency }) {
                 <label className="field-label">Category</label>
                 <select className="field-select full-w" value={row.category}
                         onChange={(e) => update(i, "category", e.target.value)}>
-                  {["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
-                    "Eye Cream", "Mask", "Treatment", "Facial Oil"].map((c) => (
-                      <option key={c} value={c}>{c}</option>))}
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div className="field-group">
@@ -156,18 +168,32 @@ export default function CompareCard({ seed, currency }) {
         {error && <p className="modal-error" role="alert" data-testid="compare-error">{error}</p>}
       </div>
 
-      {result && <CompareResult result={result} currency={currency} />}
+      {result && <CompareResult result={result} currency={currency} skinType={skinType} />}
     </div>
   );
 }
 
-function CompareResult({ result, currency }) {
-  const { products, components, verdict } = result;
+/* ------------------------------------------------------------------------- */
+
+function Row({ label, children, cols }) {
+  return (
+    <div className="compare-row" style={{ "--cols": cols }}>
+      <span className="compare-row-label">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function CompareResult({ result, currency, skinType }) {
+  const { products, components, actives, concerns, tolerability, together, verdict } = result;
+  const cols = products.length;
+  const names = products.map((p) => p.product_name);
 
   return (
     <div className="compare-result" data-testid="compare-result">
-      <div className="compare-grid" style={{ "--cols": products.length }}>
-        <div className="compare-head-row">
+      {/* ---------------------------------------------------------- scores */}
+      <div className="compare-grid">
+        <div className="compare-head-row" style={{ "--cols": cols }}>
           <span />
           {products.map((p, i) => (
             <span className="compare-col-head" key={i}>
@@ -177,46 +203,209 @@ function CompareResult({ result, currency }) {
           ))}
         </div>
 
-        <div className="compare-row compare-score-row">
-          <span className="compare-row-label">Formulation</span>
+        <Row label="Formulation" cols={cols}>
           {products.map((p, i) => (
             <span className="compare-cell" key={i}>
               <strong className="compare-score">{p.formulation_score ?? "—"}</strong>
               <span className="compare-tier">{p.formulation_tier}</span>
             </span>
           ))}
-        </div>
+        </Row>
 
-        <div className="compare-row">
-          <span className="compare-row-label">Price per ml</span>
+        <Row label="Price per ml" cols={cols}>
           {products.map((p, i) => (
             <span className="compare-cell" key={i}>
               {p.price_per_ml ? money(p.currency || currency, p.price_per_ml) : "—"}
             </span>
           ))}
-        </div>
+        </Row>
 
         {components.map((component) => (
-          <div className="compare-row" key={component.key}>
-            <span className="compare-row-label">{component.label}</span>
+          <Row key={component.key} label={component.label} cols={cols}>
             {component.values.map((value, i) => (
               <span className="compare-cell" key={i}>
-                {value
-                  ? <>
-                      <span className="compare-component-bar" aria-hidden="true">
-                        <span style={{ width: `${value.pct}%` }} />
-                      </span>
-                      <span className="compare-component-num">
-                        {Math.round(value.score)}/{value.max}
-                      </span>
-                    </>
-                  : "—"}
+                {value ? (
+                  <>
+                    <span className="compare-component-bar" aria-hidden="true">
+                      <span style={{ width: `${value.pct}%` }} />
+                    </span>
+                    <span className="compare-component-num">
+                      {Math.round(value.score)}/{value.max}
+                    </span>
+                    {(value.notes || []).length > 0 && (
+                      <span className="compare-component-note">{value.notes[0]}</span>
+                    )}
+                  </>
+                ) : "—"}
               </span>
             ))}
-          </div>
+          </Row>
         ))}
       </div>
 
+      {/* --------------------------------------------------------- actives */}
+      {(actives?.shared?.length > 0 || actives?.unique?.some((u) => u.length > 0)) && (
+        <section className="compare-block" data-testid="compare-actives">
+          <h3 className="compare-block-head">What is actually in them</h3>
+
+          {actives.shared.length > 0 && (
+            <div className="compare-actives-shared">
+              <h4>In all of them</h4>
+              <ul>
+                {actives.shared.map((a) => (
+                  <li key={a.name}>
+                    <strong>{a.name}</strong>
+                    {a.evidence && <span className="compare-evidence"> · {a.evidence}</span>}
+                    <span className="compare-levels">
+                      {a.levels.map((lvl, i) => (
+                        <span key={i}>
+                          {names[i]}: {lvl.concentration_pct
+                            ? `${lvl.concentration_pct}%`
+                            : (lvl.position ? `position ${lvl.position}` : "present")}
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="compare-actives-unique">
+            {actives.unique.map((list, i) => (
+              <div key={i}>
+                <h4>Only in {names[i]}</h4>
+                {list.length > 0 ? (
+                  <ul>
+                    {list.map((a) => (
+                      <li key={a.name}>
+                        <strong>{a.name}</strong>
+                        {a.targets?.length > 0 && (
+                          <span className="compare-evidence"> · for {a.targets.join(", ").toLowerCase()}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="compare-muted">Nothing the others do not also have.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* -------------------------------------------------------- concerns */}
+      {concerns?.length > 0 && (
+        <section className="compare-block" data-testid="compare-concerns">
+          <h3 className="compare-block-head">Against what you are treating</h3>
+          <div className="compare-grid">
+            {concerns.map((entry) => (
+              <Row key={entry.concern} label={entry.concern} cols={cols}>
+                {entry.scores.map((score, i) => (
+                  <span className={`compare-cell${entry.best_index === i ? " compare-cell-best" : ""}`}
+                        key={i}>
+                    <strong>{score ?? "—"}</strong>
+                    <span className="compare-component-num">/ 100</span>
+                  </span>
+                ))}
+              </Row>
+            ))}
+          </div>
+          {concerns.some((c) => c.note) && (
+            <p className="compare-muted">
+              Where no product is highlighted, the gap is inside what the method
+              can resolve.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* ---------------------------------------------------- tolerability */}
+      {/* Two measures, deliberately on separate rows. Together in one cell
+          they produced "Tolerability 100% - High Risk", which reads as a
+          contradiction and is not one: the first is formulation-level and the
+          same for everybody, the second is specific to the skin type being
+          analysed for. A product can be free of irritants and still be a poor
+          idea for oily skin. */}
+      {tolerability?.length > 0 && (
+        <section className="compare-block" data-testid="compare-tolerability">
+          <h3 className="compare-block-head">Irritation and congestion risk</h3>
+          <div className="compare-grid">
+            <Row label="Known irritants" cols={cols}>
+              {tolerability.map((t, i) => (
+                <span className="compare-cell" key={i}>
+                  <strong>
+                    {t.formulation_pct !== null && t.formulation_pct !== undefined
+                      ? `${Math.round(t.formulation_pct)}%`
+                      : "—"}
+                  </strong>
+                  {(t.formulation_notes || []).length > 0 && (
+                    <span className="compare-component-note">{t.formulation_notes[0]}</span>
+                  )}
+                </span>
+              ))}
+            </Row>
+            <Row label={`For ${String(skinType || "this").toLowerCase()} skin`} cols={cols}>
+              {tolerability.map((t, i) => (
+                <span className="compare-cell" key={i}>
+                  {t.skin_type_risk ? (
+                    <span className={`compare-risk compare-risk-${t.skin_type_risk}`}>
+                      {t.skin_type_risk} risk
+                    </span>
+                  ) : <span>&mdash;</span>}
+                  {(t.skin_type_notes || []).length > 0 && (
+                    <span className="compare-component-note">
+                      {t.skin_type_notes.length === 1
+                        ? t.skin_type_notes[0]
+                        : `${t.skin_type_notes.length} ingredients flagged`}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </Row>
+          </div>
+          <p className="compare-muted">
+            The first row is about the formula and is the same for everyone.
+            The second is about your skin type &mdash; pore-clogging
+            ingredients matter to oily and acne-prone skin and barely at all to
+            dry skin, so a product can be free of irritants and still be the
+            wrong choice for you.
+          </p>
+        </section>
+      )}
+
+      {/* --------------------------------------------------- using them both */}
+      {together?.checked && (
+        <section className="compare-block" data-testid="compare-together">
+          <h3 className="compare-block-head">Could you use both?</h3>
+          {together.clear && (
+            <p className="compare-together-clear">
+              <i className="fa-solid fa-circle-check"></i> No layering conflict
+              found between these two, and neither duplicates the other's job.
+            </p>
+          )}
+          {together.conflicts.map((c, i) => (
+            <p className="compare-together-warn" key={`c${i}`}>
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <span><strong>{c.families.join(" + ")}.</strong> {c.message}</span>
+            </p>
+          ))}
+          {together.redundant.map((r, i) => (
+            <p className="compare-together-warn" key={`r${i}`}>
+              <i className="fa-solid fa-copy"></i>
+              <span>{r.message}</span>
+            </p>
+          ))}
+        </section>
+      )}
+      {together && together.checked === false && (
+        <p className="compare-muted" data-testid="compare-together-skipped">
+          {together.reason}
+        </p>
+      )}
+
+      {/* --------------------------------------------------------- verdict */}
       <div className="compare-verdict" data-testid="compare-verdict">
         {verdict.best_formulation && (
           <p className="compare-verdict-line">
@@ -231,6 +420,18 @@ function CompareResult({ result, currency }) {
           </p>
         )}
         {verdict.note && <p className="compare-note">{verdict.note}</p>}
+
+        {verdict.choose_if?.length > 0 && (
+          <div className="compare-choose">
+            {verdict.choose_if.map((c) => (
+              <div className="compare-choose-item" key={c.product_name}>
+                <h4>Choose {c.product_name} if…</h4>
+                <ul>{c.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        )}
+
         <p className="compare-method">{result.method_note}</p>
       </div>
     </div>

@@ -3681,7 +3681,8 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             'missing_actives': missing_actives[:3],
             'supporting_ingredients': present_supporters[:4],
             'explanation': explanation[:4],
-            'advisory': (f"Great formula. For even faster {concern.lower()} results, consider adding {missing_actives[0]}" + (f" or {missing_actives[1]}" if len(missing_actives) > 1 else "") + " to your routine.") if missing_actives else "Great active coverage for this concern.",
+            'advisory': _concern_advisory(
+                _norm['category_score'], concern, missing_actives),
             'synergy_bonus': comp_c,
         }
 
@@ -4127,6 +4128,51 @@ def get_upgrade_suggestions(ingredient_list, concerns):
             unique_suggestions.append(s)
             seen.add(key)
     return unique_suggestions[:3]
+
+
+
+def _concern_advisory(score, concern, missing_actives):
+    """One line of advice that agrees with the score above it.
+
+    This used to open with "Great formula" on every concern regardless of the
+    number, so a 12/100 fit was announced as great and then scored as very
+    low in the same card. Praise that contradicts the number printed beside it
+    is worse than no advice: it tells a reader the score is decoration.
+    """
+    concern_l = str(concern or 'this concern').lower()
+    options = ''
+    if missing_actives:
+        options = missing_actives[0]
+        if len(missing_actives) > 1:
+            options += ' or %s' % missing_actives[1]
+
+    if score >= 75:
+        if not options:
+            return "Strong coverage for %s - this is what you want." % concern_l
+        return ("Strong coverage for %s. If you wanted to push further, %s "
+                "would be the next addition." % (concern_l, options))
+
+    if score >= 50:
+        if not options:
+            return ("Reasonable coverage for %s, though nothing here is a "
+                    "primary treatment for it." % concern_l)
+        return ("Reasonable coverage for %s. Adding %s would do more for it "
+                "than anything currently in this formula."
+                % (concern_l, options))
+
+    if score >= 25:
+        if not options:
+            return ("This does little for %s. It is not the wrong product, but "
+                    "it is not the one treating that." % concern_l)
+        return ("This does little for %s - the actives here only support it. "
+                "%s is what actually treats it."
+                % (concern_l, options.capitalize()))
+
+    if not options:
+        return ("Nothing in this formula targets %s. If that is what you are "
+                "treating, this is not the product for it." % concern_l)
+    return ("Nothing in this formula targets %s. Look for %s instead."
+            % (concern_l, options))
 
 
 def analyze_product(product_data):
