@@ -46,7 +46,8 @@ def client():
 
 @pytest.fixture(autouse=True)
 def _free_by_default(monkeypatch):
-    monkeypatch.setattr(server, "_resolve_entitlement", lambda request: False)
+    monkeypatch.setattr(server, "_resolve_entitlement",
+                        lambda request, analysis_key=None: False)
     # /api/analyze is rate-limited to 10/minute per IP. This file makes more
     # requests than that from one address, so without disabling the limiter the
     # later tests receive a 429 whose body has no "access" key - which looks
@@ -136,7 +137,8 @@ def test_cache_hits_are_gated_too(client):
 
 
 def test_entitled_caller_receives_the_full_result(client, monkeypatch):
-    monkeypatch.setattr(server, "_resolve_entitlement", lambda request: True)
+    monkeypatch.setattr(server, "_resolve_entitlement",
+                        lambda request, analysis_key=None: True)
     body = client.post("/api/analyze", json=_unique()).json()
     assert body["access"]["tier"] == "full"
     assert "skin_concern_fit" in body

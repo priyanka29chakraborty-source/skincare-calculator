@@ -16,6 +16,9 @@ from typing import List, Optional
 from scoring import analyze_product
 from entitlement import filter_for_entitlement, audit_no_paid_leakage
 from affiliate import disclosure_for
+import wallet
+import identity
+from accounts import accounts_router, current_account
 from data_loader import data_loader
 from admin import admin_router
 from admin_db import log_fetch, log_analysis, increment_credits
@@ -182,25 +185,96 @@ async def health():
     return PlainTextResponse("ok")
 
 
-def _resolve_entitlement(request: Request) -> bool:
+@api_router.get("/readiness")
+async def readiness():
+    """Configuration that is safe locally and wrong in production.
+
+    These are the settings whose failure is invisible until it costs
+    something: credits on an ephemeral disk vanish on the next restart,
+    and an ephemeral session secret signs everyone out on every deploy.
+    Reported rather than merely logged so a deploy check can fail on them.
+    """
+    import payments
+    ledger_durable = wallet.storage_is_durable()
+    session_persistent = identity.secret_is_persistent()
+    warnings = []
+    if not ledger_durable:
+        warnings.append(
+            "The credit ledger is on SQLite. On an ephemeral filesystem a "
+            "restart deletes credits customers paid for. Set AIVEN_PG_URL.")
+    if not session_persistent:
+        warnings.append(
+            "SESSION_SECRET is unset, so sessions do not survive a restart. "
+            "Set SESSION_SECRET.")
+    if _DEV_UNLOCK:
+        warnings.append(
+            "DEV_UNLOCK_ALL is on - every caller receives the paid analysis "
+            "for free.")
+    return {
+        "ledger_durable": ledger_durable,
+        "session_secret_persistent": session_persistent,
+        "payments_configured": payments.is_configured(),
+        "dev_unlock_all": _DEV_UNLOCK,
+        "ready_to_charge": ledger_durable and session_persistent
+                           and payments.is_configured() and not _DEV_UNLOCK,
+        "warnings": warnings,
+    }
+
+
+def _resolve_entitlement(request: Request, analysis_key: str = None) -> bool:
     """Whether this caller has paid for the personal analysis.
 
-    Resolved entirely server-side. When the credit ledger lands this reads a
-    verified session and decrements a balance; until then it returns False so
-    the free path is the one actually exercised in production.
+    Resolved entirely server-side from a signed session cookie and the credit
+    ledger. Deliberately ignores everything in the request body: a header,
+    cookie or JSON field claiming entitlement is a request to be trusted, not
+    proof of payment, and the session cookie is only believed after its HMAC
+    verifies.
 
-    Deliberately ignores anything in the request body. A header, cookie or JSON
-    field claiming entitlement is a request to be trusted, not proof of
-    payment.
+    *analysis_key* is the cache key for this product and profile. It is used as
+    the ledger idempotency reference, which makes re-analysing the same product
+    free - a page refresh, a retry after a dropped connection, or coming back
+    to a product tomorrow all reuse the credit already spent. "Every new
+    product costs a credit" is the promise; charging twice for one product
+    because the network blipped is not something to discover from a complaint.
 
-    DEV_UNLOCK_ALL exists so the paid experience can be developed and tested
-    before accounts exist. It is read from the server environment, which the
-    client cannot influence, and is logged loudly at startup so it can never be
-    left on in production by accident.
+    Returning False is not an error. It is the free tier: the caller gets the
+    formulation analysis and the paid sections are stripped before
+    serialisation.
+
+    DEV_UNLOCK_ALL exists so the paid experience can be developed and tested.
+    It is read from the server environment, which the client cannot influence,
+    is logged loudly at startup, and is reported by /api/readiness so it cannot
+    be left on in production unnoticed.
     """
     if _DEV_UNLOCK:
         return True
-    return False
+
+    account_id = current_account(request)
+    if not account_id:
+        return False
+
+    try:
+        wallet.spend(account_id, reference=_spend_reference(account_id, analysis_key))
+        return True
+    except wallet.InsufficientCredits:
+        return False
+    except Exception:
+        # A ledger failure must not hand out the paid analysis for free, and
+        # must not 500 a request that has a perfectly good free answer.
+        logger.exception("credit spend failed; serving the free analysis")
+        return False
+
+
+def _spend_reference(account_id, analysis_key):
+    """The idempotency key for one account analysing one product.
+
+    None when there is no cache key - a spend with no reference is never
+    deduplicated, which is the safe direction: the customer is charged once per
+    call rather than possibly twice for one product.
+    """
+    if not analysis_key:
+        return None
+    return "analysis:%s:%s" % (account_id, analysis_key)
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}
@@ -261,7 +335,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
             # cached object directly would hand a free caller the paid data
             # whenever anyone had analysed the same product before them, which
             # is precisely how a paywall leaks without anyone noticing.
-            _entitled = _resolve_entitlement(request)
+            _entitled = _resolve_entitlement(request, cache_key)
             _out = filter_for_entitlement(cached, _entitled)
             if not _entitled:
                 audit_no_paid_leakage(_out)
@@ -320,7 +394,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
         # editable field. Until accounts and credits exist this resolves to
         # False, so the free payload is what ships and the gate is exercised in
         # production from day one rather than bolted on later.
-        entitled = _resolve_entitlement(request)
+        entitled = _resolve_entitlement(request, cache_key)
         result = filter_for_entitlement(result, entitled)
         if not entitled:
             # Last line of defence before serialisation - if a future change
@@ -1066,6 +1140,7 @@ async def _best_price_impl(req: BestPriceRequest, request: Request):
         }
 
 
+api_router.include_router(accounts_router)
 app.include_router(api_router)
 
 # Production: locked to urancal.com only

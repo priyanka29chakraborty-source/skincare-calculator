@@ -93,3 +93,9 @@ backend/logs.db
 backend/logs.db-shm
 backend/logs.db-wal
 backend/__pycache__/
+
+# Local credit ledger. Production uses PostgreSQL via AIVEN_PG_URL; this file
+# only exists when running without it, and must never be committed.
+backend/wallet.db
+backend/wallet.db-shm
+backend/wallet.db-wal
