@@ -5,6 +5,9 @@ import { API, CURRENCY_MAP } from "./constants";
 import InputForm from "./components/InputForm";
 import ResultCards from "./components/ResultCards";
 import PersonaliseCard from "./components/PersonaliseCard";
+import AccountBar from "./components/AccountBar";
+import UnlockModal from "./components/UnlockModal";
+import useAccount from "./hooks/useAccount";
 
 function App() {
   const [ingredients, setIngredients] = useState("");
@@ -30,6 +33,13 @@ function App() {
   const [fetchMsg, setFetchMsg] = useState("");
   const [fetchStatus, setFetchStatus] = useState(""); // "success" | "partial" | "failed"
   const [alternatives, setAlternatives] = useState(null);
+  const account = useAccount();
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  // Read through a ref inside handleAnalyze: adding `account` to its dependency
+  // list would rebuild the callback on every balance change and re-trigger the
+  // effects that depend on it.
+  const accountRef = useRef(account);
+  accountRef.current = account;
   const [altLoading, setAltLoading] = useState(false);
   const [bestPrice, setBestPrice] = useState(null);
   const [bestPriceLoading, setBestPriceLoading] = useState(false);
@@ -141,6 +151,11 @@ function App() {
         user_profile: userProfile,
       });
       setResult(data);
+      // An analysis may have spent a credit, so the counter in the header is
+      // now stale. Leaving it stale means someone watches their balance sit
+      // still while it is quietly going down, which is exactly the kind of
+      // thing that makes a paid product feel untrustworthy.
+      if (accountRef.current.signedIn) accountRef.current.refresh();
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
       const concernFit = data.skin_concern_fit || {};
       const weakConcerns = Object.entries(concernFit).filter(([, v]) => typeof v === 'object' ? v.score < 75 : v < 75);
@@ -240,6 +255,18 @@ function App() {
     <div className="sc-app" data-testid="skincare-app">
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
+      <AccountBar account={account} onOpenUnlock={() => setUnlockOpen(true)} />
+
+      <UnlockModal
+        open={unlockOpen}
+        onClose={() => setUnlockOpen(false)}
+        account={account}
+        /* Re-run the analysis straight after a purchase. The user pressed
+           unlock on a result that is already on screen; making them press
+           Analyze again to see what they just paid for would be a poor joke. */
+        onPurchased={() => { setUnlockOpen(false); handleAnalyze(); }}
+      />
+
       <header className="sc-header" data-testid="app-header">
         <div className="eyebrow">Skincare Analysis Tool</div>
         <h1 className="sc-title"><i className="fa-solid fa-flask-vial"></i> Analyze Your Skincare Product</h1>
@@ -284,6 +311,7 @@ function App() {
               bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
               fetchInput={fetchInput}
               category={category}
+              onUnlock={() => setUnlockOpen(true)}
             />
           </section>
         )}

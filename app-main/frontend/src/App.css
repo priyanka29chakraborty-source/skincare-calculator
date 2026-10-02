@@ -800,3 +800,98 @@ body::before {
   font-size: 0.72rem; line-height: 1.6; color: var(--text-sub);
 }
 .affiliate-notice i { color: var(--dusty-rose-light); margin-top: 3px; flex-shrink: 0; }
+
+/* ========== ACCOUNT ========== */
+/* Above the header, and only once there is something to say. A signed-out
+   visitor who has not hit the paywall does not need an account control in
+   front of the thing they came for. */
+.account-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  max-width: 100%; margin: 0 0 18px;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.75); border: 1px solid var(--border);
+  border-radius: 14px;
+  font-family: 'DM Sans', sans-serif; font-size: 0.78rem; color: var(--text-sub);
+}
+.account-balance { display: flex; align-items: center; gap: 7px; }
+.account-balance i { color: var(--sage); font-size: 0.8rem; }
+.account-balance strong { color: var(--charcoal); font-weight: 700; }
+.account-actions { display: flex; gap: 14px; }
+.account-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: inherit; font-weight: 600;
+  color: var(--dusty-rose-dark); text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.account-link:hover { color: var(--charcoal); }
+.account-link:focus-visible { outline: none; box-shadow: var(--focus-ring-strong); border-radius: 4px; }
+
+/* ========== UNLOCK MODAL ========== */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(30,41,59,0.42);
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.18s ease both;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-card {
+  position: relative;
+  background: var(--warm-white); border: 1px solid var(--border);
+  border-radius: 22px; padding: 30px 28px;
+  width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 18px 60px rgba(107,64,80,0.22);
+  animation: slideUp 0.26s ease both;
+}
+.modal-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-sub); cursor: pointer; font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.18s, color 0.18s;
+}
+.modal-close:hover { border-color: var(--dusty-rose); color: var(--dusty-rose-dark); }
+.modal-close:focus-visible { outline: none; box-shadow: var(--focus-ring-strong); }
+.modal-lede { font-size: 0.86rem; line-height: 1.65; color: var(--charcoal); margin-bottom: 20px; }
+.modal-fineprint { font-size: 0.72rem; line-height: 1.6; color: var(--text-sub); margin-top: 14px; }
+.modal-cta { margin-top: 18px; font-size: 1rem; padding: 14px; }
+.modal-error {
+  margin-top: 14px; padding: 10px 14px; border-radius: 10px;
+  background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c;
+  font-size: 0.78rem; line-height: 1.55;
+}
+.modal-notice {
+  margin-top: 14px; padding: 10px 14px; border-radius: 10px;
+  background: #f0fdf4; border: 1px solid #86efac; color: #166534;
+  font-size: 0.78rem;
+}
+
+/* Three packs side by side; the price per analysis is shown on each so the
+   better value is visible rather than asserted. */
+.pack-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+.pack-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 18px 8px; cursor: pointer; text-align: center;
+  background: var(--warm-white); border: 1px solid var(--border); border-radius: 14px;
+  font-family: 'DM Sans', sans-serif;
+  transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+}
+.pack-card:hover:not(:disabled) {
+  border-color: var(--dusty-rose); transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(191,136,136,0.18);
+}
+.pack-card:focus-visible { outline: none; border-color: var(--dusty-rose); box-shadow: var(--focus-ring-strong); }
+.pack-card:disabled { opacity: 0.55; cursor: not-allowed; }
+.pack-credits { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 600; color: var(--charcoal); line-height: 1; }
+.pack-unit { font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-sub); }
+.pack-price { margin-top: 8px; font-size: 0.95rem; font-weight: 700; color: var(--dusty-rose-dark); }
+.pack-each { font-size: 0.64rem; color: var(--text-sub); }
+
+@media (max-width: 480px) {
+  .pack-grid { grid-template-columns: 1fr; }
+  .pack-card { flex-direction: row; justify-content: space-between; padding: 14px 16px; }
+  .pack-card .pack-credits { font-size: 1.2rem; }
+  .modal-card { padding: 26px 20px; }
+}
