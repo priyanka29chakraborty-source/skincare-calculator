@@ -85,7 +85,7 @@ def audit(records):
         # about the ingredient itself, so only the opening verdict counts.
         preg = str(entry.get('Pregnancy_Safety') or '').strip().lower()
         verdict = re.split(r'[;,.—-]', preg)[0] if preg else ''
-        if 'avoid' in verdict and re.search(r'safe', verdict):
+        if 'avoid' in verdict and re.search(r'\bsafe\b', verdict):
             findings['pregnancy: says both safe and avoid'].append(
                 '%s: %s' % (name, preg[:80]))
 
