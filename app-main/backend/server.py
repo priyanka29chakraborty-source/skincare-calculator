@@ -380,18 +380,25 @@ def _filter_comparison(out, entitled):
     Removed, not blanked: a key that is absent cannot be read out of the
     response by editing client code, which is the whole point of doing this
     here rather than hiding sections in the interface.
+
+    Builds a new dict rather than editing the caller's. The first version
+    popped straight from *out*, which was safe only because the endpoint hands
+    it a freshly built object: `verdict.pop('choose_if')` reached through into
+    a nested dict the caller still held, so a free request permanently
+    degraded the object it was given. Harmless today, and exactly the shape of
+    the cache leak already fixed on the analyse path - add comparison caching
+    later and a free request would strip choose_if from the cached result for
+    the next paying one.
     """
     if entitled:
-        out['access'] = {'tier': 'full'}
-        return out
+        return dict(out, access={'tier': 'full'})
 
-    for key in COMPARISON_PAID_SECTIONS:
-        out.pop(key, None)
+    out = {k: v for k, v in out.items() if k not in COMPARISON_PAID_SECTIONS}
 
     # The verdict is mixed: better-made and better-value come from the free
     # scoreboard, "choose X if" is built from concerns and unique actives.
-    verdict = out.get('verdict') or {}
-    verdict.pop('choose_if', None)
+    out['verdict'] = {k: v for k, v in (out.get('verdict') or {}).items()
+                      if k != 'choose_if'}
 
     out['access'] = {
         'tier': 'free',

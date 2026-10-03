@@ -352,7 +352,14 @@ def _summarise_checks(profile, flags, climate_key, ingredient_list):
             # FITZPATRICK['label'] is a description ("Burns minimally, tans
             # easily"), not a name, so it reads as nonsense in this sentence.
             'Nothing in this formula raises dark-mark risk for type %s skin.' % tone),
-        row('climate', 'Climate', climate_label,
+        # Climate is the one question that can answer itself: resolve_climate
+        # falls back to the country already collected on the main form. That is
+        # the intended design, but the row has to say where the value came
+        # from - presenting an inferred climate as something the reader told us
+        # claims an answer they never gave.
+        row('climate', 'Climate',
+            ('%s (from your country)' % climate_label) if climate_label and not profile.get('climate')
+            else climate_label,
             'Nothing about this texture works against a %s climate.'
             % (str(climate_label or '').lower() or 'your')),
         row('allergens', 'Sensitivities',

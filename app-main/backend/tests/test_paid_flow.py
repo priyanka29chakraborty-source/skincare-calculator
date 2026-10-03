@@ -610,3 +610,33 @@ def test_whitespace_and_case_do_not_make_a_new_product(client, funded):
     body['ingredients'] = body['ingredients'].upper().replace(', ', ',  ')
     client.post('/api/analyze', json=body)
     assert client.get('/api/auth/me').json()['balance'] == after_first
+
+
+def test_the_comparison_gate_does_not_mutate_what_it_is_given(client):
+    """It used to pop straight from the caller's dict, and `choose_if` lives
+    one level down, so a free request permanently degraded the object it was
+    handed. Safe only because the endpoint builds a fresh one each time - and
+    exactly the shape of the cache leak already fixed on the analyse path.
+    Add comparison caching later and a free request would strip choose_if from
+    the cached result for the next paying reader."""
+    import server
+
+    built = {
+        'products': [1, 2], 'components': [],
+        'verdict': {'best_formulation': 'A', 'best_value': 'B',
+                    'choose_if': [{'product_name': 'A'}]},
+        'actives': {'shared': []}, 'concerns': [], 'tolerability': [], 'together': {},
+    }
+    free = server._filter_comparison(built, False)
+
+    assert 'choose_if' not in free['verdict']
+    assert all(k not in free for k in ('actives', 'concerns', 'tolerability', 'together'))
+
+    # The object handed in is untouched.
+    assert 'choose_if' in built['verdict']
+    assert 'actives' in built
+    assert 'access' not in built
+
+    paid = server._filter_comparison(built, True)
+    assert 'choose_if' in paid['verdict']
+    assert all(k in paid for k in ('actives', 'concerns', 'tolerability', 'together'))

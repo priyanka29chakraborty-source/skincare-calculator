@@ -228,3 +228,33 @@ def test_new_concerns_are_scorable(concern):
     score = _fit(result).get(concern)
     assert score is not None, "{} produced no score".format(concern)
     assert 0 <= score <= 100
+
+
+def test_an_inferred_climate_says_where_it_came_from():
+    """resolve_climate falls back to the country already collected on the main
+    form, which is the intended design - but the row sits under "What your
+    answers changed", so presenting an inferred value as something the reader
+    told us claims an answer they never gave."""
+    from personalization import build_personal_context
+
+    ctx = build_personal_context({}, ['aqua', 'glycerin'], ['Hydration'],
+                                 'serum', 'India')
+    climate = next(c for c in ctx['checks'] if c['key'] == 'climate')
+    assert 'from your country' in (climate['answer'] or '')
+
+    chosen = build_personal_context({'climate': 'hot_arid'}, ['aqua'], ['Hydration'],
+                                    'serum', 'India')
+    answered = next(c for c in chosen['checks'] if c['key'] == 'climate')
+    assert 'from your country' not in (answered['answer'] or '')
+
+
+def test_unanswered_questions_report_as_unanswered():
+    """Three distinct states - unanswered, clear, flagged - so that silence
+    and "we did not look" stop being the same output."""
+    from personalization import build_personal_context
+
+    ctx = build_personal_context({}, ['aqua', 'glycerin'], ['Hydration'],
+                                 'serum', 'India')
+    statuses = {c['key']: c['status'] for c in ctx['checks']}
+    for key in ('skin_tone', 'allergens', 'routine'):
+        assert statuses[key] == 'unanswered', statuses
