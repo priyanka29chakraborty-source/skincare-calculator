@@ -65,7 +65,7 @@ COUNTRY_CLIMATE = {
 ALLERGEN_GROUPS = {
     'fragrance': {
         'label': 'Fragrance / parfum',
-        'markers': ('parfum', 'fragrance', 'aroma', 'limonene', 'linalool',
+        'markers': ('parfum', 'fragrance', 'aroma', 'sugandhit', 'limonene', 'linalool',
                     'citronellol', 'geraniol', 'eugenol', 'coumarin', 'citral',
                     'benzyl benzoate', 'benzyl salicylate', 'cinnamal',
                     'hexyl cinnamal', 'isoeugenol', 'farnesol'),
@@ -143,7 +143,13 @@ ROUTINE_INTERACTIONS = [
 ]
 
 # Families where owning two products is redundant rather than additive.
-REDUNDANT_WITH_SELF = ('retinoid', 'vitamin_c', 'aha', 'bha', 'benzoyl_peroxide')
+# Niacinamide and azelaic acid are in here because a second product with the
+# same one rarely adds a result. Peptides are left out: people often layer
+# different peptides on purpose.
+REDUNDANT_WITH_SELF = (
+    'retinoid', 'vitamin_c', 'aha', 'bha', 'benzoyl_peroxide',
+    'niacinamide', 'azelaic',
+)
 
 
 def _norm(s):
@@ -290,7 +296,9 @@ def climate_context(climate_key, ingredient_list, category):
                        "formula - it may simply be more than your air requires."
                        .format(heavy[0]),
         })
-    elif data['humidity'] == 'low' and not heavy:
+    elif data['humidity'] == 'low' and not heavy and category != 'facial oil':
+        # A facial oil is the sealing step. Telling someone to put a richer
+        # layer over squalane or rosehip oil describes a gel, not an oil.
         flags.append({
             'type': 'climate_texture', 'severity': 'info',
             'message': "In dry air, humectants work best with something on top "
@@ -352,7 +360,14 @@ def _summarise_checks(profile, flags, climate_key, ingredient_list):
             # FITZPATRICK['label'] is a description ("Burns minimally, tans
             # easily"), not a name, so it reads as nonsense in this sentence.
             'Nothing in this formula raises dark-mark risk for type %s skin.' % tone),
-        row('climate', 'Climate', climate_label,
+        # Climate is the one question that can answer itself: resolve_climate
+        # falls back to the country already collected on the main form. That is
+        # the intended design, but the row has to say where the value came
+        # from - presenting an inferred climate as something the reader told us
+        # claims an answer they never gave.
+        row('climate', 'Climate',
+            ('%s (from your country)' % climate_label) if climate_label and not profile.get('climate')
+            else climate_label,
             'Nothing about this texture works against a %s climate.'
             % (str(climate_label or '').lower() or 'your')),
         row('allergens', 'Sensitivities',

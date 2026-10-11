@@ -1,6 +1,7 @@
 import React from "react";
+import { createPortal } from "react-dom";
 
-import { money } from "../constants";
+import { money, categoryLabel, pricePlain } from "../constants";
 
 /**
  * The PDF.
@@ -68,7 +69,9 @@ export default function PrintReport({
   const unit = sizeUnit === "g" ? "g" : "ml";
   const perUnit = (price && size) ? Number(price) / Number(size) : null;
 
-  return (
+  // A direct child of <body>: the print stylesheet hides every other body
+  // child, including #root, so a report rendered inside the app prints blank.
+  return createPortal(
     <div className="print-report" data-testid="print-report" aria-hidden="true">
       {/* ---------------------------------------------------------------- */}
       <header className="pr-head">
@@ -76,7 +79,7 @@ export default function PrintReport({
           <div className="pr-eyebrow">Formulation analysis</div>
           <h1 className="pr-product">{productName || "Unnamed product"}</h1>
           <div className="pr-sub">
-            {[brand, category].filter(Boolean).join(" · ")}
+            {[brand, categoryLabel(category)].filter(Boolean).join(" · ")}
           </div>
         </div>
         <div className="pr-score-block">
@@ -110,7 +113,7 @@ export default function PrintReport({
       {/* ------------------------------------------------- score breakdown */}
       {breakdown.length > 0 && (
         <section className="pr-section">
-          <h2>How the score was reached</h2>
+          <h2>How this score works</h2>
           {result.formulation_rationale && (
             <p className="pr-rationale">{result.formulation_rationale}</p>
           )}
@@ -167,15 +170,8 @@ export default function PrintReport({
       {/* -------------------------------------------------------------- value */}
       {value.available && (
         <section className="pr-section">
-          <h2>Price, assessed separately</h2>
-          <p>
-            {money(currency, value.price_per_ml)} per {unit}
-            {value.category_avg
-              ? ` against a category average of ${money(currency, value.category_avg)}`
-              : ""}
-            {value.ratio ? ` (${value.ratio}×).` : "."}
-            {value.headline ? ` ${value.headline}` : ""}
-          </p>
+          <h2>Price</h2>
+          <p>{pricePlain(value, currency)}</p>
           {value.note && <p className="pr-muted">{value.note}</p>}
         </section>
       )}
@@ -315,6 +311,7 @@ export default function PrintReport({
           check with a clinician before changing a routine.
         </p>
       </footer>
-    </div>
+    </div>,
+    document.body,
   );
 }

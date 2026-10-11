@@ -8,6 +8,76 @@ from config import (
 )
 
 
+def _split_ingredient_text(text):
+    """Split on commas and line breaks, but not on a comma inside brackets.
+
+    'Turmeric (Curcuma Longa, Linn.-Rhizome-Powder)' is one ingredient.
+    The comma is part of the botanical citation, not the next ingredient.
+    """
+    parts = []
+    buf = []
+    depth = 0
+    for ch in text or '':
+        if ch == '(':
+            depth += 1
+            buf.append(ch)
+        elif ch == ')':
+            depth = max(0, depth - 1)
+            buf.append(ch)
+        elif ch in ',;\n\r' and depth == 0:
+            parts.append(''.join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        parts.append(''.join(buf))
+    return parts
+
+
+def _unwrap_other_ingredients(text):
+    """'Other Ingredients:' continues the list. It is not a heading that
+    deletes the line above it. A 90% aloe line was being discarded because
+    the words Ingredients: appeared later in the paste."""
+    return re.sub(r'\bother\s+ingred\w*\s*:', ',', text or '', flags=re.I)
+
+
+def _listed_ingredient_name(segment):
+    """The name to keep from one pasted entry.
+
+    'Ghritkumari Swaras (Aloe barbadensis)' is aloe. The name outside the
+    brackets is a local name and is not in the database. A bracket that is
+    only a translation of a name we already know, such as Niacinamide
+    (Vitamin B3), stays the outer name.
+    """
+    segment = segment or ''
+    if ':' in segment:
+        left, right = segment.split(':', 1)
+        if re.search(r'\d', right):
+            segment = left
+    inners = re.findall(r'\(([^)]*)\)', segment)
+    bare = re.sub(r'\([^)]*\)', ' ', segment)
+    bare = re.sub(r'\s*[\d.]+\s*(?:%|percent)\s*', ' ', bare, flags=re.I)
+    bare = re.sub(r'\s{2,}', ' ', bare).strip(' .-/,')
+    chosen = None
+    readable = None
+    for inner in inners:
+        inner = inner.split(',')[0].strip()
+        if len(inner) < 6 or re.fullmatch(r'[\d.\s%]+', inner or ''):
+            continue
+        data = data_loader.get_ingredient_data(inner)
+        if data and data.get('INCI_Name'):
+            chosen = str(data['INCI_Name']).strip()
+            break
+        if readable is None:
+            readable = inner
+    outer = data_loader.get_ingredient_data(bare) if bare else None
+    if not outer and not chosen and readable:
+        chosen = readable
+    if chosen and not outer:
+        return chosen
+    return bare
+
+
 def extract_concentrations_from_inci(ingredient_list_str):
     """Scan raw INCI text for explicit percentage annotations and return a dict
     of {normalized_lower_name: float_pct}. This must be called BEFORE any stripping
@@ -19,7 +89,26 @@ def extract_concentrations_from_inci(ingredient_list_str):
     if not ingredient_list_str:
         return {}
 
+    ingredient_list_str = _unwrap_other_ingredients(ingredient_list_str)
     found = {}
+    # A percentage written on the same entry as the ingredient, including
+    # values above 60. Aloe at 90% was dropped by the old ceiling.
+    for part in _split_ingredient_text(ingredient_list_str):
+        match = re.search(r'(\d+\.?\d*)\s*%', part)
+        if not match:
+            continue
+        try:
+            pct = float(match.group(1))
+        except ValueError:
+            continue
+        if not (0 < pct <= 100):
+            continue
+        name = _listed_ingredient_name(part)
+        if not name or len(name) < 3:
+            continue
+        key = name.lower()
+        if key not in found:
+            found[key] = pct
     patterns = [
         # "10% Niacinamide" — number precedes name
         re.compile(r'([\d]+\.?\d*)\s*%\s*\(?\s*([a-zA-Z][a-zA-Z0-9 \-\/]{2,40}?)\s*\)?(?=[,;\n\|+&\.]|$)', re.I),
@@ -34,10 +123,12 @@ def extract_concentrations_from_inci(ingredient_list_str):
                     pct, raw_name = float(g[0]), g[1]
                 else:
                     raw_name, pct = g[0], float(g[1])
-                if not (0 < pct <= 60):
+                if not (0 < pct <= 100):
                     continue
                 # Normalize the same way parse_ingredients() does: strip parens, lowercase
                 norm = re.sub(r'\([^)]*\)', '', raw_name).strip().strip('.-/ ').lower()
+                if norm in ('w/w', 'w/v', 'ww', 'wv', 'q.s', 'qs'):
+                    continue
                 if len(norm) > 2 and not norm[0].isdigit():
                     if norm not in found:
                         found[norm] = pct
@@ -55,6 +146,8 @@ def parse_ingredients(ingredient_list_str):
     if not ingredient_list_str:
         return []
 
+    ingredient_list_str = _unwrap_other_ingredients(ingredient_list_str)
+
     # Replace emojis with commas (emojis often used as separators between ingredients)
     ingredient_list_str = re.sub(
         r'[\U0001F300-\U0001F9FF\U00002700-\U000027BF'
@@ -66,8 +159,9 @@ def parse_ingredients(ingredient_list_str):
     if marker:
         ingredient_list_str = ingredient_list_str[marker.end():]
 
-    # Split by comma, semicolon, or line breaks
-    raw_parts = re.split(r'[,;\n\r]+', ingredient_list_str)
+    # Split by comma, semicolon, or line breaks. A comma inside brackets
+    # belongs to that ingredient.
+    raw_parts = _split_ingredient_text(ingredient_list_str)
 
     # Merge IUPAC numbering fragments: "1, 3 Butylene Glycol" → "1,3 Butylene Glycol"
     # A lone numeric segment (like "1" or "3") is never a real INCI name — it's part
@@ -122,14 +216,10 @@ def parse_ingredients(ingredient_list_str):
         for ing in sub_parts:
             ing = ing.strip()
 
-            # Remove parenthetical descriptors: "(Vitamin B3)", "(Provitamin B5)", "(Kumkuma)", etc.
-            # CRITICAL: strip BEFORE dedup key so "Saffron (Kumkuma)" → "Saffron" matches DB
-            ing = re.sub(r'\([^)]*\)', '', ing).strip()
-            # Collapse multiple spaces left by parenthetical removal
-            ing = re.sub(r'\s{2,}', ' ', ing).strip()
-
-            # Remove percentage annotations inline: "10%", "0.3 %", "10 percent"
-            ing = re.sub(r'\s*[\d\.]+\s*(?:%|percent)\s*', '', ing, flags=re.IGNORECASE).strip()
+            # A local name with the INCI in brackets becomes that INCI.
+            # "Saffron (Kumkuma)" still stays Saffron, because the outer name
+            # is the one in the database.
+            ing = _listed_ingredient_name(ing)
 
             # Remove trailing/leading punctuation artifacts
             ing = ing.strip('.-/ ')
@@ -172,6 +262,7 @@ def estimate_concentration(ingredient_list, known_concentrations=None):
     # actives like niacinamide (needs 2-10%), caffeine (5%+), or tocopherol (1%+).
     HIGH_POTENCY_KEYWORDS = [
         'peptide', 'retinol', 'retinal', 'retinyl', 'adapalene', 'tretinoin',
+        'hydroxypinacolone', 'betaine salicylate',
         'ascorbic acid', 'ferulic', 'tranexamic', 'kojic', 'bakuchiol',
         'alpha arbutin', 'azelaic', 'salicylic', 'glycolic', 'lactic',
     ]
@@ -235,6 +326,7 @@ def _parse_concentrations_from_name(product_name):
         'vitamin b3': 'niacinamide',   'vitamin b5': 'panthenol',
         'aha': 'glycolic acid',        'bha': 'salicylic acid',
         'pha': 'gluconolactone',
+        'granactive retinoid': 'hydroxypinacolone retinoate',
     }
 
     STOP_WORDS = {
@@ -275,8 +367,12 @@ def _parse_concentrations_from_name(product_name):
                     raw_name, pct = g[0].strip().lower(), float(g[1])
                 if not (0 < pct <= 100 and len(raw_name) > 1):
                     continue
-                # Strip leading/trailing stop and brand words
+                # "0.5% in Squalane" is the retinol's dose, not squalane's.
+                # Stripping the word "in" used to leave Squalane holding 0.5%.
                 name_parts = raw_name.split()
+                if name_parts and name_parts[0] in STOP_WORDS:
+                    continue
+                # Strip leading/trailing stop and brand words
                 while name_parts and name_parts[0] in STOP_WORDS | BRAND_WORDS:
                     name_parts = name_parts[1:]
                 while name_parts and name_parts[-1] in STOP_WORDS | BRAND_WORDS:
@@ -1518,6 +1614,100 @@ def _price_pts(price, size_ml, category, country):
     return 2
 
 
+_BENEFIT_DANGLING = {
+    'a', 'an', 'the', 'is', 'of', 'to', 'and', 'or', 'for', 'with', 'in', 'its',
+    'this', 'that', 'it', 'as', 'by', 'from', 'on', 'at', 'are', 'was', 'be',
+    'also', 'more', 'than', 'their', 'can', 'may', 'not', 'so',
+}
+# Scraped notes that stop halfway through a word.
+_BENEFIT_STUBS = {
+    'meani', 'mo', 'tha', 'po', 'aro', 'repa', 'hel', 'whil', 'absor', 'activ',
+    'antio', 'benefi', 'studie', 'argini', 'speci', 'alginol', 'antimicro',
+    'polyp', 'amer', 'humecta', 'cucumbe', 'perso', 'spo', 'infl', 'ha', 'th',
+}
+_BENEFIT_SCRAP = re.compile(
+    r'^(and |or |which |making |it is |they are |due to |used in sun |'
+    r'to provide |is believed |is derived |typically |resulting |revealing |'
+    r'occur |seen |acts |native |keeping |a compound |but it |or can |so is |'
+    r'and also |and has |and is |and conveys |this natural |derived from |'
+    r'including supporting |used for its |it is used)',
+    re.I,
+)
+
+
+def _benefit_clauses(raw, ingredient_name=None):
+    """Benefit labels with cut-off scraps removed.
+
+    The source notes are short labels joined by semicolons. A scrape also
+    left half-words in some of them ("meani", "and th", "within p").
+    """
+    text = str(raw or '').strip()
+    if not text or text.lower() in ('nan', 'none'):
+        return []
+    name = re.sub(r'[^a-z0-9]+', ' ', str(ingredient_name or '').lower()).strip()
+    kept = []
+    for part in re.split(r'[;]', text):
+        s = part.strip(' -.')
+        if len(s) < 3:
+            continue
+        words = s.split()
+        last = re.sub(r'[^A-Za-z0-9]', '', words[-1]).lower()
+        if last in _BENEFIT_DANGLING or last in _BENEFIT_STUBS:
+            continue
+        if len(last) <= 2 and not last.isupper():
+            continue
+        if _BENEFIT_SCRAP.match(s):
+            continue
+        if re.search(r'\bis an?\s+\w+$', s, re.I):
+            continue
+        folded = re.sub(r'[^a-z0-9]+', ' ', s.lower()).strip()
+        # Drop a clause that is only the ingredient's own name. A longer
+        # note that mentions the name ("X is a synthetic active") stays.
+        if name and folded and (folded == name or folded in name):
+            continue
+        kept.append(s)
+    return kept
+
+
+def _benefit_sentence(raw, ingredient_name=None):
+    """One complete sentence from the benefit labels. No new claim is added."""
+    parts = _benefit_clauses(raw, ingredient_name)
+    if not parts:
+        return None
+
+    def _lead(phrase):
+        phrase = phrase.replace('/', ' and ')
+        words = []
+        for word in phrase.split(' '):
+            core = re.sub(r'[^A-Za-z0-9-]', '', word)
+            # Keep tokens that are already abbreviations (EGCG, UV, A2A, NF-kB).
+            if core.isupper() or any(ch.isdigit() for ch in core):
+                words.append(word)
+            elif word:
+                words.append(word[0].lower() + word[1:])
+        return ' '.join(words)
+
+    if len(parts) == 1:
+        one = parts[0]
+        if (len(one.split()) >= 4 and re.search(
+                r'\b(is|are|supports|reduces|improves|neutralizes|replenishes|'
+                r'forms|creates|stabilizes|used)\b', one, re.I)):
+            return one if one.endswith('.') else one + '.'
+        return 'Used for %s.' % _lead(one)
+    bits = [_lead(p) for p in parts]
+    if len(bits) == 2:
+        body = '%s and %s' % (bits[0], bits[1])
+    else:
+        body = '%s, and %s' % (', '.join(bits[:-1]), bits[-1])
+    return 'Used for %s.' % body
+
+
+def _clean_benefits(raw):
+    """Keep short benefit labels. Drop a clause that was cut off mid-sentence."""
+    parts = _benefit_clauses(raw)
+    return '; '.join(parts) or None
+
+
 def calculate_main_worth_score(ingredient_list, price, size_ml, category, country='India', known_concentrations=None, skin_type='normal'):
     """
     Category-specific scoring engine.
@@ -1565,15 +1755,10 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
         ev_label  = get_evidence_label(get_evidence_factor(data))
         eq_factor = get_evidence_factor(data)
 
-        conc_label = (
-            "At or above effective concentration"   if conc_factor >= 1.0 else
-            "Likely within effective range"         if conc_factor >= 0.7 else
-            "Likely underdosed — deep in formula"   if conc_factor >= 0.5 else
-            "Likely trace amount — position too deep"
-        )
-
         _kc = known_concentrations or {}
         _conc_is_known = ing_lower in _kc
+        from formulation import dose_band_label
+        conc_label = dose_band_label(ing, conc, known=_conc_is_known)
 
         # MoA: only expose for Tier 1/2 (Activity_Tier_Weight >= 0.8)
         tier_weight = data_loader.get_activity_tier_weight(data)
@@ -1599,20 +1784,9 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             'concentration_known': _conc_is_known,
             'score_contribution': round(imp_score / 100, 2),
             'primary_benefits': (
-                # Clean truncated DB fragments: a segment is truncated if its last word
-                # is 1-2 chars and lowercase (e.g. 'it is used f', 'keeping skin m')
-                (lambda raw: '; '.join(
-                    s.strip() for s in str(raw).split(';')
-                    if s.strip() and len(s.strip()) > 2
-                    and not (len(s.strip().split()[-1].rstrip('.,;')) <= 2
-                             and s.strip().split()[-1].rstrip('.,;').islower())
-                ) or None
-                if raw and str(raw).lower() not in ('nan','none','') else None
-                )(data.get('Primary_Benefits',''))
-                or (lambda v: str(v).strip() if v and str(v).lower() not in ('nan','none','') else None)
-                (data.get('Functional_Category',''))
-                or (lambda v: str(v).split(';')[0].strip() if v and str(v).lower() not in ('nan','none','') else None)
-                (data.get('Skin_Concerns',''))
+                _benefit_sentence(data.get('Primary_Benefits', ''), ing)
+                or _benefit_sentence(data.get('Functional_Category', ''), ing)
+                or _benefit_sentence(str(data.get('Skin_Concerns', '') or '').split(';')[0], ing)
             ),
             'targets': [t.strip() for t in str(data.get('Skin_Concerns','') or '').split(';')
                         if t.strip() and t.strip() not in ('','nan')][:3],
@@ -2087,7 +2261,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     elif price_score >= 5: component_details['E'].append("Slightly overpriced for active content")
     else: component_details['E'].append("Heavily overpriced for the active content")
     if avg_price > 0 and price > 0 and size_ml > 0:
-        component_details['E'].append(f"{ratio:.1f}x vs category average ({price/size_ml:.2f}/ml vs avg {avg_price:.2f}/ml)")
+        component_details['E'].append(f"{ratio:.2f}× vs category average ({price/size_ml:.2f}/ml vs avg {avg_price:.2f}/ml)")
 
     red_flags, red_flag_penalty = detect_red_flags(ingredient_list, concentrations, category)
     total_score = min(100, max(0, total_score + red_flag_penalty))
@@ -2162,7 +2336,7 @@ def _build_result(total_score, score_breakdown, component_details, identified_ac
         'stats': {
             'price_per_ml': price_per_ml,
             'category_avg': round(avg_price, 2),
-            'vs_average': round(ratio, 1),
+            'vs_average': round(ratio, 2),
             'active_count': active_count,
             'active_ratio': round(active_ratio, 1),
             'price_per_active': round(price / active_count, 2) if active_count and price else price or 0,
@@ -2641,8 +2815,12 @@ def _uv_conc_factor(inci_name, resolved_list):
     pos < 20 → mid   → 0.75
     pos 20+  → low   → 0.5
     """
+    def _key(name):
+        # "(NANO)" is a form note, not a different filter.
+        return re.sub(r'\s+', ' ', re.sub(r'\([^)]*\)', ' ', str(name))).strip().lower()
+    target = _key(inci_name)
     try:
-        pos = next(i for i, x in enumerate(resolved_list) if x.lower() == inci_name.lower())
+        pos = next(i for i, x in enumerate(resolved_list) if _key(x) == target)
     except StopIteration:
         return 0.5
     if pos < 8:    return 1.0
@@ -2671,12 +2849,17 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
     seen_filter_keys = set()
     for ing in resolved_list:
         canonical = INCI_ALIASES.get(ing, ing)
+        # Trade names in the list are title case. A pasted INCI is often
+        # ALL CAPS, and Tinosorb M arrives as "... (NANO)". The lookup is
+        # case-insensitive, but the name stored here used to be the raw
+        # text, so it missed every band list and every strength weight.
         uv_data = data_loader.get_uv_data(canonical) or data_loader.get_uv_data(ing)
         if uv_data:
             cat = str(uv_data.get('Ingredient_Category', '') or '').lower()
-            if 'uv filter' in cat and canonical not in seen_filter_keys:
-                detected_filters.append(canonical)
-                seen_filter_keys.add(canonical)
+            db_name = str(uv_data.get('INCI_Name', '') or '').strip() or canonical
+            if 'uv filter' in cat and db_name.lower() not in seen_filter_keys:
+                detected_filters.append(db_name)
+                seen_filter_keys.add(db_name.lower())
 
     # ── Step 2: UV band presence ──────────────────────────────────────────────
     uvb_present  = any(f in _UVB_FILTER_LIST  for f in detected_filters)
@@ -2771,21 +2954,11 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
 
     total_score = round(coverage_pts + filter_pts + phot_pts + form_pts)
 
-    # 4.6 SPF Estimate from filter_pts
-    if   filter_pts >= 27: spf_estimate = "SPF 50+"
-    elif filter_pts >= 22: spf_estimate = "SPF 40-50"
-    elif filter_pts >= 16: spf_estimate = "SPF 30-40"
-    elif filter_pts >= 10: spf_estimate = "SPF 20-30"
-    elif filter_pts >= 5:  spf_estimate = "SPF 15-20"
-    else:                  spf_estimate = "SPF < 15 (estimated)"
+    # SPF and PA are lab grades of the finished cream. Counting filters
+    # cannot produce them, so the report never assigns either grade.
+    spf_estimate = "Not measured"
+    pa_estimate = "Not measured"
 
-    # PA Rating from UVA score
-    uva1_filter_count = sum(1 for f in detected_filters if f in _UVA1_FILTER_LIST)
-    if   uva1_filter_count >= 2 and uva2_present: pa_estimate = "PA++++"
-    elif uva1_filter_count >= 1 and uva2_present: pa_estimate = "PA+++"
-    elif uva1_filter_count >= 1:                  pa_estimate = "PA++"
-    elif uva2_present:                            pa_estimate = "PA+"
-    else:                                         pa_estimate = "No UVA protection estimated"
 
     # ── PART 6: FLAGS ─────────────────────────────────────────────────────────
     reef_safe = True
@@ -2860,8 +3033,15 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
             'supporting_ingredients': [],
             'explanation': explanation[:4],
             'advisory': (
-                f"SPF estimate: {spf_estimate} · PA estimate: {pa_estimate} "
-                f"(tool estimates only — not lab-tested values)"
+                ("This formula contains both UVB and UVA filters. "
+                 if uvb_present and (uva1_present or uva2_present)
+                 else "This formula contains UVB filters and no UVA filter. "
+                 if uvb_present
+                 else "This formula contains UVA filters and no UVB filter. "
+                 if (uva1_present or uva2_present)
+                 else "No UV filters were found. ")
+                + "SPF and PA are lab grades of the finished product, "
+                  "so this report does not assign either."
             ),
             'synergy_bonus': 0,
             'sunscreen_analysis': {
@@ -2874,7 +3054,7 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
                 },
                 'spf_estimate':    spf_estimate,
                 'pa_estimate':     pa_estimate,
-                'pa_note':         'Approximation based on filter type; not lab-tested (PPD test required)',
+                'pa_note':         'PA is a lab grade. This report does not assign one.',
                 'broad_spectrum':  uvb_present and (uva1_present or uva2_present),
                 'uvb_covered':     uvb_present,
                 'uva1_covered':    uva1_present,
@@ -3185,14 +3365,58 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
     ayurvedic_count = sum(1 for kw in AYURVEDIC_HEROES if kw in ing_str)
     has_ayurvedic_potency = ayurvedic_count >= 2
 
+    # A common name and its INCI are one oil. Rosa canina is rosehip, so a
+    # rosehip oil must not be told to add rosehip.
+    _OIL_SAME = (
+        frozenset({'rosehip', 'rosa canina'}),
+        frozenset({'jojoba', 'simmondsia chinensis', 'simmondsia'}),
+        frozenset({'argan', 'argania', 'argania spinosa'}),
+        frozenset({'olive', 'olea europaea'}),
+        frozenset({'sea buckthorn', 'hippophae'}),
+        frozenset({'marula', 'sclerocarya'}),
+        frozenset({'saffron', 'crocus sativus', 'kumkuma'}),
+        frozenset({'turmeric', 'curcuma'}),
+        frozenset({'licorice', 'glycyrrhiza'}),
+        frozenset({'sandalwood', 'santalum', 'chandana'}),
+        frozenset({'manjistha', 'rubia cordifolia'}),
+        frozenset({'carrot', 'carota sativa', 'daucus'}),
+        frozenset({'neroli', 'aurantium amara'}),
+        frozenset({'vitamin e', 'tocopherol'}),
+        frozenset({'sesame', 'sesamum'}),
+    )
+
+    def _oil_group(kw):
+        for group in _OIL_SAME:
+            if kw in group:
+                return group
+        return None
+
+    def _oil_hit(kw):
+        if kw in ing_str:
+            return True
+        group = _oil_group(kw)
+        return bool(group and any(other in ing_str for other in group))
+
     for concern in concerns:
         keywords = OIL_CONCERN_MAP.get(concern, [])
         if not keywords:
             # Generic fallback: any antioxidant/soothing ingredient
             keywords = ['tocopherol', 'ferulic', 'squalane', 'jojoba', 'rosehip']
 
-        # Count matches
-        matched = [kw for kw in keywords if kw in ing_str]
+        # Count matches. One plant counts once, even when both its common
+        # name and its INCI are on the list.
+        matched = []
+        seen_groups = set()
+        for kw in keywords:
+            if not _oil_hit(kw):
+                continue
+            group = _oil_group(kw)
+            if group is not None:
+                marker = id(group)
+                if marker in seen_groups:
+                    continue
+                seen_groups.add(marker)
+            matched.append(kw)
         match_count = len(matched)
 
         # Dual-weighted scoring: clinical matches (weight 1.0) + Ayurvedic heroes (weight 0.65)
@@ -3232,7 +3456,7 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
         if has_ayurvedic_potency:
             explanation.append(f"{ayurvedic_count} Ayurvedic hero ingredient(s) detected")
 
-        missing = [kw for kw in keywords[:3] if kw not in ing_str]
+        missing = [kw for kw in keywords[:3] if not _oil_hit(kw)]
 
         # Apply category normalisation — oils are capped per concern
         norm = apply_category_normalisation(final, concern, 'facial oil')
@@ -3268,7 +3492,7 @@ def _facial_oil_concern_fit(ingredient_list, concerns, ing_str):
     return results
 
 
-def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=None, category='serum'):
+def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=None, category='serum', skin_type=None):
     """Skin Concern Fit: 4-component intelligent scoring model.
     A (50%): Evidence × Concentration × Synergy per active
     B (20%): Support system quality (barrier/anti-inflammatory/hydration)
@@ -3360,7 +3584,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         # Prefix groups for this concern (e.g. any "Ceramide *" counts for Barrier Repair)
         prefix_groups = CONCERN_INCI_PREFIXES.get(concern, [])
 
-        def _is_concern_active(inci_name):
+        def _is_concern_active(inci_name, data=None):
             """Return True if this INCI is a relevant active for the concern."""
             if inci_name in ideal_actives_set:
                 return True
@@ -3368,12 +3592,38 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             for prefix in prefix_groups:
                 if inci_lower.startswith(prefix.lower()):
                     return True
+            # A specific active the database tags for this concern, but which
+            # did not make the short ideal list. Hydroxypinacolone retinoate
+            # and betaine salicylate are that case: tagged for aging and acne,
+            # then left out, so the card said the formula had neither.
+            # Broad actives such as niacinamide carry many concern tags and
+            # stay on the curated list only.
+            if data and str(data.get('Ingredient_Class', '')).lower().strip() == 'active':
+                tags = [str(t).lower() for t in (data.get('_skin_concerns_parsed') or [])
+                        if t and 'none' not in str(t).lower() and 'functional' not in str(t).lower()]
+                named = concern.lower() in tags
+                # Two tags keeps a specific active (a retinoid, a salicylate).
+                # A vitamin C derivative such as 3-O-ethyl ascorbic acid is
+                # tagged for four concerns and was dropped, so a vitamin C
+                # serum was told to go and look for ascorbic acid. Niacinamide
+                # carries five tags and still does not auto-count.
+                vitamin_c = any(tok in inci_lower for tok in ('ascorbic', 'ascorbyl'))
+                if named and (len(tags) <= 2 or vitamin_c):
+                    return True
+            # An ointment of mineral oil, petrolatum or shea is not "light on"
+            # barrier repair. Those are functional bases, so the active-only
+            # rule was skipping them and telling a heavy cream it had no seal.
+            if concern.lower() in ('barrier repair', 'dry skin') and any(
+                    k in inci_lower for k in (
+                        'mineral oil', 'petrolatum', 'paraffin', 'lanolin',
+                        'beeswax', 'cera alba', 'shea butter', 'butyrospermum')):
+                return True
             return False
 
         # Find present actives and their data
         present_actives_data = []
         for ing, info in product_inci_map.items():
-            if _is_concern_active(info['inci']):
+            if _is_concern_active(info['inci'], info.get('data')):
                 present_actives_data.append(info)
 
         present_active_names = [d['inci'] for d in present_actives_data]
@@ -3450,7 +3700,11 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         # roughly 78% of the budget on its own; two comfortably max it.
         active_contributions.sort(reverse=True)
         saturated = sum(c * (0.6 ** i) for i, c in enumerate(active_contributions))
-        comp_a = min(60, (saturated / 1.7) * 60)
+        # One well-dosed active (contribution about 1) has to be able to carry
+        # this concern. Dividing by 1.7 left a 15% vitamin C and a 0.5% retinol
+        # near 35–40, and the card then said a different ingredient was the
+        # one that actually treats it.
+        comp_a = min(60, saturated * 52)
 
         # --- Component B: Support System Quality (0-20%) ---
         has_barrier = False
@@ -3653,13 +3907,28 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             explanation.append("No major irritation triggers detected")
         else:
             explanation.append("Contains ingredients that may worsen condition")
-        if missing_actives:
+        suggest = _collapse_names(
+            _drop_same_family(list(missing_actives), present_active_names))
+        if (skin_type or '').strip().lower() == 'sensitive':
+            suggest = [a for a in suggest if not _harsh_for_sensitive(a)]
+            if not suggest:
+                for key, names in (
+                    ('dullness', ['Azelaic acid']),
+                    ('texture', ['Azelaic acid']),
+                    ('acne', ['Azelaic acid']),
+                    ('aging', ['Bakuchiol']),
+                    ('pigmentation', ['Azelaic acid']),
+                ):
+                    if key in concern.lower():
+                        suggest = names
+                        break
+        if suggest:
             # Framed as a suggestion for the routine, not a deduction against
             # this product. A cleanser is not a worse cleanser for lacking
             # niacinamide; it simply is not the step that delivers it.
             explanation.append(
                 "Could be paired with {} for a stronger effect on this concern."
-                .format(' or '.join(missing_actives[:2])))
+                .format(' or '.join(suggest[:2])))
 
         # Supporting ingredient display
         present_supporters = [info['inci'] for ing, info in product_inci_map.items()
@@ -3678,11 +3947,12 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             'ceiling': _norm['ceiling'],
             'is_capped': _norm['is_capped'],
             'present_actives': present_active_names[:5],
-            'missing_actives': missing_actives[:3],
+            'missing_actives': suggest[:3],
             'supporting_ingredients': present_supporters[:4],
             'explanation': explanation[:4],
             'advisory': _concern_advisory(
-                _norm['category_score'], concern, missing_actives, category),
+                _norm['category_score'], concern, suggest, category,
+                present_active_names),
             'synergy_bonus': comp_c,
         }
 
@@ -3698,6 +3968,50 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                  "about a week, so daily sunscreen matters while you use this.")
 
     return {'concerns': results, 'am_pm': am_pm}
+
+
+def _notes_for_skin(notes, skin_type):
+    """Keep a watch-out only when it is about this skin type.
+
+    A pore-clogging note written for oily skin is not a dry-skin warning,
+    and a sensitive-skin allergen note is not an oily-skin warning.
+    """
+    skin = (skin_type or '').strip().lower()
+
+    def _pores(text):
+        return any(k in text for k in (
+            'comedogenic', 'pore-clog', 'clog pores', 'acne-prone', 'breakout'))
+
+    def _reactive(text):
+        return any(k in text for k in (
+            'allergen', 'sensit', 'irritat', 'eczema', 'sting', 'reactive'))
+
+    def _drying(text):
+        return any(k in text for k in ('drying', 'barrier', 'strip'))
+
+    kept = []
+    for note in notes or []:
+        low = note.lower()
+        if skin == 'dry':
+            if _pores(low) or (_reactive(low) and not _drying(low)):
+                continue
+        elif skin == 'oily':
+            if _reactive(low) and not _pores(low):
+                continue
+        elif skin == 'sensitive':
+            if _pores(low) and not _reactive(low):
+                continue
+        elif skin == 'combination':
+            if _reactive(low) and not _pores(low):
+                continue
+            note = note.replace(
+                'for oily/acne-prone skin',
+                'on the oilier areas of combination skin')
+        elif skin == 'normal':
+            if _pores(low) or _reactive(low):
+                continue
+        kept.append(note)
+    return kept
 
 
 def calculate_skin_type_compatibility(ingredient_list, skin_type, category='serum'):
@@ -3849,7 +4163,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
             if 'fragrance' in ing_lower or 'parfum' in ing_lower:
                 score -= 20
                 penalty.append(f"{ing} (Fragrance)")
-                why_bullets.append(f"Warning: {ing} is a common irritant for sensitive skin")
+                why_bullets.append(f"Warning: {ing} can sting on sensitive skin.")
             if 'limonene' in ing_lower or 'linalool' in ing_lower or 'citronellol' in ing_lower:
                 score -= 15
                 penalty.append(f"{ing} (Allergen)")
@@ -3863,13 +4177,22 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
                 penalty.append(f"{ing} (Drying alcohol)")
                 why_bullets.append(f"Warning: {ing} is drying and may irritate sensitive skin")
             if data:
-                # DB-driven irritation risk
+                # DB-driven irritation risk. Fragrance, allergens, essential
+                # oils and drying alcohols are already counted above, so the
+                # same ingredient is not docked a second time.
+                already = (
+                    'fragrance' in ing_lower or 'parfum' in ing_lower
+                    or 'essential oil' in ing_lower
+                    or any(a in ing_lower for a in (
+                        'limonene', 'linalool', 'citronellol',
+                        'alcohol denat', 'sd alcohol', 'isopropyl alcohol'))
+                )
                 irritation = str(data.get('Irritation_Risk', 'Low')).lower()
                 sensitive_risk = str(data.get('Sensitive_Skin_Risk', 'Low')).lower()
-                if 'high' in irritation or 'high' in sensitive_risk:
+                if not already and ('high' in irritation or 'high' in sensitive_risk):
                     score -= 15
                     penalty.append(f"{ing} (High irritation risk)")
-                    why_bullets.append(f"Warning: {ing} has high irritation potential")
+                    why_bullets.append(f"{ing} is likely to irritate sensitive skin.")
                 elif 'moderate' in irritation or 'medium' in irritation or 'moderate' in sensitive_risk:
                     score -= 5
                 # DB-driven soothing bonus — covers all 97 soothing ingredients in DB
@@ -3881,7 +4204,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
                     score += 5
                     label_d = str(data.get('Primary_Benefits', 'Soothing')).split(';')[0].strip()
                     bonus.append(f"{ing} (Soothing)")
-                    why_bullets.append(f"{ing} provides soothing/calming benefits")
+                    why_bullets.append(f"{ing} is calming.")
                     helpful_ingredients.append(f"{ing} ({label_d.lower()})")
             else:
                 # No DB match — fallback to known names
@@ -4047,7 +4370,8 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
             why_bullets.append("Some ingredients may not be ideal for your skin type")
 
     # Generate formulation notes
-    formulation_notes = detect_formulation_notes(ingredient_list)
+    formulation_notes = _notes_for_skin(
+        detect_formulation_notes(ingredient_list), skin_type)
 
     # Deduplicate helpful_ingredients by ingredient name before returning
     # so "Glycerin (hydration)" and "Glycerin (hydrating)" collapse to one entry
@@ -4059,6 +4383,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
             _seen_ing_names.add(_base)
             _deduped_helpful.append(_h)
 
+    _why = list(dict.fromkeys(why_bullets))[:3]
     return {
         'score': score,
         'base_texture_score': base_texture_score,
@@ -4068,14 +4393,85 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
         'better_suited': better_suited,
         'comedogenic_warnings': list({w['name']: w for w in comedogenic_warnings}.values()),
         'allergen_warnings': list({w['name']: w for w in allergen_warnings}.values()),
-        'why_bullets': list(dict.fromkeys(why_bullets))[:3],
+        'why_bullets': _why,
         'helpful_ingredients': _deduped_helpful[:4],
         'look_for': look_for_suggestions,
         'formulation_notes': formulation_notes,
     }
 
 
-def get_upgrade_suggestions(ingredient_list, concerns):
+_HARSH_FOR_SENSITIVE = (
+    'salicylic', 'glycolic', 'lactic', 'mandelic', 'retinol', 'retinal',
+    'adapalene', 'tretinoin', 'benzoyl', 'ascorbic', 'vitamin c',
+    'aha', 'bha',
+)
+
+
+def _harsh_for_sensitive(text):
+    t = (text or '').lower()
+    return any(k in t for k in _HARSH_FOR_SENSITIVE)
+
+
+def _upgrade_tokens(text):
+    return re.findall(r'[a-z0-9]+', str(text or '').lower())
+
+
+def _token_sequence(haystack, needle):
+    width = len(needle)
+    if width == 0 or width > len(haystack):
+        return False
+    for start in range(len(haystack) - width + 1):
+        if haystack[start:start + width] == needle:
+            return True
+    return False
+
+
+def _shares_active_family(left, right):
+    """Vitamin C and 3-O-ethyl ascorbic acid are one ingredient, and so are
+    vitamin K and phytonadione."""
+    def _fam(text):
+        t = str(text or '').lower()
+        for fam in _ACTIVE_FAMILIES:
+            if any(k in t for k in fam):
+                return fam
+        return None
+
+    found = _fam(left)
+    return found is not None and found == _fam(right)
+
+
+def _upgrade_already_present(suggestion, ingredient_list):
+    """The suggested ingredient is already written in this formula.
+
+    Match the name as whole words, so retinol does not count as present just
+    because the list says retinyl palmitate. A trailing plural still counts:
+    ceramides is the same ingredient as ceramide NP.
+    """
+    name = _upgrade_tokens(suggestion.get('suggested_active'))
+    if not name:
+        return False
+    if len(name) == 1 and len(name[0]) < 5:
+        return False
+    if name in (['uv', 'filters'], ['uv', 'filter']):
+        return False
+    variants = [name]
+    if len(name) == 1 and name[0].endswith('s') and len(name[0]) > 6:
+        variants.append([name[0][:-1]])
+    for raw in ingredient_list or []:
+        present = _upgrade_tokens(str(raw).split('(')[0])
+        if not present:
+            continue
+        for variant in variants:
+            if _token_sequence(present, variant):
+                return True
+            if len(present) >= 1 and all(len(token) >= 5 for token in present) and _token_sequence(variant, present):
+                return True
+        if _shares_active_family(suggestion.get('suggested_active'), raw):
+            return True
+    return False
+
+
+def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None):
     suggestions = []
     upgrade_map = data_loader.active_upgrade_map
     ing_lower_list = [i.lower() for i in ingredient_list]
@@ -4105,27 +4501,37 @@ def get_upgrade_suggestions(ingredient_list, concerns):
 
     if not suggestions and concerns:
         concern_upgrades = {
-            'acne': [{'upgrade': 'Salicylic Acid 2% Serum', 'reason': 'BHA penetrates pores to clear congestion and control oil', 'suggested_active': 'Salicylic Acid'}],
-            'pigmentation': [{'upgrade': 'Tranexamic Acid 3% Serum', 'reason': 'Strongest evidence for hyperpigmentation with minimal irritation', 'suggested_active': 'Tranexamic Acid'}],
-            'aging': [{'upgrade': 'Retinol 0.5% Treatment', 'reason': 'Gold standard for collagen synthesis and cell turnover', 'suggested_active': 'Retinol'}],
-            'barrier': [{'upgrade': 'Ceramide + Cholesterol Moisturizer', 'reason': 'Mimics skin lipid structure for optimal barrier restoration', 'suggested_active': 'Ceramides'}],
-            'sensitive': [{'upgrade': 'Centella Asiatica Serum', 'reason': 'Clinically proven to calm inflammation and strengthen skin', 'suggested_active': 'Centella Asiatica'}],
-            'hydration': [{'upgrade': 'Multi-weight Hyaluronic Acid Serum', 'reason': 'Multiple molecular weights for deep and surface hydration', 'suggested_active': 'Hyaluronic Acid'}],
-            'dry skin': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'suggested_active': 'Ceramides + Petrolatum'}],
-            'dry': [{'upgrade': 'Rich Ceramide + Shea Butter Moisturizer', 'reason': 'Occlusive barrier sealing + ceramide replenishment for clinically dry skin', 'suggested_active': 'Ceramides + Petrolatum'}],
-            'pores': [{'upgrade': 'Niacinamide 10% + Zinc PCA', 'reason': 'Tightens pores and regulates sebum production', 'suggested_active': 'Niacinamide'}],
-            'dullness': [{'upgrade': 'Vitamin C 15% Serum', 'reason': 'Potent antioxidant that boosts radiance and evens skin tone', 'suggested_active': 'Vitamin C'}],
-            'texture': [{'upgrade': 'AHA/BHA Chemical Exfoliant', 'reason': 'Removes dead cells and promotes smooth, refined texture', 'suggested_active': 'Glycolic Acid'}],
+            'acne': [{'upgrade': 'Salicylic acid 2% serum', 'reason': 'A leave-on BHA clears congestion more directly than a moisturiser.', 'suggested_active': 'Salicylic acid'}],
+            'pigmentation': [{'upgrade': 'Tranexamic acid serum', 'reason': 'Published work on dark spots, with less sting than a strong acid.', 'suggested_active': 'Tranexamic acid'}],
+            'aging': [{'upgrade': 'Retinol treatment', 'reason': 'The ingredient with the most published work on lines. Start low if skin is reactive.', 'suggested_active': 'Retinol'}],
+            'barrier': [{'upgrade': 'Ceramide cream', 'reason': 'Ceramides replace the lipids a damaged barrier is short of.', 'suggested_active': 'Ceramides'}],
+            'sensitive': [{'upgrade': 'Centella serum', 'reason': 'Calms redness and is generally easier on reactive skin.', 'suggested_active': 'Centella asiatica'}],
+            'hydration': [{'upgrade': 'Hyaluronic acid serum', 'reason': 'Holds water on the skin. Follow it with a moisturiser so the water stays.', 'suggested_active': 'Hyaluronic acid'}],
+            'dry skin': [{'upgrade': 'Ceramide cream', 'reason': 'Replaces lipids and slows water leaving dry skin.', 'suggested_active': 'Ceramides'}],
+            'dry': [{'upgrade': 'Ceramide cream', 'reason': 'Replaces lipids and slows water leaving dry skin.', 'suggested_active': 'Ceramides'}],
+            'pores': [{'upgrade': 'Niacinamide serum', 'reason': 'The usual next step for visible pores and oil.', 'suggested_active': 'Niacinamide'}],
+            'dullness': [{'upgrade': 'Vitamin C serum', 'reason': 'The usual next step for dullness. It is a separate product from this one.', 'suggested_active': 'Vitamin C'}],
+            'texture': [{'upgrade': 'Glycolic acid exfoliant', 'reason': 'A leave-on acid smooths roughness more directly than a cream.', 'suggested_active': 'Glycolic acid'}],
             'dark circles': [{'upgrade': 'Caffeine + Peptide Eye Serum', 'reason': 'Constricts blood vessels and strengthens delicate under-eye skin', 'suggested_active': 'Caffeine'}],
             'sun': [{'upgrade': 'Broad Spectrum SPF 50 with antioxidants', 'reason': 'Essential UV protection with added photoaging defense', 'suggested_active': 'UV Filters'}],
             'uv': [{'upgrade': 'Ferulic Acid + Vitamin C + E Serum', 'reason': 'Triple antioxidant synergy for superior UV damage repair', 'suggested_active': 'Ferulic Acid'}],
             'tanning': [{'upgrade': 'Alpha Arbutin 2% + Niacinamide', 'reason': 'Tyrosinase inhibition for effective de-tanning without irritation', 'suggested_active': 'Alpha Arbutin'}],
             'puffiness': [{'upgrade': 'Caffeine 5% Eye Serum', 'reason': 'Reduces puffiness by improving microcirculation around eyes', 'suggested_active': 'Caffeine'}],
         }
+        has_filter = False
+        for ing in ingredient_list:
+            uv = data_loader.get_uv_data(ing)
+            if uv and 'uv filter' in str(uv.get('Ingredient_Category', '')).lower():
+                has_filter = True
+                break
         for c in concerns:
             c_lower = c.lower()
             for key, upgrades in concern_upgrades.items():
                 if key in c_lower:
+                    # A sunscreen that already has filters should not be told
+                    # to go and find UV filters.
+                    if key == 'sun' and has_filter:
+                        break
                     for u in upgrades:
                         suggestions.append({**u, 'concern': c})
                     break
@@ -4137,7 +4543,62 @@ def get_upgrade_suggestions(ingredient_list, concerns):
         if key not in seen:
             unique_suggestions.append(s)
             seen.add(key)
-    return unique_suggestions[:3]
+
+    skin = (skin_type or '').strip().lower()
+
+    def _text(s):
+        return ' '.join(str(s.get(k) or '') for k in ('upgrade', 'suggested_active', 'reason')).lower()
+
+    def _poor(text):
+        if skin == 'sensitive':
+            return _harsh_for_sensitive(text)
+        if skin == 'oily':
+            return any(k in text for k in ('petrolatum', 'coconut', 'shea butter', 'mineral oil'))
+        if skin == 'dry':
+            return any(k in text for k in ('salicylic', 'glycolic', 'lactic', 'mandelic', 'benzoyl', 'aha', 'bha'))
+        if skin == 'combination':
+            return any(k in text for k in ('petrolatum', 'coconut', 'shea butter', 'fragrance'))
+        return False
+
+    if skin in ('sensitive', 'oily', 'dry', 'combination'):
+        unique_suggestions = [s for s in unique_suggestions if not _poor(_text(s))]
+        if not unique_suggestions and concerns:
+            gentle = {
+                'sensitive': {
+                    'dullness': {'upgrade': 'Azelaic acid cream', 'reason': 'Brightens uneven tone with less sting than a strong vitamin C.', 'suggested_active': 'Azelaic acid'},
+                    'texture': {'upgrade': 'Azelaic acid cream', 'reason': 'Smooths roughness with less sting than glycolic or salicylic acid.', 'suggested_active': 'Azelaic acid'},
+                    'acne': {'upgrade': 'Azelaic acid serum', 'reason': 'Clears congestion with less sting than salicylic acid.', 'suggested_active': 'Azelaic acid'},
+                    'aging': {'upgrade': 'Bakuchiol serum', 'reason': 'A gentler option than retinol for lines.', 'suggested_active': 'Bakuchiol'},
+                    'pigmentation': {'upgrade': 'Azelaic acid cream', 'reason': 'Fades dark spots and is generally easier on reactive skin.', 'suggested_active': 'Azelaic acid'},
+                },
+                'dry': {
+                    'dullness': {'upgrade': 'Azelaic acid cream', 'reason': 'Brightens without the dryness of a strong acid.', 'suggested_active': 'Azelaic acid'},
+                    'texture': {'upgrade': 'Ceramide cream', 'reason': 'Smooths dryness by replacing lipids rather than by exfoliating.', 'suggested_active': 'Ceramides'},
+                    'acne': {'upgrade': 'Azelaic acid serum', 'reason': 'Clears congestion with less dryness than salicylic acid.', 'suggested_active': 'Azelaic acid'},
+                },
+                'oily': {
+                    'dullness': {'upgrade': 'Niacinamide serum', 'reason': 'Brightens and helps with oil, without a heavy cream.', 'suggested_active': 'Niacinamide'},
+                    'acne': {'upgrade': 'Salicylic acid serum', 'reason': 'A leave-on BHA suits oily, congested skin.', 'suggested_active': 'Salicylic acid'},
+                },
+                'combination': {
+                    'dullness': {'upgrade': 'Niacinamide serum', 'reason': 'A light step for dullness that does not add a heavy oil.', 'suggested_active': 'Niacinamide'},
+                    'acne': {'upgrade': 'Azelaic acid serum', 'reason': 'Clears congestion without a heavy occlusive.', 'suggested_active': 'Azelaic acid'},
+                },
+            }.get(skin, {})
+            for c in concerns:
+                c_lower = c.lower()
+                for key, upgrade in gentle.items():
+                    if key in c_lower:
+                        unique_suggestions.append({**upgrade, 'concern': c})
+                        break
+    kept = []
+    dropped = []
+    for suggestion in unique_suggestions:
+        if _upgrade_already_present(suggestion, ing_lower_list):
+            dropped.append(suggestion)
+        else:
+            kept.append(suggestion)
+    return kept[:3]
 
 
 
@@ -4153,8 +4614,77 @@ _NOT_A_TREATMENT = {
     'mask': 'a mask',
 }
 
+# Concerns that are the category's own job. A moisturiser is for hydration.
+# The gate below must not tell the reader that job belongs to another product.
+_CATEGORY_JOB = {
+    'moisturizer': ('hydration', 'dry skin', 'barrier', 'sensitive skin',
+                    'pigmentation', 'dullness'),
+    'moisturiser': ('hydration', 'dry skin', 'barrier', 'sensitive skin',
+                    'pigmentation', 'dullness'),
+    'toner': ('hydration', 'sensitive skin'),
+    'mask': ('hydration',),
+    'sunscreen': ('sun protection', 'uv damage'),
+}
 
-def _concern_advisory(score, concern, missing_actives, category=None):
+
+_ACTIVE_FAMILIES = (
+    ('retinol', 'retinal', 'hydroxypinacolone', 'granactive', 'adapalene',
+     'tretinoin', 'retinyl', 'bakuchiol'),
+    ('salicylic', 'betaine salicylate', 'capryloyl salicylic'),
+    ('ascorbic', 'ascorbyl', 'vitamin c'),
+    # "Vitamin K" and "Vitamin K1" are the same molecule. Phytonadione is
+    # the INCI. "Benzoyl Perox" is the truncated database name of benzoyl peroxide.
+    ('vitamin k', 'phytonadione', 'phylloquinone'),
+    ('benzoyl perox',),
+)
+
+
+def _collapse_names(names):
+    """'Centella Asiatica' and 'Centella Asiatica Extract' are one suggestion."""
+    kept = []
+    for name in names or []:
+        low = str(name).lower().strip()
+        if not low:
+            continue
+        replaced = False
+        for i, prev in enumerate(kept):
+            prev_l = prev.lower()
+            if low in prev_l or prev_l in low:
+                if len(low) < len(prev_l):
+                    kept[i] = str(name)
+                replaced = True
+                break
+        if not replaced:
+            kept.append(str(name))
+    return kept
+
+
+def _drop_same_family(missing, present):
+    """Don't tell someone to go and find retinol when the bottle already
+    has a retinoid, or salicylic acid when it already has a salicylate."""
+    present_l = [str(p).lower() for p in (present or [])]
+
+    def _family(text):
+        t = text.lower()
+        for fam in _ACTIVE_FAMILIES:
+            if any(k in t for k in fam):
+                return fam
+        return None
+
+    held = {_family(p) for p in present_l}
+    held.discard(None)
+    kept = []
+    dropped_names = []
+    for name in missing or []:
+        fam = _family(str(name))
+        if fam and fam in held:
+            dropped_names.append(str(name))
+            continue
+        kept.append(name)
+    return kept
+
+
+def _concern_advisory(score, concern, missing_actives, category=None, present_actives=None):
     """One line of advice that agrees with the score above it.
 
     This used to open with "Great formula" on every concern regardless of the
@@ -4163,6 +4693,7 @@ def _concern_advisory(score, concern, missing_actives, category=None):
     is worse than no advice: it tells a reader the score is decoration.
     """
     concern_l = str(concern or 'this concern').lower()
+    present = [p for p in (present_actives or []) if p]
     options = ''
     if missing_actives:
         options = missing_actives[0]
@@ -4170,11 +4701,27 @@ def _concern_advisory(score, concern, missing_actives, category=None):
             options += ' or %s' % missing_actives[1]
 
     kind = _NOT_A_TREATMENT.get(str(category or '').strip().lower())
-    if kind and score < 50:
-        return ("This is %s, so treating %s is not what it is for. That job "
-                "belongs to a separate treatment product%s."
-                % (kind, concern_l,
-                   (" - such as one built around %s" % options) if options else ""))
+    jobs = _CATEGORY_JOB.get(str(category or '').strip().lower(), ())
+    is_job = any(job in concern_l for job in jobs)
+    # A de-tan mask that already contains lactic acid is doing that job.
+    # The category gate must not override the ingredient that is actually there.
+    if kind and score < 50 and not is_job and not present:
+        advisory = ("This is %s, so treating %s is not what it is for. That job "
+                    "belongs to a separate treatment product%s."
+                    % (kind, concern_l,
+                       (" - such as one built around %s" % options) if options else ""))
+        return advisory
+
+    # The treatment is already in the bottle. A low number used to be read
+    # out as "look for retinol" or "salicylic acid is what actually treats it".
+    if present and score < 75:
+        if score >= 50:
+            return "Reasonable coverage for %s." % concern_l
+        return "Contains %s, which treats %s." % (present[0], concern_l)
+
+    if is_job and kind and score < 50:
+        return ("This is %s, and %s is part of its job. This formula is light on it."
+                % (kind, concern_l))
 
     if score >= 75:
         if not options:
@@ -4245,6 +4792,7 @@ def analyze_product(product_data):
         ingredient_list, _concs,
         product_data.get("category", "Serum"),
         known_concentrations=known_concentrations,
+        product_name=product_data.get("product_name") or "",
     )
     value_result = _formulation.score_value(
         product_data.get("price", 0),
@@ -4275,7 +4823,8 @@ def analyze_product(product_data):
         ingredient_list,
         product_data.get("concerns", []),
         known_concentrations=known_concentrations,
-        category=product_data.get("category", "serum")
+        category=product_data.get("category", "serum"),
+        skin_type=product_data.get("skin_type"),
     )
 
     skin_compat = calculate_skin_type_compatibility(
@@ -4286,7 +4835,8 @@ def analyze_product(product_data):
 
     upgrade_suggestions = get_upgrade_suggestions(
         ingredient_list,
-        product_data.get("concerns", [])
+        product_data.get("concerns", []),
+        skin_type=product_data.get("skin_type"),
     )
 
     concern_dict = concern_fit.get('concerns', {})
@@ -4322,17 +4872,12 @@ def analyze_product(product_data):
     ph_analysis           = infer_ph_and_check(ingredient_list)
     delivery_systems      = detect_delivery_systems(ingredient_list)
 
-    # Score confidence label
-    has_confirmed_concs = any(a.get('concentration_known') for a in main_score['identified_actives'])
-    if one_percent_marker:
-        score_confidence = f"Based on confirmed INCI order — 1% line found at {marker_name}"
-        score_confidence_level = "medium"
-    elif has_confirmed_concs:
-        score_confidence = "Some concentrations confirmed from product page"
-        score_confidence_level = "medium"
-    else:
-        score_confidence = "Estimated from INCI position only — no concentration data available"
-        score_confidence_level = "low"
+    # One confidence sentence. The badge and the formulation note used to
+    # disagree: one said the order was confirmed, the other said amounts
+    # were estimated.
+    score_confidence = formulation_result['confidence_note']
+    score_confidence_level = {'high': 'high', 'moderate': 'medium'}.get(
+        formulation_result.get('confidence'), 'low')
 
     return {
         # ── Primary score: how well-made is this product, for what it is ──────
@@ -4341,6 +4886,7 @@ def analyze_product(product_data):
         "formulation_score": formulation_result['score'],
         "formulation_category": formulation_result['category_label'],
         "formulation_rationale": formulation_result['rationale'],
+        "formulation_seal": formulation_result.get('seal'),
         "formulation_breakdown": formulation_result['components'],
         "formulation_confidence": formulation_result['confidence'],
         "formulation_confidence_note": formulation_result['confidence_note'],
@@ -4372,7 +4918,9 @@ def analyze_product(product_data):
         # What to use alongside this product. Derived from the product's own
         # actives, so it is free: it says nothing about the person. Ranked
         # using concern fit where that exists, which only changes the order.
-        "pairs_well_with": _suggest_pairings(ingredient_list, concern_dict),
+        "pairs_well_with": _suggest_pairings(
+            ingredient_list, concern_dict,
+            skin_type=product_data.get("skin_type")),
 
         "main_worth_score": formulation_result['score'],
         "main_worth_tier": _formulation.formulation_tier(
@@ -4393,7 +4941,7 @@ def analyze_product(product_data):
         "price_analysis": {
             "price_per_ml": main_score['stats']['price_per_ml'],
             "category_avg": main_score['stats'].get('category_avg', 0),
-            "vs_average": str(main_score['stats']['vs_average']) + "x",
+            "vs_average": f"{value_result['ratio'] if value_result.get('ratio') is not None else main_score['stats']['vs_average']:.2f}×",
             "price_per_active": main_score['stats']['price_per_active'],
             "active_count": main_score['stats']['active_count'],
             "active_ratio": str(main_score['stats']['active_ratio']) + "%",

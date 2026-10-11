@@ -38,9 +38,9 @@ What it refuses to do
   apart are not reliably distinguishable. Inside that margin the verdict says
   so rather than inventing a preference.
 
-Comparison is free. It compares formulation scores, and formulation analysis
-is the free tier - charging to put two free numbers next to each other would be
-charging for arithmetic.
+The comparison itself is paid: one credit for a pair, and opening that same
+pair again does not spend another. A single product's formulation score stays
+free. The table is withheld until the credit is spent.
 """
 
 import logging
@@ -108,6 +108,9 @@ def summarise(result, request_data):
                                 or result.get('score_title')),
         'breakdown': result.get('formulation_breakdown') or [],
         'price_per_ml': _ppm(request_data.get('price'), request_data.get('size_ml')),
+        'price_per_active': (
+            round(float(request_data.get('price') or 0) / len(actives), 2)
+            if actives and float(request_data.get('price') or 0) > 0 else None),
         'confidence': (result.get('formulation_confidence')
                        or result.get('confidence')),
         'actives': [
@@ -404,11 +407,11 @@ def _verdict(rows, same_category, concern_table, actives):
 
     if not same_category:
         verdict['note'] = (
-            'These are different product types, so their scores were produced '
-            'by different rubrics - a cleanser is judged on its surfactant '
-            'system and pH, a serum on its actives and the evidence behind '
-            'them. The scores are shown, but ranking them against each other '
-            'would imply a comparison that was never made.')
+            'These use different rubrics, so the formulation scores are not '
+            'ranked against each other. A cleanser is scored on how gently it '
+            'cleans, a moisturiser on how it hydrates, a serum on its actives. '
+            'The concern numbers further down still say which one treats what '
+            'you selected.')
         return verdict
 
     if len(scored) < 2:
@@ -484,9 +487,7 @@ def compare(products, analyse):
         # Said once, here, rather than left for the reader to infer from the
         # separate verdicts.
         'method_note': (
-            'Formulation score does not consider price. Value is reported '
-            'separately so an expensive product cannot look better made than '
-            'it is, and a cheap one cannot look worse.'),
+            'The formulation score ignores price. Paying more does not raise it.'),
     }
 
 

@@ -117,7 +117,8 @@ def _family_of(name, routine_actives):
     return None
 
 
-def suggest_pairings(ingredient_list, concern_fit=None, max_suggestions=MAX_SUGGESTIONS):
+def suggest_pairings(ingredient_list, concern_fit=None, max_suggestions=MAX_SUGGESTIONS,
+                      skin_type=None):
     """Actives worth using alongside this product.
 
     *concern_fit* is the per-concern scoring, used only for ranking: a partner
@@ -131,13 +132,65 @@ def suggest_pairings(ingredient_list, concern_fit=None, max_suggestions=MAX_SUGG
     recommendation is a missing nicety and a broken analysis is not.
     """
     try:
-        return _suggest(ingredient_list, concern_fit or {}, max_suggestions)
+        return _suggest(ingredient_list, concern_fit or {}, max_suggestions, skin_type)
     except Exception:
         logger.exception('pairing suggestions failed')
         return []
 
 
-def _suggest(ingredient_list, concern_fit, max_suggestions):
+_HARSH_ON_SENSITIVE = {
+    'salicylic acid', 'glycolic acid', 'lactic acid', 'mandelic acid',
+    'retinol', 'retinal', 'adapalene', 'benzoyl peroxide', 'ascorbic acid',
+}
+_DRYING_FOR_DRY = _HARSH_ON_SENSITIVE - {'retinol', 'retinal', 'adapalene', 'ascorbic acid'}
+_DRYING_ALCOHOLS = ('alcohol denat', 'sd alcohol', 'isopropyl alcohol')
+
+
+def _comedogenic(data):
+    try:
+        return float((data or {}).get('Comedogenicity_0_5') or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _blocked_for_skin(name, data, skin_type):
+    """A pairing must suit the selected skin, not only the formula.
+
+    The same lines the compatibility score treats as a warning are enough
+    to leave an ingredient off this list.
+    """
+    skin = (skin_type or '').strip().lower()
+    if skin in ('', 'normal'):
+        return False
+    n = _norm(name)
+    data = data or {}
+    from data_loader import data_loader
+    occlusive = n in (data_loader.role_sets.get('occlusive') or set())
+    if skin == 'sensitive':
+        if n in _HARSH_ON_SENSITIVE:
+            return True
+        if any(k in n for k in ('fragrance', 'parfum', 'essential oil',
+                                'limonene', 'linalool', 'citronellol')):
+            return True
+        if any(k in n for k in _DRYING_ALCOHOLS):
+            return True
+        irritation = str(data.get('Irritation_Risk') or '').lower()
+        sensitive_risk = str(data.get('Sensitive_Skin_Risk') or '').lower()
+        return 'high' in irritation or 'high' in sensitive_risk
+    if skin == 'oily':
+        return _comedogenic(data) >= 3 or occlusive or 'coconut' in n
+    if skin == 'dry':
+        return n in _DRYING_FOR_DRY or any(k in n for k in _DRYING_ALCOHOLS)
+    if skin == 'combination':
+        return (
+            occlusive or 'coconut' in n or _comedogenic(data) >= 4
+            or any(k in n for k in ('fragrance', 'parfum', 'essential oil'))
+            or any(k in n for k in _DRYING_ALCOHOLS)
+        )
+    return False
+
+
+def _suggest(ingredient_list, concern_fit, max_suggestions, skin_type=None):
     from data_loader import data_loader
     from personalization import ROUTINE_ACTIVES, ROUTINE_INTERACTIONS
 
@@ -156,6 +209,7 @@ def _suggest(ingredient_list, concern_fit, max_suggestions):
         key=lambda pair: pair[1])
 
     candidates = {}
+    skipped_for_skin = []
     for ingredient in present:
         partners = data_loader.synergy_partners_map.get(ingredient) or set()
         for partner in partners:
@@ -176,6 +230,9 @@ def _suggest(ingredient_list, concern_fit, max_suggestions):
             # the phrasing. Adding an entry there is how this feature grows.
             look_for = _TYPICAL_FORMAT.get(partner_n)
             if not look_for:
+                continue
+            if _blocked_for_skin(partner_n, data, skin_type):
+                skipped_for_skin.append(partner_n)
                 continue
 
             # Would adding this clash with what is already here?
@@ -222,4 +279,5 @@ def _suggest(ingredient_list, concern_fit, max_suggestions):
     ordered = sorted(candidates.values(), key=lambda c: c['_rank'])
     for entry in ordered:
         entry.pop('_rank', None)
-    return ordered[:max_suggestions]
+    picked = ordered[:max_suggestions]
+    return picked

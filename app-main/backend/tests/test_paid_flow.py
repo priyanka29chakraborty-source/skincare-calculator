@@ -450,25 +450,13 @@ def compare_body(**kw):
     return body
 
 
-def test_the_comparison_scoreboard_is_free(client):
-    """How well each is made, and what each costs per ml, is formulation
-    analysis - free everywhere else in the app, and the half that makes the
-    feature worth finding."""
+def test_a_comparison_is_locked_until_paid(client):
+    """The table is the paid product. A free caller gets the lock, not the scores."""
     data = client.post('/api/compare', json=compare_body()).json()
     assert data['access']['tier'] == 'free'
-    assert all(p['formulation_tier'] for p in data['products'])
-    assert all(p['price_per_ml'] for p in data['products'])
-    assert data['components']
-    assert data['verdict']['best_value']
-
-
-def test_the_personal_half_of_a_comparison_is_withheld(client):
-    """Removed, not blanked. A key that is absent cannot be read out of the
-    response by editing client code."""
-    data = client.post('/api/compare', json=compare_body()).json()
-    for section in ('actives', 'concerns', 'tolerability', 'together'):
+    for section in ('products', 'components', 'actives', 'concerns',
+                    'tolerability', 'together', 'verdict'):
         assert section not in data, '%s leaked to a free caller' % section
-    assert 'choose_if' not in data['verdict']
 
 
 def test_a_signed_in_caller_with_credits_gets_the_whole_comparison(client, funded):
@@ -515,19 +503,19 @@ def test_a_different_pair_is_a_new_comparison(client, funded):
     assert client.get('/api/auth/me').json()['balance'] == before - 2
 
 
-def test_running_out_falls_back_to_the_free_scoreboard(client, signed_in):
-    """Not an error. The free half is a real feature."""
+def test_running_out_locks_the_next_comparison(client, signed_in):
+    """The same pair can be opened again. A different pair needs another credit."""
     import wallet
     wallet.grant(signed_in, 1, reference='manual_cmp')
     assert client.post('/api/compare', json=compare_body()).json()['access']['tier'] == 'full'
-    second = client.post('/api/compare',
-                         json=compare_body(skin_concerns=['Dullness'])).json()
+    again = client.post('/api/compare',
+                        json=compare_body(skin_concerns=['Dullness'])).json()
+    assert again['access']['tier'] == 'full'
     body = compare_body()
     body['products'][0]['ingredients'] = 'Aqua, Glycerin, Panthenol, Phenoxyethanol'
     third = client.post('/api/compare', json=body).json()
     assert third['access']['tier'] == 'free'
-    assert 'concerns' not in third
-    assert third['products'][0]['formulation_score'] is not None
+    assert 'products' not in third
 
 
 def test_comparison_rejects_more_than_four(client):
@@ -610,3 +598,34 @@ def test_whitespace_and_case_do_not_make_a_new_product(client, funded):
     body['ingredients'] = body['ingredients'].upper().replace(', ', ',  ')
     client.post('/api/analyze', json=body)
     assert client.get('/api/auth/me').json()['balance'] == after_first
+
+
+def test_the_comparison_gate_does_not_mutate_what_it_is_given(client):
+    """It used to pop straight from the caller's dict, and `choose_if` lives
+    one level down, so a free request permanently degraded the object it was
+    handed. Safe only because the endpoint builds a fresh one each time - and
+    exactly the shape of the cache leak already fixed on the analyse path.
+    Add comparison caching later and a free request would strip choose_if from
+    the cached result for the next paying reader."""
+    import server
+
+    built = {
+        'products': [1, 2], 'components': [],
+        'verdict': {'best_formulation': 'A', 'best_value': 'B',
+                    'choose_if': [{'product_name': 'A'}]},
+        'actives': {'shared': []}, 'concerns': [], 'tolerability': [], 'together': {},
+    }
+    free = server._filter_comparison(built, False)
+
+    assert 'verdict' not in free
+    assert all(k not in free for k in (
+        'products', 'actives', 'concerns', 'tolerability', 'together'))
+
+    # The object handed in is untouched.
+    assert 'choose_if' in built['verdict']
+    assert 'actives' in built
+    assert 'access' not in built
+
+    paid = server._filter_comparison(built, True)
+    assert 'choose_if' in paid['verdict']
+    assert all(k in paid for k in ('actives', 'concerns', 'tolerability', 'together'))

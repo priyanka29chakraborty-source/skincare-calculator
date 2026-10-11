@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 
 import { API, api, describeError } from "../api";
+import { CREDIT_EXPIRY_HINT } from "../constants";
 import { openCheckout } from "../lib/razorpay";
+import { track } from "../track";
 
 /**
  * Sign in, then buy credits.
@@ -30,6 +32,7 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
     setError("");
     setNotice("");
     setStep(account.signedIn ? "packs" : "email");
+    track("personal_opened");
   }, [open, account.signedIn]);
 
   useEffect(() => {
@@ -78,6 +81,7 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
   async function buy(pack) {
     setBusy(true); setError(""); setNotice("");
     try {
+      track("checkout_started");
       const { data: order } = await api.post(
         `${API}/credits/order`, { pack_id: pack.pack_id }, { withCredentials: true });
 
@@ -94,6 +98,7 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
       }, { withCredentials: true });
 
       await account.refresh();
+      track("checkout_completed");
       setNotice(`${pack.credits} analyses added.`);
       if (onPurchased) onPurchased();
     } catch (err) {
@@ -132,9 +137,6 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
               the concerns you picked, whether it suits your skin type, and what
               in it is likely to cause you trouble.
             </p>
-            <p className="modal-lede modal-lede-tight">
-              Sign in with your email so your credits follow you to a new phone.
-            </p>
             <div className="field-group">
               <label className="field-label" htmlFor="unlock-email">Email</label>
               <input id="unlock-email" className="field-input" type="email" required
@@ -142,12 +144,6 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
                      placeholder="you@example.com" autoFocus
                      data-testid="unlock-email" />
             </div>
-            <p className="modal-fineprint">
-              We store your address to hold your credit balance against it, and
-              send you a six-digit code to sign in. That is all it is used for:
-              no password to remember, no marketing, and we do not pass it on.
-              You can have it deleted whenever you ask.
-            </p>
             <button className="analyze-btn modal-cta" disabled={busy} type="submit">
               {busy ? "Sending..." : "Send me a sign-in code"}
             </button>
@@ -211,10 +207,12 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
             </div>
 
             <p className="modal-fineprint">
-              Signed in{email ? ` as ${email}` : ""}. Balance:{" "}
-              <strong data-testid="modal-balance">{account.balance}</strong>{" "}
-              {account.balance === 1 ? "credit" : "credits"}. Credits never
-              expire, and unused ones are refundable.
+              Signed in{email ? ` as ${email}` : ""}.{" "}
+              <span title={CREDIT_EXPIRY_HINT}>
+                <strong data-testid="modal-balance">{account.balance}</strong>
+                {" "}
+                {account.balance === 1 ? "credit" : "credits"}
+              </span>
             </p>
             {notice && <p className="modal-notice" data-testid="unlock-notice">{notice}</p>}
           </>

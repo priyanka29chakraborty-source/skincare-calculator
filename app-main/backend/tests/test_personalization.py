@@ -152,6 +152,12 @@ def test_buying_a_second_of_the_same_active_is_flagged_as_redundant():
     assert any(f["type"] == "routine_redundant" for f in flags)
 
 
+def test_a_second_niacinamide_is_flagged_as_redundant():
+    flags, _ = check_routine(
+        parse_ingredients("Aqua, Niacinamide, Glycerin"), {"niacinamide"})
+    assert any(f["type"] == "routine_redundant" for f in flags)
+
+
 def test_unrelated_routine_raises_nothing():
     flags, _ = check_routine(parse_ingredients("Aqua, Glycerin, Panthenol"),
                              {"niacinamide"})
@@ -192,6 +198,30 @@ def test_every_climate_is_accepted(climate):
     assert _analyze({"climate": climate})["formulation_score"] > 0
 
 
+def test_a_facial_oil_is_not_told_it_needs_a_seal_in_dry_air():
+    """Squalane is the occlusive. Dry-climate copy used to say the oil was
+    light on occlusives and to put a richer layer over it."""
+    result = analyze_product({
+        "ingredients": "Squalane",
+        "price": 495, "size_ml": 30, "category": "Facial Oil",
+        "concerns": ["Hydration"], "skin_type": "dry", "country": "Canada",
+        "currency": "CAD", "user_profile": {"climate": "cold_dry"}})
+    messages = [f["message"] for f in result["advisory_flags"]
+                if f["type"] == "climate_texture"]
+    assert not any("light on occlusives" in m for m in messages)
+
+
+def test_a_light_moisturiser_in_dry_air_still_asks_for_a_seal():
+    result = analyze_product({
+        "ingredients": "Aqua, Glycerin, Panthenol, Phenoxyethanol",
+        "price": 400, "size_ml": 50, "category": "Moisturizer",
+        "concerns": ["Hydration"], "skin_type": "dry", "country": "Canada",
+        "currency": "CAD", "user_profile": {"climate": "cold_dry"}})
+    messages = [f["message"] for f in result["advisory_flags"]
+                if f["type"] == "climate_texture"]
+    assert any("light on occlusives" in m for m in messages)
+
+
 def test_humid_climate_flags_heavy_occlusive_as_comfort_not_defect():
     result = analyze_product({
         "ingredients": "Aqua, Glycerin, Petrolatum, Cetearyl Alcohol, Phenoxyethanol",
@@ -228,3 +258,33 @@ def test_new_concerns_are_scorable(concern):
     score = _fit(result).get(concern)
     assert score is not None, "{} produced no score".format(concern)
     assert 0 <= score <= 100
+
+
+def test_an_inferred_climate_says_where_it_came_from():
+    """resolve_climate falls back to the country already collected on the main
+    form, which is the intended design - but the row sits under "What your
+    answers changed", so presenting an inferred value as something the reader
+    told us claims an answer they never gave."""
+    from personalization import build_personal_context
+
+    ctx = build_personal_context({}, ['aqua', 'glycerin'], ['Hydration'],
+                                 'serum', 'India')
+    climate = next(c for c in ctx['checks'] if c['key'] == 'climate')
+    assert 'from your country' in (climate['answer'] or '')
+
+    chosen = build_personal_context({'climate': 'hot_arid'}, ['aqua'], ['Hydration'],
+                                    'serum', 'India')
+    answered = next(c for c in chosen['checks'] if c['key'] == 'climate')
+    assert 'from your country' not in (answered['answer'] or '')
+
+
+def test_unanswered_questions_report_as_unanswered():
+    """Three distinct states - unanswered, clear, flagged - so that silence
+    and "we did not look" stop being the same output."""
+    from personalization import build_personal_context
+
+    ctx = build_personal_context({}, ['aqua', 'glycerin'], ['Hydration'],
+                                 'serum', 'India')
+    statuses = {c['key']: c['status'] for c in ctx['checks']}
+    for key in ('skin_tone', 'allergens', 'routine'):
+        assert statuses[key] == 'unanswered', statuses

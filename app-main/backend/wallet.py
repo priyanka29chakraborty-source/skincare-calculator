@@ -60,12 +60,16 @@ CREDIT_PACKS = {
 # One personalised analysis costs one credit.
 COST_PER_ANALYSIS = 1
 
+# Unused credits from a purchase lapse one year after that purchase.
+CREDIT_LIFETIME_SECONDS = 365 * 24 * 60 * 60
+
 # Reasons a ledger row exists. Stored as text so the history reads plainly.
 REASON_PURCHASE = 'purchase'
 REASON_SPEND = 'spend'
 REASON_REFUND = 'refund'
 REASON_GRANT = 'grant'          # manual goodwill or a promotion
 REASON_REVERSAL = 'reversal'    # undoing a spend that failed downstream
+REASON_EXPIRY = 'expiry'        # unused credits one year after purchase
 
 
 class InsufficientCredits(Exception):
@@ -291,7 +295,87 @@ def get_or_create_account(email):
         raise
 
 
+def _remaining_lots(rows, now):
+    """Replay the ledger. A credit lasts one year from the row that added it.
+
+    Spends consume the oldest credits that had not already lapsed at the
+    moment of the spend. What is left after that, and is past its year, is
+    no longer part of the balance.
+    """
+    lots = []
+    for delta, created_at in rows:
+        delta = int(delta)
+        created_at = float(created_at)
+        if delta > 0:
+            lots.append([delta, created_at + CREDIT_LIFETIME_SECONDS, created_at])
+            continue
+        need = -delta
+        for lot in lots:
+            if need <= 0:
+                break
+            if lot[1] <= created_at:
+                continue
+            take = min(lot[0], need)
+            lot[0] -= take
+            need -= take
+    alive = 0
+    expired = 0
+    stamps = []
+    for remaining, expires_at, created_at in lots:
+        if remaining <= 0:
+            continue
+        if expires_at <= now:
+            expired += remaining
+            stamps.append(str(int(created_at)))
+        else:
+            alive += remaining
+    return alive, expired, stamps
+
+
+def _apply_expiry_locked(conn, account_id):
+    """Drop lapsed credits while this account row is locked.
+
+    Sets the cached balance to what is still inside its year. An expiry row
+    keeps the ledger equal to that number, so a later replay does not lapse
+    the same credits again.
+    """
+    cur = conn.cursor()
+    lock_sql = 'SELECT balance FROM wallet_account WHERE account_id = ?'
+    if _USE_PG:
+        lock_sql += ' FOR UPDATE'
+    cur.execute(_q(lock_sql), (account_id,))
+    row = cur.fetchone()
+    if not row:
+        return 0
+    cur.execute(_q(
+        'SELECT delta, created_at FROM wallet_ledger '
+        'WHERE account_id = ? ORDER BY created_at ASC'), (account_id,))
+    now = _now()
+    alive, expired, stamps = _remaining_lots(cur.fetchall(), now)
+    if expired > 0:
+        import hashlib
+        reference = 'expiry:%s:%s' % (
+            account_id,
+            hashlib.sha256(','.join(stamps).encode()).hexdigest()[:20])
+        cur.execute(_q(
+            'SELECT 1 FROM wallet_ledger WHERE reference = ?'), (reference,))
+        if not cur.fetchone():
+            cur.execute(_q(
+                'INSERT INTO wallet_ledger '
+                '(entry_id, account_id, delta, reason, reference, metadata, created_at) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?)'),
+                (_new_id('led'), account_id, -int(expired), REASON_EXPIRY,
+                 reference, None, now))
+    if int(row[0]) != alive:
+        cur.execute(_q(
+            'UPDATE wallet_account SET balance = ?, updated_at = ? WHERE account_id = ?'),
+            (int(alive), now, account_id))
+    return alive
+
+
 def get_balance(account_id):
+    with _transaction() as conn:
+        _apply_expiry_locked(conn, account_id)
     cur = _execute('SELECT balance FROM wallet_account WHERE account_id = ?', (account_id,))
     row = cur.fetchone()
     return int(row[0]) if row else 0
@@ -344,6 +428,21 @@ def grant(account_id, credits, reason=REASON_PURCHASE, reference=None, metadata=
     return get_balance(account_id)
 
 
+def already_spent(reference):
+    """True when this exact charge has already been written to the ledger.
+
+    Reopening a product or a comparison must stay free even after the balance
+    is zero. ``spend`` checks the balance first, so a second call with the
+    same reference raises InsufficientCredits before the unique index can say
+    the charge already happened. Callers look here first.
+    """
+    if not reference:
+        return False
+    cur = _execute(
+        'SELECT 1 FROM wallet_ledger WHERE reference = ? LIMIT 1', (reference,))
+    return cur.fetchone() is not None
+
+
 def spend(account_id, credits=COST_PER_ANALYSIS, reference=None, metadata=None):
     """Deduct credits atomically. Raises InsufficientCredits if unaffordable.
 
@@ -356,6 +455,7 @@ def spend(account_id, credits=COST_PER_ANALYSIS, reference=None, metadata=None):
 
     try:
         with _transaction() as conn:
+            _apply_expiry_locked(conn, account_id)
             cur = conn.cursor()
             cur.execute(_q(
                 'UPDATE wallet_account SET balance = balance - ?, updated_at = ? '
@@ -410,11 +510,8 @@ def recompute_balance(account_id):
     Used by the admin page and after any incident. If this ever changes a
     balance, something above is wrong and the ledger rows say what.
     """
-    cur = _execute('SELECT COALESCE(SUM(delta), 0) FROM wallet_ledger WHERE account_id = ?',
-                   (account_id,))
-    total = int(cur.fetchone()[0] or 0)
-    _execute('UPDATE wallet_account SET balance = ?, updated_at = ? WHERE account_id = ?',
-             (total, _now(), account_id), commit=True)
+    with _transaction() as conn:
+        total = _apply_expiry_locked(conn, account_id)
     return total
 
 

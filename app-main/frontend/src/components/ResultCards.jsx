@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { getBarColor, money } from "../constants";
+import { getBarColor, money, categoryLabel } from "../constants";
 import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
 import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
 import LockedCard from "./LockedCard";
@@ -9,6 +9,29 @@ import AlternativesCard from "./AlternativesCard";
 import BestPriceCard from "./BestPriceCard";
 
 // ── Value chip ──────────────────────────────────────────────────────────────
+function benefitText(raw) {
+  if (!raw) return "—";
+  const text = String(raw).trim();
+  // The API already sends one finished sentence. Splitting on the period
+  // used to leave the column as a pile of cut-off labels.
+  if (/[.!?]$/.test(text) && text.split(/\s+/).length >= 3) return text;
+  const dangling = /\b(a|an|the|is|of|to|and|or|for|with)$/i;
+  const cutOff = /\bis an?\s+\w+$/i;
+  const parts = text.split(/[;]/).map((s) => s.trim()).filter((s) => {
+    if (s.length < 3) return false;
+    if (dangling.test(s) || cutOff.test(s)) return false;
+    return true;
+  });
+  if (!parts.length) return "—";
+  const lead = (s) => s.replace(/ \/ /g, " and ").replace(/^([A-Z])(?=[a-z])/, (m) => m.toLowerCase());
+  if (parts.length === 1) return `Used for ${lead(parts[0])}.`;
+  const bits = parts.map(lead);
+  const body = bits.length === 2
+    ? `${bits[0]} and ${bits[1]}`
+    : `${bits.slice(0, -1).join(", ")}, and ${bits[bits.length - 1]}`;
+  return `Used for ${body}.`;
+}
+
 function getValueChip(valueTier, ratio) {
   switch (valueTier) {
     case 'underpriced':      return { label: 'Good Value',         subtitle: 'Priced below category average for the formula quality.',          color: '#267C36' };
@@ -101,6 +124,11 @@ function IngredientBreakdownTable({ actives, isFacialOil = false }) {
                     {a.mw_depth}
                   </div>
                 )}
+                {a.provenance?.source && (
+                  <div style={{ fontSize: '9px', color: 'var(--text-sub)', marginTop: '2px' }}>
+                    {[a.provenance.evidence_level, a.provenance.source, a.provenance.reviewed_at && `reviewed ${a.provenance.reviewed_at}`].filter(Boolean).join(" · ")}
+                  </div>
+                )}
               </td>
               <td style={{ padding: "5px 10px", textAlign: "center" }}>
                 <span style={{
@@ -113,8 +141,8 @@ function IngredientBreakdownTable({ actives, isFacialOil = false }) {
                   a.evidence?.toLowerCase().startsWith("early") ? "Emerging" : "Minimal"
                 }</span>
               </td>
-              <td style={{ padding: "5px 10px", color: "var(--text-sub)", fontSize: "0.78rem", maxWidth: "200px" }}>
-                {a.primary_benefits || a.functional_category || "—"}
+              <td style={{ padding: "5px 10px", color: "var(--text-sub)", fontSize: "0.78rem", whiteSpace: "normal", lineHeight: 1.45, minWidth: "180px" }}>
+                {benefitText(a.primary_benefits || a.functional_category)}
               </td>
               <td style={{ padding: "5px 10px", textAlign: "center", fontSize: "0.78rem" }}>
                 {a.concentration_known && a.concentration_pct != null ? (
@@ -130,7 +158,11 @@ function IngredientBreakdownTable({ actives, isFacialOil = false }) {
         </tbody>
       </table>
       <p style={{ fontSize: "0.72rem", color: "var(--text-sub)", marginTop: "8px", fontStyle: "italic" }}>
-        ℹ️ <span style={{ color: '#267C36', fontWeight: 600 }}>Confirmed concentrations (green) are sourced from the product page or INCI annotations.</span> Other values are estimated from INCI list position.
+        {actives.some(a => a.concentration_known) ? (
+          <><span style={{ color: '#267C36', fontWeight: 600 }}>Green figures are stated on the product page.</span> Everything else is estimated from its place in the list.</>
+        ) : (
+          <>Amounts in this table are estimated from each ingredient's place in the list.</>
+        )}
         &nbsp;<span style={{ color: '#5B4FBE' }}><i className="fa-solid fa-flask fa-xs" /> = Technical mechanism (Tier 1/2 only)</span>
       </p>
     </div>
@@ -159,13 +191,14 @@ function OnePercentVisualiser({ marker, hideForOil }) {
       {open && (
         <div style={{ padding: '12px 14px', fontSize: '0.76rem' }}>
           <div style={{ marginBottom: '8px', color: 'var(--text-sub)', lineHeight: '1.5' }}>
-            EU/US law requires ingredients above 1% to be listed from highest to lowest.
-            Ingredients below the threshold line can appear in any order — exact % unknown.
+            Ingredients above about 1% are usually listed from highest to lowest.
+            A thickener or preservative often sits near that line. It is a guide
+            to the list, not a measured percentage.
           </div>
           {above.length > 0 && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{ fontWeight: 700, color: '#267C36', marginBottom: '5px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                ✅ Above 1% — descending order confirmed
+                Before this line — usually the larger amounts
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                 {above.map((ing, i) => (
@@ -182,7 +215,7 @@ function OnePercentVisualiser({ marker, hideForOil }) {
           {below.length > 0 && (
             <div>
               <div style={{ fontWeight: 700, color: '#8B7355', marginBottom: '5px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                ⚠ Below 1% — any order, concentration unknown
+                From this line on — order does not show the amount
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                 {below.map((ing, i) => (
@@ -329,11 +362,11 @@ function SunscreenAnalysisCard({ data }) {
         </div>
         <div style={{ flex: '1 1 100px', background: '#fff8f0', border: '1.5px solid var(--gold)', borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
           <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gold)', lineHeight: 1.2 }}>{spf}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>SPF Estimate*</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Lab SPF</div>
         </div>
         <div style={{ flex: '1 1 100px', background: '#f0f8ff', border: '1.5px solid #5BA4CF', borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
           <div style={{ fontSize: '15px', fontWeight: 700, color: '#2D7FD3', lineHeight: 1.2 }}>{pa}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>PA Estimate*</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Lab PA</div>
         </div>
         <div style={{ flex: '1 1 100px', background: '#fff5f5', border: '1.5px solid #e07070', borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
           <div style={{ fontSize: '22px', fontWeight: 700, color: '#C0392B', lineHeight: 1 }}>{sunburnScore}</div>
@@ -396,7 +429,7 @@ function SunscreenAnalysisCard({ data }) {
         </div>
       )}
       <p style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '12px', fontStyle: 'italic' }}>
-        * Estimates based on filter type and position. Not lab-tested values. PA rating requires PPD test.
+        SPF and PA are lab grades of the finished product. This card describes the filters. It does not assign either grade.
       </p>
     </div>
   );
@@ -423,7 +456,7 @@ function SunscreenHeadlineStats({ result }) {
       <div className="pg-box"><div className="pg-val">{filterCount}</div><div className="pg-lbl">UV filters</div></div>
       <div className="pg-box"><div className="pg-val" style={{ fontSize: '0.75rem' }}>{spectrumLabel}</div><div className="pg-lbl">protection spectrum</div></div>
       <div className="pg-box"><div className="pg-val" style={{ color: photostab >= 16 ? '#267C36' : photostab >= 10 ? '#C9A96E' : '#D06030' }}>{photostabLabel}</div><div className="pg-lbl">photostability</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val" style={{ fontSize: '0.72rem' }}>{spf}</div><div className="pg-lbl">SPF estimate</div></div>
+      <div className="pg-box pg-bot"><div className="pg-val" style={{ fontSize: '0.72rem' }}>{spf}</div><div className="pg-lbl">Lab SPF</div></div>
       <div className="pg-box pg-bot"><div className="pg-val">{uvb ? '✓' : '✗'}</div><div className="pg-lbl">UVB covered</div></div>
       <div className="pg-box pg-bot"><div className="pg-val">{uva1 ? '✓' : uva2 ? '~' : '✗'}</div><div className="pg-lbl">UVA covered</div></div>
     </div>
@@ -486,15 +519,12 @@ function MoisturizerHeadlineStats({ result }) {
     : barrierIndex >= 75 ? 'Strong' : barrierIndex >= 50 ? 'Moderate' : 'Low';
   const barrierColor = barrierIndex === null ? 'var(--text-sub)'
     : barrierIndex >= 75 ? '#267C36' : barrierIndex >= 50 ? '#2D7FD3' : '#C9A96E';
-  // Occlusion level: from barrier_actives or active_classes
-  const barrierActives = result.active_classes?.barrier_support || [];
-  const occlusionLevel = barrierActives.length >= 3 ? 'Rich' : barrierActives.length >= 1 ? 'Medium' : 'Light';
-
   return (
-    <div className="price-grid-sep" data-testid="moisturizer-headline-stats">
-      <div className="pg-box"><div className="pg-val" style={{ color: barrierColor }}>{barrierIndex}%</div><div className="pg-lbl">barrier recovery</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ color: barrierColor, fontSize: '0.8rem' }}>{barrierLabel}</div><div className="pg-lbl">barrier strength</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ fontSize: '0.8rem' }}>{occlusionLevel}</div><div className="pg-lbl">occlusion level</div></div>
+    <div className="price-grid-sep pg-quad" data-testid="moisturizer-headline-stats">
+      <div className="pg-box">
+        <div className="pg-val" style={{ color: barrierColor, fontSize: '0.95rem' }}>{barrierLabel}</div>
+        <div className="pg-lbl">barrier{barrierIndex !== null ? ` · ${barrierIndex}%` : ''}</div>
+      </div>
       <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.price_per_ml}</div><div className="pg-lbl">per ml</div></div>
       <div className="pg-box pg-bot"><div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div><div className="pg-lbl">vs average</div></div>
       <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.active_count}</div><div className="pg-lbl">actives found</div></div>
@@ -591,7 +621,7 @@ function TreatmentIntensityBanner({ result, concerns }) {
 }
 
 // ── Main ResultCards Component ────────────────────────────────────────────────
-export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, fetchInput, category, onUnlock, personalisePrompt, onAnswerQuestions,
+export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, bestPriceError, onRetryBestPrice, fetchInput, category, onUnlock, personalisePrompt, onAnswerQuestions, onSavePdf, pdfLocked,
   productName, brand, price, size, sizeUnit }) {
   // Paid sections are stripped server-side, so the UI must branch on the
   // tier the server reported rather than on whether a field happens to be
@@ -606,7 +636,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
   const cat = (category || '').toLowerCase();
   const isSunscreen   = cat === 'sunscreen';
   const isCleanser    = cat === 'cleanser';
-  const isMoisturizer = cat === 'moisturizer';
+  const isMoisturizer = cat === 'moisturizer' || cat === 'moisturiser';
   const isFacialOil   = cat === 'facial oil' || cat === 'oil';
   const isTreatment   = cat === 'treatment';
   const isSerum       = cat === 'serum';
@@ -662,7 +692,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           <div className="result-ident-text">
             {(brand || category) && (
               <div className="result-brand">
-                {[brand, category].filter(Boolean).join(' · ')}
+                {[brand, categoryLabel(category)].filter(Boolean).join(' · ')}
               </div>
             )}
             {productName && <h3 className="result-name">{productName}</h3>}
@@ -841,9 +871,9 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
             <i className="fa-solid fa-user-check"></i> How this suits you
           </h2>
           <p className="suit-waiting-lede">
-            Unlocked, and waiting on the four answers above. Without them this
-            section can only go on the skin type you picked from a dropdown,
-            which is the same thing we already told you.
+            This can go further than the skin type you picked. It needs four
+            answers: skin tone, climate, what you react to, and what you
+            already use.
           </p>
           <ul className="suit-waiting-list">
             <li>Dark-mark risk needs your skin tone</li>
@@ -864,6 +894,18 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         <SunscreenAnalysisCard data={result.skin_concern_fit['Sun Protection']} />
       )}
 
+      <div className="export-row no-print">
+        <button
+          className="export-btn"
+          type="button"
+          data-testid="export-btn"
+          onClick={pdfLocked ? onUnlock : onSavePdf}
+        >
+          <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
+        </button>
+        <p className="export-note">Included with the personal analysis. One credit covers this product.</p>
+      </div>
+
       {/* What to use alongside this one. Free: derived from the product's
           own actives, not from the reader. */}
       <PairingsCard pairings={result.pairs_well_with} />
@@ -872,7 +914,9 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
       <AlternativesCard result={result} concerns={concerns} alternatives={alternatives} altLoading={altLoading} currency={currency} category={category} />
 
       {/* CARD 4B: BEST PRICE */}
-      <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading} currency={currency} fetchInput={fetchInput} />
+      <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
+        bestPriceError={bestPriceError} onRetry={onRetryBestPrice}
+        currency={currency} fetchInput={fetchInput} />
 
     </>
   );
@@ -891,7 +935,7 @@ export function MethodCard() {
       <div className="disclaimer-title"><i className="fa-solid fa-circle-info"></i> How scores are calculated</div>
       <ul className="disclaimer-list">
         <li><strong>Scores are estimates</strong> based on INCI ingredient position and clinical evidence.</li>
-        <li><strong>Concentrations are inferred</strong> from list order. EU/US law requires ingredients above 1% to be listed in descending order. Confirmed percentages come from the product page only.</li>
+        <li><strong>Amounts are estimated</strong> from list order. Ingredients above 1% are listed from most to least. A stated percentage is used only when the product page gives one.</li>
         <li><strong>pH is directional</strong>, inferred from the buffering ingredients in the formula.</li>
         <li><strong>Ingredient conflicts</strong> are within the single formula only — always patch test new products.</li>
         <li><strong>Not medical advice.</strong> This tool is for educational use only. Consult a dermatologist for personalised skin concerns.</li>

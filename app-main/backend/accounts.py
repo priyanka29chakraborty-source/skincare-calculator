@@ -402,6 +402,50 @@ async def forget_all_analyses(request: Request):
     return {'forgotten': history.forget_all(account_id)}
 
 
+class RefundRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    order_id: str = Field(min_length=3, max_length=80)
+    note: str = Field(default='', max_length=500)
+
+
+_REFUND_SCHEMA = """
+CREATE TABLE IF NOT EXISTS refund_request (
+    request_id TEXT PRIMARY KEY,
+    email      TEXT NOT NULL,
+    order_id   TEXT NOT NULL,
+    note       TEXT,
+    created_at DOUBLE PRECISION NOT NULL
+)
+"""
+
+
+@accounts_router.post('/credits/refund-request')
+async def refund_request(body: RefundRequest):
+    """Record a refund ask. Money is not moved here.
+
+    Razorpay is the payment record. This row is the customer's request so it
+    can be matched to an order and handled, rather than arriving only as email.
+    """
+    import time
+    import uuid
+    wallet.init_storage()
+    sql = _REFUND_SCHEMA if wallet.storage_is_durable() else _REFUND_SCHEMA.replace(
+        'DOUBLE PRECISION', 'REAL')
+    wallet._execute(sql, (), commit=True)
+    wallet._execute(
+        'INSERT INTO refund_request (request_id, email, order_id, note, created_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        (uuid.uuid4().hex, body.email.strip()[:200], body.order_id.strip()[:80],
+         (body.note or '')[:500], time.time()),
+        commit=True)
+    try:
+        import events
+        events.record('refund_requested')
+    except Exception:
+        logger.exception('refund request saved but the event was not')
+    return {'received': True}
+
+
 @accounts_router.get('/credits/history')
 async def credit_history(request: Request):
     account_id = _require_account(request)

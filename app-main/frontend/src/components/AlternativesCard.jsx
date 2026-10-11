@@ -18,7 +18,10 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
 
   const weakConcerns = Object.entries(concernFit)
     .filter(([, v]) => (typeof v === 'object' ? v.score : v) < 75)
-    .map(([k]) => k);
+    .map(([k, v]) => {
+      const score = typeof v === 'object' ? v.score : v;
+      return `${k} (${score}/100)`;
+    });
   const hasWeakConcerns = weakConcerns.length > 0 && concerns.length > 0;
 
   const allConcernsFit = concerns.length > 0 && concerns.every(c => {
@@ -76,9 +79,8 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
     <div className="sc-card result-card card-4" data-testid="card-alternatives" style={{ "--anim-delay": "0.45s" }}>
       <h2 className="card-title"><i className={cardIcon}></i> {cardTitle}</h2>
       <div className="alt-concern-msg" data-testid="weak-concerns-msg">
-        This product scores lower on <strong>{weakConcerns.join(', ')}</strong>.
-        These target {weakConcerns.length === 1 ? 'that' : 'those'} more directly
-        — to use <em>alongside</em> what you have, not instead of it.
+        For <strong>{weakConcerns.join(', ')}</strong>, a separate step can do
+        more of that job. Use it with this product, not instead of it.
       </div>
 
       {result.upgrade_suggestions?.map((sug, i) => (

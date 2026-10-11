@@ -1,4 +1,4 @@
-import { CONCERNS_LIST, SKIN_TYPES, CATEGORIES, COUNTRIES, SIZE_UNITS, CURRENCY_MAP, currencyAffix } from "../constants";
+import { CONCERNS_LIST, SKIN_TYPES, CATEGORIES, COUNTRIES, SIZE_UNITS, CURRENCY_MAP, currencyAffix, categoryLabel } from "../constants";
 
 
 // Keyboard support for the custom radio chips. They carry role="radio", which
@@ -125,7 +125,7 @@ export default function InputForm({
           <div className="field-group">
             <label className="field-label">Category</label>
             <select className="field-select full-w" data-testid="category-select" value={category} onChange={e => setCategory(e.target.value)} aria-label="Category">
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
             </select>
           </div>
           <div className="field-group">
@@ -156,7 +156,7 @@ export default function InputForm({
         <div className="field-sublabel">
           Skin Concerns <span className="field-hint">choose up to 3</span>
         </div>
-        <div className="concerns-grid" role="group" aria-label="Skin concerns">
+        <div className="concerns-grid" role="group" aria-label="Skin concerns" data-testid="skin-concerns-grid">
           {CONCERNS_LIST.map(c => (
             <div key={c.key} data-testid={`concern-${c.key.replace(/\s+/g, "-").toLowerCase()}`}
               role="button" tabIndex={0}

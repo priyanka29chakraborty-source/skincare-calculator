@@ -152,6 +152,34 @@ _INGREDIENT_ALIASES = {
     "licorice extract": "glycyrrhiza glabra root extract",
 }
 
+def _technology_target(normalized):
+    """Map a delivery-technology name onto its record before fuzzy matching.
+
+    'Centella Asiatica Leaf Vesicles' shares every token of centella extract,
+    and 'Hydrolyzed Sponge' shares 'hydrolyzed' with hyaluronate, so the
+    fuzzy step would score them as the wrong ingredient. An empty string
+    means the name is known to be something else and must stay unmatched.
+    """
+    n = normalized or ''
+    if 'fruit juice vesicle' in n:
+        return None
+    if any(k in n for k in ('hydrolyzed sponge', 'reedle', 'spicule')):
+        return 'spicules'
+    if n in ('milt extract', 'salmon milt extract'):
+        return ''
+    if any(k in n for k in ('exosome', 'extracellular vesicle', 'leaf vesicle')):
+        return 'exosomes'
+    return None
+
+
+def _protected_tokens(text):
+    words = set(re.findall(r'[a-z0-9]+', text or ''))
+    return words & {
+        'vesicle', 'vesicles', 'exosome', 'exosomes', 'extracellular',
+        'sponge', 'reedle', 'milt',
+    }
+
+
 _INGREDIENT_FAMILY_MAP = {
     "hydrolyzed hyaluronic acid": "sodium hyaluronate",
     "sodium hyaluronate crosspolymer": "sodium hyaluronate",
@@ -603,7 +631,13 @@ class DataLoader:
         familied_norm = _INGREDIENT_FAMILY_MAP.get(normalized)
         if familied_norm and familied_norm in self.ingredient_lookup:
             return self.ingredient_lookup[familied_norm]
-        # Fuzzy fallback (same threshold as before)
+        tech = _technology_target(normalized)
+        if tech == '':
+            return None
+        if tech and tech in self.ingredient_lookup:
+            return self.ingredient_lookup[tech]
+        # Fuzzy fallback (same threshold as before). A longer name that adds
+        # vesicle, sponge, or milt is not the shorter ingredient it contains.
         match = process.extractOne(
             normalized,
             list(self.ingredient_lookup.keys()),
@@ -611,6 +645,8 @@ class DataLoader:
             score_cutoff=85
         )
         if match:
+            if _protected_tokens(normalized) - _protected_tokens(match[0]):
+                return None
             return self.ingredient_lookup[match[0]]
         return None
 

@@ -1,6 +1,6 @@
 import { money, currencyAffix } from "../constants";
 import AffiliateNotice from "./AffiliateNotice";
-export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, fetchInput }) {
+export default function BestPriceCard({ bestPrice, bestPriceLoading, bestPriceError, onRetry, currency, fetchInput }) {
   const userUrl = bestPrice?.user_url || (fetchInput?.trim().startsWith('http') ? fetchInput.trim() : null);
 
   function displaySource(source) {
@@ -71,32 +71,50 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, currency, f
         </div>
       )}
 
-      {/* ── Case 3: Not found anywhere ── */}
-      {!bestPriceLoading && bestPrice?.not_found && (
+      {!bestPriceLoading && bestPriceError && (
+        <p className="alt-empty" role="alert" data-testid="best-price-error">
+          {bestPriceError}{" "}
+          {onRetry && (
+            <button type="button" className="clear-btn-solo" onClick={onRetry}>
+              Search again
+            </button>
+          )}
+        </p>
+      )}
+
+      {!bestPriceLoading && !bestPriceError && bestPrice?.not_found && (
         <div style={{ marginBottom: "0.5rem" }}>
           {userUrl ? (
-            <div className="best-price-badge user-cheapest" data-testid="not-found-with-url">
-              <i className="fa-solid fa-circle-check" style={{ color: "#267C36", fontSize: "1rem" }}></i>
+            <div className="best-price-badge user-cheapest" data-testid="not-found-message">
+              <i className="fa-solid fa-store" style={{ color: "#267C36", fontSize: "1.1rem" }}></i>
               <div>
-                <strong style={{ color: "#267C36" }}>Best price here!</strong>
-                <p style={{ fontSize: "0.8rem", color: "var(--text-sub)", margin: "2px 0 8px" }}>
-                  You are already viewing the lowest available price for this product.
-                </p>
-                <a href={userUrl} target="_blank" rel="noopener noreferrer" className="buy-here-link">
-                  Buy Here <i className="fa-solid fa-arrow-right"></i>
+                <strong>Your listing</strong>
+                {bestPrice.user_price > 0 && (
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-sub)", margin: "2px 0 8px" }}>
+                    {money(currency, bestPrice.user_price)}. A wider search did not return another price for this exact product and size.
+                  </p>
+                )}
+                <a href={userUrl} target="_blank" rel="noopener noreferrer" className="buy-here-link" data-testid="buy-here-link">
+                  <i className="fa-solid fa-store" style={{ marginRight: "5px" }}></i>
+                  View &amp; Buy <i className="fa-solid fa-arrow-up-right-from-square"></i>
                 </a>
               </div>
             </div>
           ) : (
             <p className="alt-empty" data-testid="not-found-message">
-              Best price here! No lower price found across verified listings.
+              No other listings found for this product.
             </p>
+          )}
+          {onRetry && (
+            <button type="button" className="clear-btn-solo" onClick={onRetry} data-testid="best-price-retry">
+              Search again
+            </button>
           )}
         </div>
       )}
 
       {/* ── Fallback: no data at all ── */}
-      {!bestPriceLoading && !bestPrice && (
+      {!bestPriceLoading && !bestPrice && !bestPriceError && (
         <p className="alt-empty">No other listings found for this product.</p>
       )}
 

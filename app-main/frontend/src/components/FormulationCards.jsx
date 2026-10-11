@@ -1,5 +1,5 @@
 import React from "react";
-import { money } from "../constants";
+import { money, pricePlain } from "../constants";
 import { ProgressBar } from "./ScoreComponents";
 
 /**
@@ -61,7 +61,7 @@ export function FormulationBreakdown({ result }) {
           }}
         >
           <strong style={{ color: "var(--text)" }}>
-            How a {(result.formulation_category || "product").toLowerCase()} is scored:
+            How a {(result.formulation_category || "product").toLowerCase()} works
           </strong>{" "}
           {result.formulation_rationale}
         </div>
@@ -152,14 +152,15 @@ export function ValueCard({ value, currency }) {
         {value.available && (
           <span style={{ marginLeft: "auto", fontSize: 12.5, color: t.fg, fontWeight: 600 }}>
             {money(currency, value.price_per_ml)}/ml
-            {value.ratio ? ` · ${value.ratio}× category average` : ""}
           </span>
         )}
       </div>
-      <p style={{ margin: 0, fontSize: 13, color: t.fg, lineHeight: 1.45 }}>{value.headline}</p>
-      <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "#7A7168", lineHeight: 1.4 }}>
-        {value.note}
-      </p>
+      <p style={{ margin: 0, fontSize: 13, color: t.fg, lineHeight: 1.45 }}>{pricePlain(value, currency)}</p>
+      {value.note ? (
+        <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "#7A7168", lineHeight: 1.4 }}>
+          {value.note}
+        </p>
+      ) : null}
     </div>
   );
 }
