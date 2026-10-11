@@ -41,17 +41,10 @@ const ALLERGENS = [
 ];
 
 export default function PersonaliseCard({ profile, onApply, loading, level,
-                                         locked, onUnlock, skinType,
-                                         personalisation }) {
-  // Named rather than implied: "scored for your skin type and nothing else" is
-  // abstract, "scored for oily skin and nothing else" is a fact the reader can
-  // check against what they picked.
-  const typeLabel = String(skinType || "").trim().toLowerCase() || "your skin type";
+                                         locked, onUnlock, personalisation,
+                                         opened }) {
   const checks = personalisation?.checks || [];
-  const answeredChecks = checks.filter((c) => c.status !== "unanswered");
-  const allClear = answeredChecks.length > 0
-    && answeredChecks.every((c) => c.status === "clear");
-  const [open, setOpen] = useState(false);
+  const [showChecks, setShowChecks] = useState(false);
   const [draft, setDraft] = useState({
     fitzpatrick: profile?.fitzpatrick || "",
     climate: profile?.climate || "",
@@ -107,35 +100,10 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
     );
   }
 
-  // Collapsed only before the first answer. Once there are answers the card
-  // stays open and shows what they produced, rather than folding back into a
-  // second prompt that asks the same thing again.
-  if (!open && level === "none") {
-    return (
-      <div className="personalise-prompt" data-testid="personalise-prompt">
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <i className="fa-solid fa-wand-magic-sparkles" style={{ color: "var(--dusty-rose-dark)" }}></i>
-          <strong style={{ fontSize: 14 }}>
-            This has been scored for {typeLabel} skin and nothing else
-          </strong>
-          <button
-            className="btn btn-secondary btn-sm"
-            style={{ marginLeft: "auto" }}
-            onClick={() => setOpen(true)}
-            data-testid="personalise-open"
-          >
-            Tune it to me
-          </button>
-        </div>
-        <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--text-sub)", lineHeight: 1.5 }}>
-          Four answers and this stops being a general verdict. We check it
-          against your skin tone for dark-mark risk, your climate for whether
-          the texture will work, anything you react to, and what is already in
-          your routine. The formulation score above is about the product, so it
-          will not move.
-        </p>
-      </div>
-    );
+  // The questions stay hidden until the reader asks for them from
+  // "How this suits you". A banner here repeated that card.
+  if (!opened && level === "none") {
+    return null;
   }
 
   return (
@@ -272,12 +240,9 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
         />
       </div>
 
-      {/* What the answers produced, including the checks that found nothing.
-          Without this, answering a question about a clean product changed
-          nothing on screen - which is indistinguishable from not having
-          looked. A negative result is the reassurance someone answered to
-          get. */}
-      {checks.length > 0 && (
+      {/* Shown only after Update result. Before that click the rows would
+          describe an analysis that has not been run yet. */}
+      {showChecks && checks.length > 0 && (
         <div className="personal-checks" data-testid="personal-checks">
           <h4>What your answers changed</h4>
           <ul>
@@ -298,19 +263,13 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
               </li>
             ))}
           </ul>
-          {allClear && (
-            <p className="personal-checks-foot">
-              Nothing to flag. That is the result, not a blank — this formula
-              came through every check you answered.
-            </p>
-          )}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
+      <div className="personalise-actions">
         <button
-          className="btn btn-primary"
-          onClick={() => onApply(draft)}
+          className="personalise-update"
+          onClick={() => { setShowChecks(true); onApply(draft); }}
           disabled={loading || answered === 0}
           data-testid="personalise-apply"
         >
@@ -319,11 +278,19 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
               <i className="fa-solid fa-spinner fa-spin"></i> Updating…
             </>
           ) : (
-            <>Update my result</>
+            "Update result"
           )}
         </button>
-        <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={loading}>
-          Not now
+        <button
+          type="button"
+          className="personalise-clear"
+          disabled={loading}
+          onClick={() => {
+            setDraft({ fitzpatrick: "", climate: "", allergens: [], current_routine: "" });
+            setShowChecks(false);
+          }}
+        >
+          Clear
         </button>
       </div>
     </div>

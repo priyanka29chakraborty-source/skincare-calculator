@@ -93,6 +93,10 @@ _OCCLUSIVES = (
 # the old "26 allergens" figure. This is a PERSONAL RISK signal, not a defect:
 # general-population fragrance allergy is 0.7-2.6% (PMID 32475515).
 _FRAGRANCE = ('parfum', 'fragrance', 'aroma')
+# Same thing on Indian and plain-language labels. Named in the tolerability
+# sentence so it cannot read "no common irritants", and not scored here:
+# fragrance stays a personal warning, not a general-score penalty.
+_FRAGRANCE_LABELS = ('perfume', 'sugandhit')
 _FRAGRANCE_ALLERGENS = (
     'limonene', 'linalool', 'citronellol', 'geraniol', 'eugenol', 'coumarin',
     'citral', 'farnesol', 'benzyl benzoate', 'benzyl salicylate',
@@ -245,7 +249,27 @@ def _has_preservative_booster(ingredient_list):
 # Each returns (points, explanations, flags). Explanations are user-facing.
 
 
-def _dose_sentence(name, estimate, contribution):
+_STORY_MARKERS = (
+    'spicule', 'hydrolyzed sponge', 'reedle',
+    'exosome', 'extracellular vesicle', 'leaf vesicle',
+    'sodium dna', 'polydeoxyribonucleotide',
+)
+
+
+def _is_story_ingredient(name):
+    """A technology the label can name without ever stating a dose.
+
+    Fruit-juice vesicles are citrus pulp, not exosomes.
+    """
+    n = _norm(name)
+    if not n or 'fruit juice vesicle' in n:
+        return False
+    if n == 'pdrn':
+        return True
+    return any(m in n for m in _STORY_MARKERS)
+
+
+def _dose_sentence(name, estimate, known=False):
     """Describe an estimated dose without ever contradicting the database.
 
     The wording used to depend on how well the active scored, not on its range,
@@ -266,17 +290,63 @@ def _dose_sentence(name, estimate, contribution):
 
     lo, hi = _num('Min_Effective_%'), _num('Max_Safe_%')
 
+    if _is_story_ingredient(name) and not known:
+        return ("The label names {} and does not state an amount. "
+                "Its place in the list is not a measured dose.".format(name))
+    if known and hi is not None and estimate > hi:
+        return ("The label states {:g}%. Published ceiling for this "
+                "ingredient is about {:g}%.".format(estimate, hi))
     if hi is not None and estimate > hi:
-        return ("{} is listed high enough that it is likely at or near its "
-                "usual ceiling of about {:g}%. The label cannot say exactly "
-                "where.".format(name, hi))
+        return ("{} is high on the list. Usual ceiling is about {:g}%. "
+                "The label does not give the exact amount.".format(name, hi))
     if lo is not None and estimate < lo:
-        return ("{} at an estimated {:.1f}% (below the {:g}% generally shown "
-                "to be effective)".format(name, estimate, lo))
+        return ("{} at an estimated {:.1f}%. Published results for this "
+                "ingredient generally start around {:g}%. A 5% or 10% product "
+                "is above that line, not in conflict with it. This estimate "
+                "is under it.".format(name, estimate, lo))
     if lo is not None and hi is not None:
         return ("{} at an estimated {:.1f}% (within its evidenced range of "
                 "{:g}-{:g}%)".format(name, estimate, lo, hi))
     return "{} at an estimated {:.1f}%".format(name, estimate)
+
+
+def dose_band_label(name, estimate, known=False):
+    """Same dose claim as _dose_sentence, for the ingredient table.
+
+    The table used to grade an estimate with a separate scale, so one place
+    could say an active was near its ceiling while another called the same
+    estimate "within range".
+    """
+    data = data_loader.get_ingredient_data(name) or {}
+
+    def _num(key):
+        try:
+            return float(str(data.get(key, '')).strip())
+        except (TypeError, ValueError):
+            return None
+
+    lo, hi = _num('Min_Effective_%'), _num('Max_Safe_%')
+    try:
+        estimate = float(estimate)
+    except (TypeError, ValueError):
+        return "Estimated from its place in the list."
+    if _is_story_ingredient(name) and not known:
+        return "Named on the label. No amount is stated."
+    if known and hi is not None and estimate > hi:
+        return ("The label states {:g}%. Published ceiling for this "
+                "ingredient is about {:g}%.".format(estimate, hi))
+    if hi is not None and estimate > hi:
+        return ("High on the list. Usual ceiling is about {:g}%. "
+                "The label does not give the exact amount.".format(hi))
+    if lo is not None and estimate < lo:
+        return "Under the published starting dose of about {:g}%.".format(lo)
+    if lo is not None and hi is not None:
+        if known:
+            return "Stated at {:g}%, within the published range of {:g}–{:g}%.".format(estimate, lo, hi)
+        return "Within the published range of {:g}–{:g}%.".format(lo, hi)
+    if known:
+        return "Stated at {:g}%.".format(estimate)
+    return "Estimated from its place in the list."
 
 
 def _score_actives(ingredient_list, concentrations, max_pts, category,
@@ -355,7 +425,7 @@ def _score_actives(ingredient_list, concentrations, max_pts, category,
             "rather than percentage is what matters.".format(top[0])
         )
     elif top[2] > 0:
-        explanations.append(_dose_sentence(top[0], top[2], top[1]))
+        explanations.append(_dose_sentence(top[0], top[2], _norm(top[0]) in known))
     else:
         explanations.append("{} identified.".format(top[0]))
 
@@ -364,6 +434,22 @@ def _score_actives(ingredient_list, concentrations, max_pts, category,
             "{} further active{} contributing: {}.".format(
                 len(scored) - 1, "s" if len(scored) > 2 else "",
                 ", ".join(s[0] for s in scored[1:4]))
+        )
+
+    # Niacinamide is usually the highest contributor, so a reedle or an
+    # exosome further down the list would otherwise never be mentioned.
+    story = []
+    for ing in ingredient_list:
+        if not _is_story_ingredient(ing) or _norm(ing) in known:
+            continue
+        if _norm(ing) == _norm(top[0]):
+            continue
+        story.append(ing)
+    if story:
+        explanations.append(
+            "The label names {} and does not state an amount. "
+            "A place in the list is not a measured dose.".format(
+                ", ".join(story[:3]))
         )
 
     unconfident = [s[0] for s in scored if not s[4] and not s[5]]
@@ -529,20 +615,32 @@ def _score_tolerability(ingredient_list, max_pts, occlusive_context=False,
     multiplier = 1.6 if (occlusive_context or periocular) else 1.0
 
     frag = _find(ingredient_list, _FRAGRANCE)
+    labelled = _find(ingredient_list, _FRAGRANCE_LABELS)
+    spicules = _find(ingredient_list, ('spicule', 'hydrolyzed sponge', 'reedle'))
     allergens = _find(ingredient_list, _FRAGRANCE_ALLERGENS)
     eos = _find(ingredient_list, _ESSENTIAL_OIL_MARKERS)
     alcohols = _find(ingredient_list, _DRYING_ALCOHOLS)
 
+    if spicules:
+        pts -= max_pts * 0.2
+        explanations.append(
+            "Contains {} (spicules). These are physical micro-needles, "
+            "so stinging comes from the spicules.".format(spicules[0])
+        )
+        flags.append({
+            'type': 'spicules',
+            'severity': 'medium',
+            'message': "Contains spicules ({}). They prick the skin surface. "
+                       "The label does not state how many, or their size."
+                       .format(spicules[0]),
+        })
     if frag:
         pts -= max_pts * 0.18 * multiplier
         explanations.append("Contains fragrance.")
         flags.append({
             'type': 'fragrance',
             'severity': 'info',
-            'message': "Contains fragrance. Most people tolerate this without "
-                       "issue - fragrance allergy affects roughly 1-3% of the "
-                       "general population - but it is a common trigger if your "
-                       "skin is sensitive or eczema-prone.",
+            'message': "Contains fragrance.",
         })
     if allergens:
         pts -= max_pts * 0.10 * multiplier
@@ -586,7 +684,10 @@ def _score_tolerability(ingredient_list, max_pts, occlusive_context=False,
         })
 
     if pts >= max_pts:
-        explanations.append("No common irritants identified.")
+        if labelled:
+            explanations.append("Contains fragrance.")
+        else:
+            explanations.append("No common irritants identified.")
     return round(max(0.0, pts), 1), explanations, flags
 
 
@@ -671,6 +772,35 @@ def _score_barrier(ingredient_list, max_pts):
         notes.append("No occlusive ingredients identified to slow water loss.")
 
     return round(min(max_pts, pts), 1), notes
+
+
+def seal_label(ingredient_list):
+    """How much of a film this formula leaves to slow water loss.
+
+    Counted from occlusive ingredients only. Humectants draw water in; they
+    do not seal it, so they do not raise this label.
+    """
+    found = _find(ingredient_list, _OCCLUSIVES)
+    count = len({_norm(o) for o in found})
+    if count >= 3:
+        return {
+            'label': 'Slowed a lot',
+            'note': "Several ingredients sit on the skin and slow water from "
+                    "evaporating. The finish is heavier, which helps in dry air "
+                    "and can feel like too much when the air is humid.",
+        }
+    if count >= 1:
+        return {
+            'label': 'Slowed a little',
+            'note': "One or two ingredients slow water loss a little. "
+                    "Comfortable in humid weather. Dry skin often wants more.",
+        }
+    return {
+        'label': 'Barely slowed',
+        'note': "Almost nothing here slows water from leaving the skin. "
+                "Ingredients that draw water in can still be present, but "
+                "that water is easier to lose.",
+    }
 
 
 def _score_soothing(ingredient_list, max_pts):
@@ -1074,10 +1204,10 @@ CATEGORY_RUBRICS = {
             ('integrity', 'Formulation Integrity', 25),
             ('tolerability', 'Tolerability', 15),
         ],
-        'rationale': "A serum is a delivery vehicle for actives, so it is "
-                     "judged mostly on whether it contains meaningful actives "
-                     "at doses shown to work, and whether the formula keeps "
-                     "them stable.",
+        'rationale': "A serum's job is to carry active ingredients into the "
+                     "skin. Most of the score is whether those ingredients are "
+                     "present at amounts that have been shown to work, and "
+                     "whether the formula is built to keep them stable.",
     },
     'moisturizer': {
         'label': 'Moisturiser',
@@ -1088,10 +1218,12 @@ CATEGORY_RUBRICS = {
             ('tolerability', 'Tolerability', 15),
             ('actives', 'Added Actives (bonus)', 10),
         ],
-        'rationale': "A moisturiser is judged on how well it hydrates and "
-                     "repairs the barrier. Actives are a bonus, not a "
-                     "requirement - an excellent plain cream is still an "
-                     "excellent cream.",
+        'rationale': "A moisturiser's job is to add water to the skin and hold "
+                     "it there. Most of the score is the ingredients that draw "
+                     "water in, and the ones that slow it from leaving. A name "
+                     "such as glow or vitamin C does not change that job. How "
+                     "well it treats dullness or pigmentation is a separate "
+                     "score. A plain cream can still score well.",
     },
     'cleanser': {
         'label': 'Cleanser',
@@ -1102,9 +1234,11 @@ CATEGORY_RUBRICS = {
             ('integrity', 'Formulation Integrity', 15),
             ('tolerability', 'Tolerability', 10),
         ],
-        'rationale': "A cleanser is on your skin for under a minute and is then "
-                     "rinsed off. What matters is how gently it cleans - not "
-                     "what actives it claims.",
+        'rationale': "A cleanser stays on the skin for under a minute, then "
+                     "it is rinsed off. The score is how gently it cleans: "
+                     "the surfactants, the pH, and whether the skin is left "
+                     "comfortable. Actives on a wash-off product count for "
+                     "very little.",
     },
     'sunscreen': {
         'label': 'Sunscreen',
@@ -1115,9 +1249,10 @@ CATEGORY_RUBRICS = {
             ('integrity', 'Formulation Integrity', 15),
             ('tolerability', 'Tolerability', 10),
         ],
-        'rationale': "A sunscreen is judged on its filter system - spectrum "
-                     "coverage and whether those filters survive sunlight. The "
-                     "number of filters is not a quality signal.",
+        'rationale': "A sunscreen is scored on its filters. The questions are "
+                     "whether they cover both UVA and UVB, and whether they "
+                     "stay effective in sunlight. A longer filter list is not, "
+                     "by itself, a better sunscreen.",
     },
     'toner': {
         'label': 'Toner / Essence',
@@ -1127,10 +1262,9 @@ CATEGORY_RUBRICS = {
             ('actives', 'Active Efficacy', 20),
             ('tolerability', 'Tolerability', 20),
         ],
-        'rationale': "A toner is simply a lightweight leave-on layer. It is "
-                     "judged on hydration and comfort rather than on being a "
-                     "necessary step - there is no evidence the step itself is "
-                     "required.",
+        'rationale': "A toner is a light layer left on the skin. It is "
+                     "scored on hydration and how soothing it feels. It is not "
+                     "expected to do the work of a serum or a moisturiser.",
     },
     'eye cream': {
         'label': 'Eye Cream',
@@ -1140,11 +1274,11 @@ CATEGORY_RUBRICS = {
             ('integrity', 'Formulation Integrity', 20),
             ('actives', 'Targeted Actives', 15),
         ],
-        'rationale': "Eyelid skin is the thinnest on the face and absorbs far "
-                     "more than facial skin, so gentleness is weighted highest. "
-                     "There is no good evidence that a dedicated eye cream "
-                     "outperforms a well-chosen facial moisturiser, so actives "
-                     "are weighted modestly here.",
+        'rationale': "The skin around the eyes is thin and takes in more of "
+                     "what is applied, so gentleness carries the most weight. "
+                     "Hydration and barrier support come next. A separate eye "
+                     "cream is not assumed to work better than a well-made "
+                     "facial moisturiser.",
     },
     'mask': {
         'label': 'Mask',
@@ -1154,10 +1288,11 @@ CATEGORY_RUBRICS = {
             ('integrity', 'Formulation Integrity', 20),
             ('actives', 'Contact-Appropriate Actives', 15),
         ],
-        'rationale': "A mask sits on skin for 10-20 minutes and is then "
-                     "removed. That is long enough to hydrate and soothe, but "
-                     "not to deliver a course of actives - so actives are "
-                     "weighted low and comfort under occlusion is weighted high.",
+        'rationale': "A mask stays on for about 10 to 20 minutes, then it "
+                     "comes off. That is long enough to hydrate and soothe, "
+                     "and too short for a full course of actives. Comfort "
+                     "while it sits on the skin counts for more than the "
+                     "actives.",
     },
     'facial oil': {
         'label': 'Facial Oil',
@@ -1167,9 +1302,9 @@ CATEGORY_RUBRICS = {
             ('tolerability', 'Tolerability', 20),
             ('evidence', 'Ingredient Evidence', 15),
         ],
-        'rationale': "An oil is judged on its lipid profile and on how well it "
-                     "resists going rancid - oxidised oil, not fresh oil, is "
-                     "what causes problems.",
+        'rationale': "An oil is scored on the lipids it is made from, and on "
+                     "whether those oils stay stable. Fresh oil is not the "
+                     "problem. Oil that has oxidised is.",
     },
     'treatment': {
         'label': 'Treatment',
@@ -1179,10 +1314,10 @@ CATEGORY_RUBRICS = {
             ('integrity', 'Formulation Integrity', 20),
             ('tolerability', 'Tolerability', 20),
         ],
-        'rationale': "A targeted treatment is judged on whether its active is "
-                     "present at a dose shown to work. Note that a higher "
-                     "percentage is not automatically better - benzoyl peroxide "
-                     "at 2.5% works as well as 10% with less irritation.",
+        'rationale': "A treatment is scored on whether its active is present "
+                     "at an amount shown to work. A higher percentage is not "
+                     "automatically better. Benzoyl peroxide at 2.5% works "
+                     "about as well as 10%, with less irritation.",
     },
 }
 
@@ -1206,8 +1341,36 @@ def resolve_category(category):
     return _CATEGORY_ALIASES.get(key, 'serum')
 
 
+def _name_claim_gaps(ingredient_list, product_name):
+    """The product title promises a technology the ingredient list does not name."""
+    name = (product_name or '').lower()
+    blob = ' '.join(ingredient_list or []).lower()
+    notes = []
+    if any(k in name for k in ('reedle', 'spicule')) and not any(
+            k in blob for k in ('hydrolyzed sponge', 'spicule', 'reedle')):
+        notes.append(
+            "The name says reedle, and the ingredient list does not name "
+            "hydrolyzed sponge or spicules.")
+    if 'exosome' in name and not any(
+            k in blob for k in ('exosome', 'extracellular vesicle', 'leaf vesicle')):
+        notes.append(
+            "The name says exosome, and the ingredient list does not name "
+            "an exosome or extracellular vesicle.")
+    if re.search(r'\bpdrn\b', name) and not any(
+            k in blob for k in ('sodium dna', 'pdrn', 'polydeoxyribonucleotide')):
+        notes.append(
+            "The name says PDRN, and the ingredient list does not name "
+            "sodium DNA or PDRN.")
+    if any(k in name for k in ('microneedle', 'micro-needle', 'micro needle')):
+        notes.append(
+            "This is a dissolving microneedle patch. The score covers the "
+            "ingredients on the list. The label does not state a needle "
+            "size or how much those needles deliver.")
+    return notes
+
+
 def score_formulation(ingredient_list, concentrations, category,
-                      known_concentrations=None):
+                      known_concentrations=None, product_name=None):
     """Score how well-made this product is, for what it is. Price-independent.
 
     Returns a dict with the 0-100 score, the per-component breakdown with
@@ -1222,6 +1385,7 @@ def score_formulation(ingredient_list, concentrations, category,
         return {
             'score': 0, 'category': cat_key, 'category_label': rubric['label'],
             'rationale': rubric['rationale'], 'components': [],
+            'seal': seal_label([]),
             'flags': [], 'confidence': 'none',
             'confidence_note': "No ingredients were provided.",
         }
@@ -1331,18 +1495,45 @@ def score_formulation(ingredient_list, concentrations, category,
                            "even though it performs on UVB.",
             })
 
+    claim_notes = _name_claim_gaps(ingredient_list, product_name)
+    if claim_notes:
+        placed = False
+        for comp in components:
+            if comp.get('key') == 'actives':
+                comp['notes'] = list(comp.get('notes') or []) + claim_notes
+                placed = True
+                break
+        if not placed and components:
+            components[0]['notes'] = list(components[0].get('notes') or []) + claim_notes
+        for note in claim_notes:
+            all_flags.append({'type': 'label_claim', 'severity': 'medium', 'message': note})
+
     # --- Honest confidence ---
     cutoff = one_percent_line(ingredient_list)
-    declared = bool(known_concentrations)
-    if declared:
+    declared_names = []
+    known = known_concentrations or {}
+    for ing in ingredient_list:
+        if _norm(ing) in known or ing.lower().strip() in known:
+            declared_names.append(ing)
+    if declared_names and len(declared_names) < len(ingredient_list):
+        confidence = 'moderate'
+        shown = ", ".join(declared_names[:3])
+        extra = len(declared_names) - 3
+        if extra > 0:
+            shown += " and %d more" % extra
+        verb = "is" if len(declared_names) == 1 else "are"
+        note = ("%s %s stated on the label. The other amounts are estimated "
+                "from ingredient order." % (shown, verb))
+    elif declared_names:
         confidence = 'high'
         note = ("Concentrations were declared for this product, so the active "
                 "assessment is based on stated figures rather than inference.")
     elif cutoff < len(ingredient_list) and cutoff >= 4:
         confidence = 'moderate'
-        note = ("Concentrations are estimated from ingredient order. "
-                "Ingredients listed below 1% may legally appear in any order, "
-                "so anything after {} cannot be dosed from the label."
+        note = ("Amounts are estimated from ingredient order. "
+                "The 1% line is at {}. Ingredients after that line "
+                "may be listed in any order, so their amounts cannot "
+                "be read from the label."
                 .format(ingredient_list[cutoff]))
     else:
         confidence = 'low'
@@ -1363,6 +1554,7 @@ def score_formulation(ingredient_list, concentrations, category,
         'category': cat_key,
         'category_label': rubric['label'],
         'rationale': rubric['rationale'],
+        'seal': seal_label(ingredient_list),
         'components': components,
         'flags': all_flags,
         'confidence': confidence,
@@ -1406,8 +1598,7 @@ def score_value(price, size_ml, category, country='India'):
             'tier': 'unknown',
             'headline': "Enter a price and size to see how this compares.",
             'price_per_ml': None, 'category_avg': avg, 'ratio': None,
-            'note': "Price is reported separately from formulation quality - it "
-                    "says nothing about how well a product is made.",
+            'note': "",
         }
 
     ppm = price / size_ml
@@ -1431,9 +1622,7 @@ def score_value(price, size_ml, category, country='India'):
         'price_per_ml': round(ppm, 2),
         'category_avg': avg,
         'ratio': round(ratio, 2),
-        'note': "Price is reported separately from formulation quality. A more "
-                "expensive product is not necessarily better made, and a cheap "
-                "one is not necessarily worse.",
+        'note': "",
     }
 
 
@@ -1470,6 +1659,16 @@ def build_advisory_flags(ingredient_list):
         if not raw:
             continue
         low = raw.lower()
+        # A note about sensitive skin is not a pregnancy note. It belongs in
+        # the personal result, once a skin type is known.
+        if 'sensitive' in low and not any(
+                w in low for w in ('pregnan', 'breast', 'nurs', 'foetal', 'fetal')):
+            continue
+        # "Restricted in some regions" is a dye rule, not a pregnancy rule.
+        # It was being filed under pregnancy because the word restrict is in it.
+        if any(w in low for w in ('region', 'not permitted', 'prohibited')) and not any(
+                w in low for w in ('pregnan', 'breast', 'nurs', 'foetal', 'fetal', 'teratogen')):
+            continue
         # "Safe" with no qualifier needs no advisory.
         if any(c in low for c in _PREGNANCY_CAUTION):
             if low.startswith('safe') and 'caution' not in low and 'avoid' not in low:

@@ -255,9 +255,37 @@ def test_recompute_repairs_a_drifted_balance(wallet, account):
     wallet._execute(
         'UPDATE wallet_account SET balance = 9999 WHERE account_id = ?',
         (account,), commit=True)
-    assert wallet.get_balance(account) == 9999
+    raw = wallet._execute(
+        'SELECT balance FROM wallet_account WHERE account_id = ?', (account,))
+    assert int(raw.fetchone()[0]) == 9999
     assert wallet.recompute_balance(account) == 10
     assert wallet.get_balance(account) == 10
+
+
+def test_unused_credits_expire_one_year_after_purchase(wallet, account, monkeypatch):
+    bought = 1_700_000_000.0
+    monkeypatch.setattr(wallet, '_now', lambda: bought)
+    wallet.grant(account, 5, reference='pay_old')
+    wallet.spend(account, reference='used_one')
+    monkeypatch.setattr(wallet, '_now', lambda: bought + wallet.CREDIT_LIFETIME_SECONDS + 5)
+    assert wallet.get_balance(account) == 0
+    try:
+        wallet.spend(account, reference='too_late')
+        raised = False
+    except wallet.InsufficientCredits:
+        raised = True
+    assert raised
+
+
+def test_a_later_purchase_survives_an_older_pack_expiring(wallet, account, monkeypatch):
+    bought = 1_700_000_000.0
+    monkeypatch.setattr(wallet, '_now', lambda: bought)
+    wallet.grant(account, 5, reference='pay_old')
+    later = bought + 200 * 24 * 60 * 60
+    monkeypatch.setattr(wallet, '_now', lambda: later)
+    wallet.grant(account, 2, reference='pay_new')
+    monkeypatch.setattr(wallet, '_now', lambda: bought + wallet.CREDIT_LIFETIME_SECONDS + 5)
+    assert wallet.get_balance(account) == 2
 
 
 def test_history_is_newest_first(wallet, account):

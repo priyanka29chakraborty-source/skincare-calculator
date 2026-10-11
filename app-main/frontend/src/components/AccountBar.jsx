@@ -1,4 +1,5 @@
 import React from "react";
+import { CREDIT_EXPIRY_HINT } from "../constants";
 
 /**
  * Balance and sign-out, above the header.
@@ -14,7 +15,7 @@ export default function AccountBar({ account, onOpenUnlock }) {
 
   return (
     <div className="account-bar" data-testid="account-bar">
-      <span className="account-balance">
+      <span className="account-balance" title={CREDIT_EXPIRY_HINT}>
         <i className="fa-solid fa-circle-check" aria-hidden="true"></i>
         <strong data-testid="account-balance">{balance}</strong>
         {balance === 1 ? " analysis left" : " analyses left"}

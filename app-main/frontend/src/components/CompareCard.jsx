@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 
-import { money } from "../constants";
+import { money, categoryLabel } from "../constants";
 import { API, api, describeError } from "../api";
+import { track } from "../track";
 
 const MAX_PRODUCTS = 4;
 
@@ -16,9 +18,8 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
 /**
  * Two to four products side by side.
  *
- * Free, and the card says so: it compares formulation scores, and formulation
- * analysis is the free tier. Charging to put two free numbers next to each
- * other would be charging for arithmetic.
+ * Paid. One credit covers this pair. Opening the same pair again does not
+ * spend another. A single product's formulation score stays free.
  *
  * The first version of this was a scoreboard - two numbers and a winner. That
  * tells you which number is bigger and nothing about what you would be giving
@@ -77,6 +78,7 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
         })),
       });
       setResult(data);
+      track("comparison_completed");
     } catch (e) {
       setError(describeError(e));
     } finally { setBusy(false); }
@@ -88,9 +90,8 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
         <div>
           <div className="card-label">Compare products</div>
           <p className="compare-lede">
-            Two to four products side by side: what each has that the others do
-            not, which one treats your concerns, whether they can be layered,
-            and whether buying both means buying the same job twice.
+            Two to four products side by side. One credit covers this comparison.
+            Opening the same pair again does not spend another.
           </p>
         </div>
         <button className="btn btn-primary compare-start" onClick={start}
@@ -128,7 +129,7 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
                 <label className="field-label">Category</label>
                 <select className="field-select full-w" value={row.category}
                         onChange={(e) => update(i, "category", e.target.value)}>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
                 </select>
               </div>
               <div className="field-group">
@@ -185,10 +186,31 @@ function Row({ label, children, cols }) {
 }
 
 function CompareResult({ result, currency, skinType, onUnlock }) {
-  // The server removes the personal sections rather than blanking them, so
-  // their absence is the signal - there is nothing to reveal by editing this
-  // component.
+  // The server omits the table until the comparison is paid for.
   const locked = result.access?.tier === "free";
+  if (locked) {
+    return (
+      <section className="compare-block compare-locked" data-testid="compare-locked">
+        <h3 className="compare-block-head">Comparison</h3>
+        <p className="compare-locked-lede">{result.access?.message}</p>
+        <ul className="compare-locked-list">
+          <li><strong>Formulation and price per ml</strong> — side by side</li>
+          <li><strong>What each has that the other does not</strong></li>
+          <li><strong>Which one treats your concerns</strong></li>
+          <li><strong>Irritation for your skin type</strong></li>
+          <li><strong>Whether you could use both</strong></li>
+        </ul>
+        <button className="locked-cta" onClick={onUnlock} data-testid="compare-unlock">
+          <span className="locked-cta-main">
+            <i className="fa-solid fa-lock-open"></i> Unlock this comparison
+          </span>
+          <span className="locked-cta-sub">
+            One credit &middot; covers this pair for good
+          </span>
+        </button>
+      </section>
+    );
+  }
   const { products, components, actives, concerns, tolerability, together, verdict } = result;
   const cols = products.length;
   const names = products.map((p) => p.product_name);
@@ -220,6 +242,14 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
           {products.map((p, i) => (
             <span className="compare-cell" key={i}>
               {p.price_per_ml ? money(p.currency || currency, p.price_per_ml) : "—"}
+            </span>
+          ))}
+        </Row>
+
+        <Row label="Price per active" cols={cols}>
+          {products.map((p, i) => (
+            <span className="compare-cell" key={i}>
+              {p.price_per_active ? money(p.currency || currency, p.price_per_active) : "—"}
             </span>
           ))}
         </Row>
@@ -303,14 +333,23 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
       {concerns?.length > 0 && (
         <section className="compare-block" data-testid="compare-concerns">
           <h3 className="compare-block-head">Against what you are treating</h3>
+          <p className="compare-muted">
+            Each number belongs to the product named above it. This is how well
+            that product treats the concern. It is not the formulation score.
+            A product can be well made and still be the weaker treatment.
+          </p>
           <div className="compare-grid">
             {concerns.map((entry) => (
               <Row key={entry.concern} label={entry.concern} cols={cols}>
                 {entry.scores.map((score, i) => (
                   <span className={`compare-cell${entry.best_index === i ? " compare-cell-best" : ""}`}
                         key={i}>
+                    <span className="compare-col-name">{names[i]}</span>
                     <strong>{score ?? "—"}</strong>
                     <span className="compare-component-num">/ 100</span>
+                    {entry.best_index === i && (
+                      <span className="compare-component-note">Better for this concern</span>
+                    )}
                   </span>
                 ))}
               </Row>
@@ -336,12 +375,13 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
         <section className="compare-block" data-testid="compare-tolerability">
           <h3 className="compare-block-head">Irritation and congestion risk</h3>
           <div className="compare-grid">
-            <Row label="Known irritants" cols={cols}>
+            <Row label="Formula tolerability" cols={cols}>
               {tolerability.map((t, i) => (
                 <span className="compare-cell" key={i}>
+                  <span className="compare-col-name">{names[i]}</span>
                   <strong>
                     {t.formulation_pct !== null && t.formulation_pct !== undefined
-                      ? `${Math.round(t.formulation_pct)}%`
+                      ? `${Math.round(t.formulation_pct)}/100`
                       : "—"}
                   </strong>
                   {(t.formulation_notes || []).length > 0 && (
@@ -353,8 +393,9 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
             <Row label={`For ${String(skinType || "this").toLowerCase()} skin`} cols={cols}>
               {tolerability.map((t, i) => (
                 <span className="compare-cell" key={i}>
+                  <span className="compare-col-name">{names[i]}</span>
                   {t.skin_type_risk ? (
-                    <span className={`compare-risk compare-risk-${t.skin_type_risk}`}>
+                    <span className={`compare-risk compare-risk-${String(t.skin_type_risk).split(" ")[0].toLowerCase()}`}>
                       {t.skin_type_risk} risk
                     </span>
                   ) : <span>&mdash;</span>}
@@ -362,7 +403,7 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
                     <span className="compare-component-note">
                       {t.skin_type_notes.length === 1
                         ? t.skin_type_notes[0]
-                        : `${t.skin_type_notes.length} ingredients flagged`}
+                        : `${t.skin_type_notes.length} ingredients this skin type often reacts to`}
                     </span>
                   )}
                 </span>
@@ -370,11 +411,9 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
             </Row>
           </div>
           <p className="compare-muted">
-            The first row is about the formula and is the same for everyone.
-            The second is about your skin type &mdash; pore-clogging
-            ingredients matter to oily and acne-prone skin and barely at all to
-            dry skin, so a product can be free of irritants and still be the
-            wrong choice for you.
+            Formula tolerability is the same for everyone. The row under it
+            counts ingredients that often bother this skin type. Both can say
+            low risk and still list a different number of ingredients.
           </p>
         </section>
       )}
@@ -409,27 +448,6 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
         </p>
       )}
 
-      {locked && (
-        <section className="compare-block compare-locked" data-testid="compare-locked">
-          <h3 className="compare-block-head">The part that depends on you</h3>
-          <p className="compare-locked-lede">{result.access?.message}</p>
-          <ul className="compare-locked-list">
-            <li><strong>What each has that the other does not</strong> — two products can score the same and do different jobs</li>
-            <li><strong>Which one treats your concerns</strong> — scored side by side</li>
-            <li><strong>Irritation risk for your skin type</strong></li>
-            <li><strong>Whether you could use both</strong> — layering clashes, and whether one makes the other redundant</li>
-          </ul>
-          <button className="locked-cta" onClick={onUnlock} data-testid="compare-unlock">
-            <span className="locked-cta-main">
-              <i className="fa-solid fa-lock-open"></i> Unlock the full comparison
-            </span>
-            <span className="locked-cta-sub">
-              One credit &middot; covers this comparison for good
-            </span>
-          </button>
-        </section>
-      )}
-
       {/* --------------------------------------------------------- verdict */}
       <div className="compare-verdict" data-testid="compare-verdict">
         {verdict.best_formulation && (
@@ -459,6 +477,81 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
 
         <p className="compare-method">{result.method_note}</p>
       </div>
+      <div className="export-row no-print">
+        <button type="button" className="export-btn" data-testid="compare-pdf"
+                onClick={() => {
+                  document.body.classList.add("print-compare");
+                  window.print();
+                  document.body.classList.remove("print-compare");
+                }}>
+          <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
+        </button>
+      </div>
+      <ComparePrint result={result} currency={currency} skinType={skinType} />
     </div>
+  );
+}
+
+function ComparePrint({ result, currency, skinType }) {
+  const { products, concerns, tolerability, verdict } = result;
+  return createPortal(
+    <article className="print-compare">
+      <h1>Comparison</h1>
+      <table>
+        <thead>
+          <tr>
+            <th />
+            {products.map((p) => <th key={p.product_name}>{p.product_name}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>Formulation</th>
+            {products.map((p) => (
+              <td key={p.product_name}>{p.formulation_score ?? "—"} {p.formulation_tier || ""}</td>
+            ))}
+          </tr>
+          <tr>
+            <th>Price per ml</th>
+            {products.map((p) => (
+              <td key={p.product_name}>
+                {p.price_per_ml ? money(p.currency || currency, p.price_per_ml) : "—"}
+              </td>
+            ))}
+          </tr>
+          {(concerns || []).map((entry) => (
+            <tr key={entry.concern}>
+              <th>{entry.concern}</th>
+              {entry.scores.map((score, i) => (
+                <td key={products[i].product_name}>{score ?? "—"} / 100</td>
+              ))}
+            </tr>
+          ))}
+          <tr>
+            <th>Formula tolerability</th>
+            {(tolerability || []).map((t, i) => (
+              <td key={products[i].product_name}>
+                {t.formulation_pct != null ? `${Math.round(t.formulation_pct)}/100` : "—"}
+                {t.formulation_notes?.[0] ? `. ${t.formulation_notes[0]}` : ""}
+              </td>
+            ))}
+          </tr>
+          <tr>
+            <th>For {String(skinType || "this skin").toLowerCase()}</th>
+            {(tolerability || []).map((t, i) => (
+              <td key={products[i].product_name}>
+                {t.skin_type_risk ? `${t.skin_type_risk} risk` : "—"}
+                {t.skin_type_notes?.length > 1
+                  ? `. ${t.skin_type_notes.length} ingredients this skin type often reacts to`
+                  : (t.skin_type_notes?.[0] ? `. ${t.skin_type_notes[0]}` : "")}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+      {verdict?.note && <p>{verdict.note}</p>}
+      {result.method_note && <p>{result.method_note}</p>}
+    </article>,
+    document.body
   );
 }

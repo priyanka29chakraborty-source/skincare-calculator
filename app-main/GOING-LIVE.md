@@ -207,24 +207,46 @@ Two things worth knowing:
 
 ## Still outstanding before charging money
 
-These are not code problems, and none of them can be closed from here.
+`GET /api/readiness` is the gate. `ready_to_charge` is true only when the
+ledger is on Postgres (`AIVEN_PG_URL`), `SESSION_SECRET` is set, Razorpay is
+configured, and `DEV_UNLOCK_ALL` is off. Leave `PAYWALL_ENABLED` unset until
+that response is true. This worktree does not contain those secrets.
 
-1. **The 21 pregnancy-safety contradictions were resolved by rule, not by a
-   clinician.** Where the JSON and CSV disagreed, the JSON won. That is a
-   consistent rule, not a medical judgement. Before you take money from someone
-   who is pregnant and relying on this, have those 21 entries reviewed against
-   AAD/ACOG guidance by someone qualified to do it.
+1. **Pregnancy lines still need a clinician.** Where the JSON and CSV
+   disagreed, the JSON won. That was a consistent rule, not a medical
+   judgement. `python scripts/export_evidence_queue.py` lists every pregnancy
+   record and every active that still has no signed review. A qualified
+   reviewer adds a row to `evidence_reviews.json` with `reviewer`, `source`,
+   `evidence_level`, and `reviewed_at`. The app shows that line beside the
+   active and will not invent one. `/api/readiness` reports how many are
+   still unsigned under `evidence_queue`.
 
-2. **About 96% of ingredient records carry no citation.** The scoring is
-   defensible and the method is documented, but "evidence quality" as a scored
-   dimension invites the question "according to what", and right now most
-   entries have no answer. This is the gap between a good tool and one a
-   dermatologist would recommend — and it is what you are charging for.
+2. **Citations are attached only where a person has signed them.** Score-driving
+   actives are the ones to sign first. Do not wait to cite every low-impact
+   record before a beta.
 
 3. **Indian GST.** Razorpay is a payment gateway, not a merchant of record, so
-   the tax obligation on these sales is yours. Worth an accountant's half hour
-   before the first live payment rather than after.
+   the tax obligation on these sales is yours. The refund page states that GST
+   invoices for Indian sales are issued against the order. An accountant still
+   has to confirm the treatment before the first live payment.
 
-4. **A refund policy, and the page that states it.** The ledger supports
-   refunds (`wallet.refund`), but there is no published policy and no customer
-   route to request one.
+4. **Payments for a personalised analysis are non-refundable.** That is stated
+   on the Terms of Service and the Privacy Policy. Feedback is the third
+   footer page.
+
+Privacy, terms, and the medical note are the other hash pages in the footer.
+
+## Paid beta
+
+Give 20–30 Indian shoppers a few test credits. The events worth reading are
+`analysis_completed`, `personal_opened`, `checkout_started`,
+`checkout_completed`, `routine_saved`, `comparison_completed`,
+`result_reopened`, `refund_requested`, and `pdf_saved`. Counts are
+`GET /api/events/summary`. Unknown names are rejected, and the table stores
+no email and no ingredient list.
+
+Launch publicly when readiness is true, the pregnancy queue you care about is
+signed, people can explain the main verdict without help, and a meaningful
+share come back to a saved result or analyse another product. After that,
+choose bundles, affiliate, or a separate clinic workspace from what those
+counts show.

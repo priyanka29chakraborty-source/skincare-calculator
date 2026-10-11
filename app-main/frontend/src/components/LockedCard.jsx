@@ -51,8 +51,7 @@ export default function LockedCard({ title, icon, access, lines, onUnlock }) {
                   {preview.routine_issues_found === 1 ? "issue" : "issues"}
                 </strong>
               </>
-            )}
-            .
+            )}{"."}
           </p>
         )}
 

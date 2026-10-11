@@ -10,7 +10,9 @@ import UnlockModal from "./components/UnlockModal";
 import HistoryCard from "./components/HistoryCard";
 import CompareCard from "./components/CompareCard";
 import PrintReport from "./components/PrintReport";
+import LegalPages, { LegalFooter, isLegalPage, legalPageName } from "./components/LegalPages";
 import useAccount from "./hooks/useAccount";
+import { track } from "./track";
 
 function App() {
   const [ingredients, setIngredients] = useState("");
@@ -38,6 +40,7 @@ function App() {
   const [alternatives, setAlternatives] = useState(null);
   const account = useAccount();
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [personaliseOpen, setPersonaliseOpen] = useState(false);
   const [pendingReopen, setPendingReopen] = useState(false);
   // Read through a ref inside handleAnalyze: adding `account` to its dependency
   // list would rebuild the callback on every balance change and re-trigger the
@@ -47,7 +50,9 @@ function App() {
   const [altLoading, setAltLoading] = useState(false);
   const [bestPrice, setBestPrice] = useState(null);
   const [bestPriceLoading, setBestPriceLoading] = useState(false);
+  const [bestPriceError, setBestPriceError] = useState("");
   const resultRef = useRef(null);
+  const [hashPage, setHashPage] = useState(legalPageName);
   const analyzeTimerRef = useRef(null);
   const [fetchVerifyPending, setFetchVerifyPending] = useState(false);
 
@@ -92,6 +97,7 @@ function App() {
     const pName = (productName || brand || (!isUrl && !isBarcode ? fetchInput : '') || '').trim();
     if (!pName) { setBestPriceLoading(false); return; }
     setBestPriceLoading(true);
+    setBestPriceError("");
     try {
       const userUrl = isUrl ? fetchInput.trim() : null;
       const { data } = await api.post(`${API}/best-price`, {
@@ -103,7 +109,10 @@ function App() {
         user_url: userUrl,
       });
       setBestPrice(data);
-    } catch { setBestPrice(null); }
+    } catch (e) {
+      setBestPrice(null);
+      setBestPriceError(describeError(e) + " Price search did not finish.");
+    }
     finally { setBestPriceLoading(false); }
   }, [productName, brand, fetchInput, size, country, currency, price]);
 
@@ -137,6 +146,7 @@ function App() {
     if (!ingredients.trim()) { setError("Please enter ingredients"); return; }
     if (!skinType) { setError("Please select a skin type"); return; }
     setError(""); setLoading(true); setResult(null); setAlternatives(null);
+    setPersonaliseOpen(false);
     try {
       let sizeMl = parseFloat(size) || 30;
       if (sizeUnit === "oz" || sizeUnit === "fl oz") sizeMl = sizeMl * 29.5735;
@@ -155,6 +165,7 @@ function App() {
         user_profile: userProfile,
       });
       setResult(data);
+      track("analysis_completed");
       // An analysis may have spent a credit, so the counter in the header is
       // now stale. Leaving it stale means someone watches their balance sit
       // still while it is quietly going down, which is exactly the kind of
@@ -205,6 +216,12 @@ function App() {
     handleAnalyze();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingReopen]);
+
+  useEffect(() => {
+    if (!personaliseOpen) return;
+    document.querySelector('[data-testid="personalise-card"]')
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [personaliseOpen]);
 
   // Input debouncing - clear error after typing
   useEffect(() => {
@@ -279,16 +296,49 @@ function App() {
         setFetchMsg("Product details fetched successfully!");
         setFetchVerifyPending(true);
       }
-    } catch (e) { setFetchError(describeError(e) + " You can paste the ingredient list manually instead."); }
+    } catch (e) {
+      setFetchStatus("failed");
+      setFetchError(describeError(e) + " You can paste the ingredient list manually instead.");
+    }
     finally { setFetchLoading(false); }
   }, [fetchInput]);
+
+  useEffect(() => {
+    const onHash = () => setHashPage(legalPageName());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("share");
+    if (!id) return;
+    api.get(`${API}/share/${id}`).then(({ data }) => {
+      const product = data.product || {};
+      setProductName(product.product_name || "");
+      setBrand(product.brand || "");
+      setCategory(product.category || "Serum");
+      setPrice(product.price ? String(product.price) : "");
+      setSize(product.size_ml ? String(product.size_ml) : "");
+      setIngredients(product.ingredients || "");
+      setCountry(product.country || "India");
+      setResult(data.result || null);
+    }).catch((e) => setError(describeError(e)));
+  }, []);
+
+  function savePdf() {
+    document.body.classList.remove("print-compare");
+    track("pdf_saved");
+    window.print();
+  }
 
   const handleClear = () => {
     setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml"); setCategory("Serum");
     setSkinType(""); setConcerns([]); setCountry("India"); setProductName(""); setBrand("");
     setResult(null); setError(""); setFetchInput(""); setFetchError(""); setFetchMsg(""); setFetchStatus("");
-    setAlternatives(null); setBestPrice(null); setActiveConcentrations({});
+    setAlternatives(null); setBestPrice(null); setBestPriceError(""); setActiveConcentrations({});
   };
+
+  if (isLegalPage(hashPage)) return <LegalPages page={hashPage} />;
 
   return (
     <div className="sc-app" data-testid="skincare-app">
@@ -309,7 +359,7 @@ function App() {
       <header className="sc-header" data-testid="app-header">
         <div className="eyebrow">Skincare Analysis Tool</div>
         <h1 className="sc-title"><i className="fa-solid fa-flask-vial"></i> Analyze Your Skincare Product</h1>
-        <p className="sc-subtitle">Science-backed ingredient analysis. Transparent scoring.</p>
+        <p className="sc-subtitle">Science-backed ingredient analysis.</p>
       </header>
 
       <main className="sc-main">
@@ -340,14 +390,13 @@ function App() {
               productName={productName} brand={brand} price={price} size={size} sizeUnit={sizeUnit}
               alternatives={alternatives} altLoading={altLoading}
               bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
+              bestPriceError={bestPriceError} onRetryBestPrice={fetchBestPrice}
               fetchInput={fetchInput}
               category={category}
               onUnlock={() => setUnlockOpen(true)}
-              onAnswerQuestions={() => {
-                document.querySelector('[data-testid="personalise-open"]')?.click();
-                document.querySelector('[data-testid="personalise-prompt"]')
-                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
+              onSavePdf={savePdf}
+              pdfLocked={result.access?.tier === "free"}
+              onAnswerQuestions={() => setPersonaliseOpen(true)}
               /* Rendered inside, directly under the formulation score, because
                  that is the number these four answers sharpen. Skin tone,
                  climate, sensitivities and routine are the paid product; when
@@ -362,17 +411,11 @@ function App() {
                   skinType={skinType}
                   personalisation={result.personalisation}
                   locked={result.access?.tier === "free"}
+                  opened={personaliseOpen}
                   onUnlock={() => setUnlockOpen(true)}
                 />
               }
             />
-
-            <div className="export-row no-print">
-              <button className="export-btn" onClick={() => window.print()}
-                      data-testid="export-btn">
-                <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
-              </button>
-            </div>
 
             {/* The document that actually prints. Hidden on screen; @media
                 print hides the app and shows only this. It is a standalone
@@ -406,6 +449,7 @@ function App() {
           </section>
         )}
       </main>
+      <LegalFooter />
     </div>
   );
 }

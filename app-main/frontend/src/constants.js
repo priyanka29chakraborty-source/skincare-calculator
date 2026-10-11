@@ -1,4 +1,5 @@
 export const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+export const CREDIT_EXPIRY_HINT = "Credits expire one year after you buy them.";
 // Set REACT_APP_BACKEND_URL in Render environment to your backend URL e.g. https://your-backend.onrender.com
 
 export const CONCERNS_LIST = [
@@ -21,6 +22,13 @@ export const CONCERNS_LIST = [
 
 export const SKIN_TYPES = ["Oily", "Dry", "Combination", "Sensitive", "Normal"];
 export const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen", "Eye Cream", "Mask", "Treatment", "Facial Oil"];
+
+/** Visible spelling. The stored value stays "Moisturizer" so saved results still match. */
+export function categoryLabel(value) {
+  const raw = String(value || "").trim();
+  if (/^moisturi[sz]er$/i.test(raw)) return "Moisturiser";
+  return raw;
+}
 export const COUNTRIES = ["India", "USA", "UK", "UAE", "Singapore", "Australia", "Canada", "South Korea", "Japan", "France", "Germany", "Brazil"];
 export const CURRENCY_MAP = { India:"INR", USA:"USD", UK:"GBP", UAE:"AED", Singapore:"SGD", Australia:"AUD", Canada:"CAD", "South Korea":"KRW", Japan:"JPY", France:"EUR", Germany:"EUR", Brazil:"BRL" };
 export const SIZE_UNITS = ["ml", "g", "oz", "fl oz"];
@@ -47,6 +55,20 @@ export function money(currency, amount) {
 /** Just the affix, for the price field's unit tag. */
 export function currencyAffix(currency) {
   return CURRENCY_SYMBOL[currency] || currency;
+}
+
+/** Price per ml, compared with the usual price per ml for this type of product. */
+export function pricePlain(value, currency) {
+  if (!value?.available) return value?.headline || "";
+  const yours = `${money(currency, value.price_per_ml)} per ml`;
+  if (!value.category_avg) return `This costs ${yours}.`;
+  const typical = `${money(currency, value.category_avg)} per ml`;
+  const ratio = Number(value.ratio);
+  let compare = "far more per ml";
+  if (ratio <= 1) compare = "the same or less per ml";
+  else if (ratio <= 1.8) compare = "a bit more per ml";
+  else if (ratio <= 3.5) compare = "much more per ml";
+  return `This costs ${yours}. Most products of this type cost about ${typical}, so this costs ${compare}.`;
 }
 
 export function getScoreColor(s) {

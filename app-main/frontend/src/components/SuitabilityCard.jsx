@@ -142,8 +142,22 @@ function mergeBySubject(lines) {
 
 const RISK_COPY = {
   low: { label: "Low irritation risk overall", tone: "good" },
-  moderate: { label: "Some ingredients may not suit acne-prone or sensitive skin", tone: "warn" },
-  high: { label: "Multiple irritation or pore-clogging risks — read the notes", tone: "bad" },
+  moderate: { label: "Some ingredients may not suit this skin type", tone: "warn" },
+  high: { label: "Several ingredients may not suit this skin type", tone: "bad" },
+};
+
+const WATCH_LEDE = {
+  dry: "These can dry the skin or weaken the barrier.",
+  oily: "These can clog pores on oily skin.",
+  combination: "These can be a problem on the oilier or the drier areas.",
+  sensitive: "These can sting or irritate sensitive skin.",
+};
+
+const WATCH_CLEAR = {
+  dry: "Nothing here works against dry skin.",
+  oily: "Nothing here is likely to clog pores on oily skin.",
+  combination: "Nothing here stands out as a problem for combination skin.",
+  sensitive: "Nothing here is likely to sting sensitive skin.",
 };
 
 export default function SuitabilityCard({ result, skinType }) {
@@ -154,7 +168,7 @@ export default function SuitabilityCard({ result, skinType }) {
 
   const hasConcerns = Object.keys(concerns).length > 0;
   const hasCompat = typeof compat === "number";
-  if (!hasConcerns && !hasCompat) return null;
+  const skinKey = String(skinType || "").toLowerCase();
 
   // Split the "why" bullets: warnings belong with the other risks, not among
   // the reasons the product suits you.
@@ -177,6 +191,7 @@ export default function SuitabilityCard({ result, skinType }) {
 
   const lookFor = details.look_for || [];
   const betterSuited = result.better_suited || [];
+  if (!hasConcerns && !hasCompat) return null;
 
   return (
     <div className="sc-card result-card suitability-card" data-testid="card-suitability"
@@ -234,15 +249,14 @@ export default function SuitabilityCard({ result, skinType }) {
             <div className="suit-list suit-list-watch" data-testid="suit-watch">
               <h4><i className="fa-solid fa-triangle-exclamation"></i> Watch out for</h4>
               <p className="suit-list-lede">
-                Safe for many people, but worth knowing about if your skin is
-                acne-prone or reactive.
+                {WATCH_LEDE[skinKey] || "Worth knowing about for this skin type."}
               </p>
               <ul>{watchFor.map((n, i) => <li key={i}>{n}</li>)}</ul>
             </div>
           ) : (
             <div className="suit-list suit-list-clean" data-testid="suit-clean">
               <h4><i className="fa-solid fa-circle-check"></i> Nothing to watch out for</h4>
-              <p>No major irritation or pore-clogging risks detected in this formula.</p>
+              <p>{WATCH_CLEAR[skinKey] || "Nothing here stands out for this skin type."}</p>
             </div>
           )}
 

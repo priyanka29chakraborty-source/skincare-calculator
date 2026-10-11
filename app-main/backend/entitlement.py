@@ -37,6 +37,7 @@ FREE_KEYS = {
     # The product-quality answer - impersonal, identical for every user,
     # cacheable and shareable. This is the acquisition engine and stays free.
     'formulation_score', 'formulation_category', 'formulation_rationale',
+    'formulation_seal',
     'formulation_breakdown', 'formulation_confidence',
     'formulation_confidence_note', 'formulation_flags',
     'main_worth_score', 'main_worth_tier', 'score_title',

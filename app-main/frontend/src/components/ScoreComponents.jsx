@@ -74,13 +74,7 @@ function FitBars({ bars, color }) {
 export function ConcernCard({ concern, data }) {
   const ic = CONCERNS_LIST.find(c => c.key === concern)?.icon || "fa-solid fa-circle";
 
-  // Dual-score display: category-normalised score for the bar (fair comparison within
-  // category), absolute score shown as secondary context (honest cross-category view)
-  const displayScore  = data.score;                              // bar always uses category score
-  const absoluteScore = data.absolute_score ?? data.score;       // fallback for serums (ceiling=100)
-  const isCapped      = data.is_capped === true;
-  const ceiling       = data.ceiling ?? 100;
-
+  const displayScore = data.score;
   const fit      = getFitLevel(displayScore);
   const barColor = getBarColor(displayScore);
 
@@ -97,38 +91,9 @@ export function ConcernCard({ concern, data }) {
       <ProgressBar pct={displayScore} label={concern} />
       <div className="concern-detail open">
 
-        {/* Dual-score block — only shown when category ceiling < 100 */}
-        {isCapped ? (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '120px', background: 'var(--bg-deep)', borderRadius: '8px',
-                          padding: '8px 10px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', textTransform: 'uppercase',
-                            letterSpacing: '0.5px', marginBottom: '2px' }}>Within category</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: barColor }}>{displayScore}/100</div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>{fit.label}</div>
-              <div style={{ fontSize: '0.66rem', color: 'var(--text-sub)', marginTop: '4px', lineHeight: 1.45 }}>
-                Against other products of this type. This is the fair
-                comparison and the one the bar above uses.
-              </div>
-            </div>
-            <div style={{ flex: 1, minWidth: '120px', background: 'var(--bg-deep)', borderRadius: '8px',
-                          padding: '8px 10px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', textTransform: 'uppercase',
-                            letterSpacing: '0.5px', marginBottom: '2px' }}>vs all formats</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-sub)' }}>{absoluteScore}/100</div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-sub)' }}>max possible: {ceiling}/100</div>
-              <div style={{ fontSize: '0.66rem', color: 'var(--text-sub)', marginTop: '4px', lineHeight: 1.45 }}>
-                Against every product type at once. This format has a
-                realistic ceiling of {ceiling}/100 for this concern, so it is
-                not marked down for being what it is.
-              </div>
-            </div>
-          </div>
-        ) : (
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontStyle: 'italic', marginBottom: '6px' }}>
-            {displayScore}/100 = {fit.label.toLowerCase()} for this concern, based on the actives this product actually contains and whether they are at doses shown to work.
-          </p>
-        )}
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontStyle: 'italic', marginBottom: '6px' }}>
+          {displayScore}/100 = {fit.label.toLowerCase()} for this concern, compared with other products of this type, based on the actives this product actually contains and whether they are at doses shown to work.
+        </p>
 
         <ul className="concern-explain">
           {data.explanation?.map((e, i) => <li key={i}>{e}</li>)}

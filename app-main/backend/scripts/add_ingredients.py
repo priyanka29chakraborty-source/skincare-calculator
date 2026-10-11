@@ -145,7 +145,37 @@ ADDITIONS = [
     ("Citrus Limon Peel Oil", "Functional", "Fragrance", "Essential oil", "Terpene fragrance", "High", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Oil", "", "Citrus peel oils are phototoxic and sensitising; limonene content oxidises with air"),
     ("Eugenia Caryophyllus Bud Oil", "Functional", "Fragrance", "Essential oil", "Eugenol fragrance", "High", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Oil", "", "Clove oil; eugenol is a recognised contact sensitiser"),
     ("Menthone Glycerin Acetal", "Functional", "Fragrance", "Cooling agent", "TRPM8 cooling sensation", "Moderate", 0.0, "Safe", "Oil", "", "Provides a cooling sensation; does not lower skin temperature"),
+
+    # ── Names that were missing, or matched the wrong ingredient ───────────
+    # Doses stay empty. Functions below are the EU CosIng (or COSMILE) declared
+    # role, which is not a clinical result.
+    ("Glutamic Acid", "Functional", "Amino acid", "Amino acid", "Amino acid", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng functions: antistatic, hair conditioning, humectant. CAS 56-86-0. Not polyglutamic acid, and no leave-on dose is stored."),
+    ("Aspartic Acid", "Functional", "Amino acid", "Amino acid", "Amino acid", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng functions: antistatic, hair conditioning, masking, skin conditioning. Not asiatic acid, and no leave-on dose is stored."),
+    ("Sorbitan Oleate", "Functional", "Emulsifier", "Emulsifier", "Sorbitan ester emulsification", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Oil", "", "COSMILE Europe: surfactant-emulsifying. Not sorbitan olivate."),
+    ("Corallina Officinalis Extract", "Functional", "Botanical extract", "Red-alga extract", "Skin conditioning", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng function: skin conditioning. A red alga, not calendula. No leave-on dose is stored."),
+    ("Polyglyceryl-4 Caprate", "Functional", "Emulsifier", "Emulsifier", "Polyglyceryl ester emulsification", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Both", "", "Emulsifying surfactant. Not polyglyceryl-6 caprylate. No leave-on dose is stored."),
+    ("Sodium Polyacryloyldimethyl Taurate", "Functional", "Thickener", "Thickener", "Acrylate viscosity control", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng-type role: emulsion stabilising and viscosity controlling. No leave-on dose is stored."),
+    ("Sodium Acrylate/Sodium Acryloyldimethyl Taurate Copolymer", "Functional", "Thickener", "Thickener", "Acrylate copolymer gel", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "Viscosity-controlling copolymer. Not the hydroxyethyl acrylate version. No leave-on dose is stored."),
+    ("Polyglycerin-3", "Functional", "Humectant", "Humectant", "Polyglycerin humectancy", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng function: humectant. No leave-on dose is stored."),
+    ("Propolis Extract", "Functional", "Botanical extract", "Bee-product extract", "Skin conditioning", "Moderate", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Both", "", "CosIng function: skin conditioning. Propolis can sensitise. No leave-on dose is stored."),
+    ("Portulaca Oleracea Extract", "Functional", "Botanical extract", "Purslane extract", "Skin conditioning", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng function: skin conditioning. No leave-on dose is stored."),
+    ("Cyanocobalamin", "Functional", "Vitamin", "Vitamin B12", "Skin conditioning", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng function: skin conditioning. It is a coloured form of vitamin B12. No leave-on dose is stored."),
+    ("Milt Extract", "Functional", "Animal extract", "Fish-milt extract", "Skin conditioning", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng: extract of fish milt, function skin conditioning. Not malt, and not a measured PDRN dose. Sodium DNA is the separate INCI."),
+    ("Salmon Egg Extract", "Functional", "Animal extract", "Salmon-egg extract", "Skin conditioning; emollient", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng name Salmo Ovum Extract. Functions: skin conditioning, emollient. CAS 94944-92-0. No leave-on dose is stored."),
+    ("Collagen", "Functional", "Film former", "Collagen", "Film forming; skin conditioning", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng lists COLLAGEN separately from HYDROLYZED COLLAGEN. Functions include film forming, humectant, and skin conditioning. No leave-on dose is stored."),
+    ("Collagen Extract", "Functional", "Film former", "Label name", "Not a more specific collagen INCI", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "Kept so a label that says collagen extract is not scored as hydrolyzed collagen. No CosIng dose is stored."),
+    ("Atelocollagen", "Functional", "Film former", "Soluble collagen", "Collagen with telopeptides removed", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "Suppliers declare the CosIng name Soluble Collagen for atelocollagen. No leave-on dose is stored."),
+    ("PVP", "Functional", "Film former", "Film former", "Polyvinylpyrrolidone film", "Low", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "CosIng name polyvinylpyrrolidone. Functions include binding, film forming, and viscosity controlling. Used as the dissolving base of some microneedle patches. No dose is stored."),
+    ("S-Mu-Conotoxin CnIIIC", "Functional", "Peptide", "Cone-snail peptide", "Skin conditioning", "Insufficient data", 0.0, "Insufficient data; consult doctor before use in pregnancy", "Water", "", "INCI for this synthetic conotoxin peptide. No concentration was stated on the patch label checked, and none is stored here."),
 ]
+
+# Lookup names that are not the record key. Applied only when the target exists
+# and the alias is not already taken.
+EXTRA_ALIASES = {
+    "polyvinylpyrrolidone": "pvp",
+    "salmo ovum extract": "salmon egg extract",
+    "soluble collagen": "atelocollagen",
+}
 
 
 def make_record(row):
@@ -226,7 +256,20 @@ def main():
         ingredients[key] = record
         added.append(row[0])
 
+    alias_book = db.setdefault('aliases', {})
+    alias_added = []
+    for alias, target in EXTRA_ALIASES.items():
+        if target not in ingredients or alias in ingredients or alias in alias_book:
+            continue
+        if args.dry_run:
+            alias_added.append(alias)
+            continue
+        alias_book[alias] = target
+        alias_added.append(alias)
+
     print("would add" if args.dry_run else "added", len(added), "ingredients")
+    if alias_added:
+        print("aliases:", ", ".join(alias_added))
     if skipped:
         print("already present, skipped:", len(skipped), "->", ", ".join(skipped[:6]))
     print("database: {} -> {} records".format(before, before + len(added)))

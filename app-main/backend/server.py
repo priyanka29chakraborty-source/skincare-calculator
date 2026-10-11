@@ -229,6 +229,14 @@ async def readiness():
             "and no credit is ever spent. This is the intended state while the "
             "product is being reviewed; set PAYWALL_ENABLED=1 to start "
             "charging.")
+    import evidence
+    evidence_queue = evidence.queue_counts()
+    if evidence_queue['pregnancy_unsigned'] or evidence_queue['actives_missing_evidence']:
+        warnings.append(
+            "Evidence reviews are incomplete: %d pregnancy records and %d "
+            "actives still have no signed source. See evidence_reviews.json."
+            % (evidence_queue['pregnancy_unsigned'],
+               evidence_queue['actives_missing_evidence']))
     return {
         "ledger_durable": ledger_durable,
         "session_secret_persistent": session_persistent,
@@ -238,6 +246,7 @@ async def readiness():
         "ready_to_charge": (ledger_durable and session_persistent
                             and payments.is_configured() and not _DEV_UNLOCK),
         "currently_charging": (paywall_on and not _DEV_UNLOCK),
+        "evidence_queue": evidence_queue,
         "warnings": warnings,
     }
 
@@ -279,8 +288,11 @@ def _resolve_entitlement(request: Request, product_data: dict = None) -> bool:
     if not account_id:
         return False
 
+    reference = _spend_reference(account_id, product_data)
+    if wallet.already_spent(reference):
+        return True
     try:
-        wallet.spend(account_id, reference=_spend_reference(account_id, product_data))
+        wallet.spend(account_id, reference=reference)
         return True
     except wallet.InsufficientCredits:
         return False
@@ -330,8 +342,13 @@ def _spend_reference(account_id, product_data):
 
 
 
-# Sections of a comparison that depend on the reader rather than the products.
-COMPARISON_PAID_SECTIONS = ('actives', 'concerns', 'tolerability', 'together')
+# The whole comparison is paid. Formulation scores for one product stay free.
+# Putting two of them side by side, with price, actives, concerns, and
+# layering, is a separate credit.
+COMPARISON_PAID_SECTIONS = (
+    'products', 'components', 'actives', 'concerns', 'tolerability',
+    'together', 'verdict', 'same_category', 'method_note',
+)
 
 
 def _comparison_reference(account_id, products):
@@ -350,11 +367,11 @@ def _comparison_reference(account_id, products):
 
 
 def _resolve_comparison_entitlement(request: Request, products) -> bool:
-    """Whether this caller has paid for the personal half of a comparison.
+    """Whether this caller has paid for this comparison.
 
     Same shape as _resolve_entitlement and the same rules: server-side only,
-    nothing in the request body is believed, and running out falls back to the
-    free half rather than erroring.
+    nothing in the request body is believed, and running out returns a lock
+    rather than the table.
     """
     if not _PAYWALL_ENABLED or _DEV_UNLOCK:
         return True
@@ -363,53 +380,41 @@ def _resolve_comparison_entitlement(request: Request, products) -> bool:
     if not account_id:
         return False
 
+    reference = _comparison_reference(account_id, products)
+    if wallet.already_spent(reference):
+        return True
     try:
-        wallet.spend(account_id,
-                     reference=_comparison_reference(account_id, products))
+        wallet.spend(account_id, reference=reference)
         return True
     except wallet.InsufficientCredits:
         return False
     except Exception:
-        logger.exception("comparison credit spend failed; serving the free half")
+        logger.exception("comparison credit spend failed; withholding the comparison")
         return False
 
 
 def _filter_comparison(out, entitled):
-    """Strip the personal sections unless they have been paid for.
+    """Return the comparison only when it has been paid for.
 
     Removed, not blanked: a key that is absent cannot be read out of the
-    response by editing client code, which is the whole point of doing this
-    here rather than hiding sections in the interface.
-
-    Builds a new dict rather than editing the caller's. The first version
-    popped straight from *out*, which was safe only because the endpoint hands
-    it a freshly built object: `verdict.pop('choose_if')` reached through into
-    a nested dict the caller still held, so a free request permanently
-    degraded the object it was given. Harmless today, and exactly the shape of
-    the cache leak already fixed on the analyse path - add comparison caching
-    later and a free request would strip choose_if from the cached result for
-    the next paying one.
+    response by editing client code. A new dict is built so a locked response
+    cannot strip fields from an object the caller still holds.
     """
     if entitled:
         return dict(out, access={'tier': 'full'})
 
-    out = {k: v for k, v in out.items() if k not in COMPARISON_PAID_SECTIONS}
-
-    # The verdict is mixed: better-made and better-value come from the free
-    # scoreboard, "choose X if" is built from concerns and unique actives.
-    out['verdict'] = {k: v for k, v in (out.get('verdict') or {}).items()
-                      if k != 'choose_if'}
-
-    out['access'] = {
-        'tier': 'free',
-        'locked_sections': list(COMPARISON_PAID_SECTIONS),
-        'message': (
-            "How well each of these is made, and what each costs per ml, is "
-            "free. What is locked is the part that depends on you - which one "
-            "treats your concerns, what each has that the others do not, "
-            "irritation risk for your skin, and whether you could use both."),
+    return {
+        'access': {
+            'tier': 'free',
+            'locked_sections': list(COMPARISON_PAID_SECTIONS),
+            'message': (
+                "A comparison costs one credit. It covers how each product is "
+                "made, price per ml, what each has that the others do not, "
+                "which treats your concern, irritation for your skin, and "
+                "whether you could use both. Opening the same pair again does "
+                "not spend another credit."),
+        },
     }
-    return out
 
 
 class CompareRequest(BaseModel):
@@ -424,12 +429,7 @@ class CompareRequest(BaseModel):
 @api_router.post("/compare")
 @limiter.limit("6/minute")
 async def compare_endpoint(req: CompareRequest, request: Request):
-    """Two to four products side by side.
-
-    Free, and deliberately so: it compares formulation scores, and formulation
-    analysis is the free tier. Charging to put two free numbers next to each
-    other would be charging for arithmetic.
-    """
+    """Two to four products side by side. One credit, same pair is free to reopen."""
     products = req.products or []
     if len(products) > MAX_PRODUCTS:
         return JSONResponse(status_code=400, content={
@@ -549,7 +549,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
                 audit_no_paid_leakage(_out)
             return _out
 
-        result = analyze_product(product_data)
+        import evidence
+        result = evidence.attach(analyze_product(product_data))
         elapsed = round((_time.time() - t0) * 1000)
 
 
@@ -1250,6 +1251,11 @@ async def _best_price_impl(req: BestPriceRequest, request: Request):
     ddg_query = f"{query} {size_query} buy {site_filter}"
     ddg_results = _ddg_search(ddg_query, max_results=10)
     ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href')]
+    if not ddg_urls:
+        # The site-limited query often comes back empty. A plain buy query
+        # still has to pass the same product and size check below.
+        ddg_results = _ddg_search(f"{query} {size_query} buy", max_results=6)
+        ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href')]
 
     if ddg_urls:
         fetched = await fetch_multiple_products(ddg_urls[:6], timeout=20)
@@ -1363,7 +1369,11 @@ async def _best_price_impl(req: BestPriceRequest, request: Request):
         }
 
 
+import events
+import shares
 api_router.include_router(accounts_router)
+api_router.include_router(shares.shares_router)
+api_router.include_router(events.events_router)
 app.include_router(api_router)
 
 # Production: locked to urancal.com only

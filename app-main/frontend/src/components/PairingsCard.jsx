@@ -22,8 +22,8 @@ export default function PairingsCard({ pairings }) {
         <i className="fa-solid fa-link"></i> What to pair this with
       </h2>
       <p className="pairings-lede">
-        These work <em>with</em> what is already in this product rather than
-        repeating it. Nothing here is required &mdash; the product stands on
+        These work with what is already in this product, and with the skin
+        type you selected. Nothing here is required. The product stands on
         its own.
       </p>
 
@@ -62,8 +62,7 @@ export default function PairingsCard({ pairings }) {
       </ul>
 
       <p className="pairings-foot">
-        Based on documented interactions between these ingredients, not on who
-        sells them. We earn nothing from these suggestions.
+        Pairings come from how these ingredients are documented to work together.
       </p>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { money } from "../constants";
 import { API, api } from "../api";
+import { track } from "../track";
 
 /**
  * Previously analysed products, for signed-in accounts.
@@ -39,6 +40,7 @@ export default function HistoryCard({ account, onReopen }) {
     try {
       const { data } = await api.get(`${API}/history/${entry.entry_id}`);
       onReopen(data);
+      track("result_reopened");
       setOpen(false);
     } catch {
       // Nothing useful to say: the entry is gone or the network failed, and

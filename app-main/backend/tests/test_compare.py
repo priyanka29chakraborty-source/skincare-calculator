@@ -128,7 +128,7 @@ def test_value_and_formulation_are_reported_separately():
     verdict = out['verdict']
     assert verdict['best_formulation'] == 'B'
     assert verdict['best_value'] == 'A'
-    assert 'does not consider price' in out['method_note']
+    assert 'ignores price' in out['method_note']
 
 
 def test_products_without_a_price_still_compare_on_formulation():
