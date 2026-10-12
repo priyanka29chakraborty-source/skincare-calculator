@@ -360,33 +360,22 @@ def _choose_if(rows, concern_table, actives):
         if entry['best_index'] is None:
             continue
         i = entry['best_index']
-        lines[i].append('you are mainly treating {} ({} vs {})'.format(
-            entry['concern'].lower(),
-            _trim(entry['scores'][i]),
-            _trim(max(s for j, s in enumerate(entry['scores']) if j != i))))
+        lines[i].append('Stronger match for {}.'.format(entry['concern'].lower()))
 
     for i, unique_actives in enumerate(actives['unique']):
         if unique_actives:
             names = ', '.join(a['name'] for a in unique_actives[:3])
-            lines[i].append('you want {} specifically'.format(names))
+            lines[i].append('Contains {}.'.format(names))
 
     priced = [(i, r['price_per_ml']) for i, r in enumerate(rows) if r['price_per_ml']]
     if len(priced) == len(rows) and len(priced) > 1:
         cheapest = min(priced, key=lambda t: t[1])[0]
-        lines[cheapest].append('cost per ml is what matters most to you')
+        lines[cheapest].append('Lower price per ml.')
 
     return [
         {'product_name': rows[i]['product_name'], 'reasons': reasons}
         for i, reasons in enumerate(lines) if reasons
     ]
-
-
-def _trim(value):
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        return str(value)
-    return str(int(f)) if f == int(f) else str(round(f, 1))
 
 
 def _verdict(rows, same_category, concern_table, actives):
@@ -487,7 +476,7 @@ def compare(products, analyse):
         # Said once, here, rather than left for the reader to infer from the
         # separate verdicts.
         'method_note': (
-            'The formulation score ignores price. Paying more does not raise it.'),
+            'The formulation score is about how the product is made. Price is separate.'),
     }
 
 

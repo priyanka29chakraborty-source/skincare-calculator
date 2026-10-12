@@ -128,7 +128,7 @@ def test_value_and_formulation_are_reported_separately():
     verdict = out['verdict']
     assert verdict['best_formulation'] == 'B'
     assert verdict['best_value'] == 'A'
-    assert 'ignores price' in out['method_note']
+    assert 'how the product is made' in out['method_note']
 
 
 def test_products_without_a_price_still_compare_on_formulation():
@@ -377,7 +377,7 @@ def test_a_product_with_nothing_distinguishing_gets_no_manufactured_reason(engin
     by_name = {c['product_name']: c['reasons'] for c in out['verdict']['choose_if']}
     # Identical formulas: the only honest difference is price.
     assert 'B' not in by_name
-    assert by_name['A'] == ['cost per ml is what matters most to you']
+    assert by_name['A'] == ['Lower price per ml.']
 
 
 def test_tolerability_is_reported_per_product_not_ranked(engine):

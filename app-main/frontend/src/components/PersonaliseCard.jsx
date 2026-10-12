@@ -29,6 +29,22 @@ const CLIMATES = [
   { key: "cold_dry", label: "Cold & dry", hint: "Winter, heated indoors" },
 ];
 
+function draftAnswer(key, draft) {
+  if (key === "skin_tone") return draft.fitzpatrick ? `Type ${draft.fitzpatrick}` : "";
+  if (key === "climate") {
+    const match = CLIMATES.find((c) => c.key === draft.climate);
+    return match ? match.label : "";
+  }
+  if (key === "allergens") {
+    return draft.allergens
+      .map((k) => (ALLERGENS.find((a) => a.key === k) || {}).label)
+      .filter(Boolean)
+      .join(", ");
+  }
+  if (key === "routine") return (draft.current_routine || "").trim();
+  return "";
+}
+
 const ALLERGENS = [
   { key: "fragrance", label: "Fragrance" },
   { key: "essential_oils", label: "Essential oils" },
@@ -246,22 +262,33 @@ export default function PersonaliseCard({ profile, onApply, loading, level,
         <div className="personal-checks" data-testid="personal-checks">
           <h4>What your answers changed</h4>
           <ul>
-            {checks.map((c) => (
-              <li key={c.key} className={`personal-check personal-check-${c.status}`}>
+            {checks.map((c) => {
+              const chosen = draftAnswer(c.key, draft);
+              const fromCountry = c.key === "climate" && /from your country/i.test(c.answer || "");
+              const pending = Boolean(chosen) && (c.status === "unanswered" || fromCountry);
+              const status = pending ? "unanswered" : c.status;
+              return (
+              <li key={c.key} className={`personal-check personal-check-${status}`}>
                 <i className={
-                  c.status === "flagged" ? "fa-solid fa-triangle-exclamation"
-                  : c.status === "clear" ? "fa-solid fa-circle-check"
+                  status === "flagged" ? "fa-solid fa-triangle-exclamation"
+                  : status === "clear" ? "fa-solid fa-circle-check"
                   : "fa-regular fa-circle"}></i>
                 <span>
                   <strong>{c.label}</strong>
-                  {c.answer ? ` — ${c.answer}. ` : " — not answered yet. "}
-                  {c.finding
+                  {pending
+                    ? ` — ${chosen}. Press Update result to check this.`
+                    : c.answer
+                      ? ` — ${c.answer}. `
+                      : " — not answered yet. "}
+                  {!pending && !fromCountry && (c.finding
                     || (c.status === "unanswered"
                         ? "Answer it and we will check this one too."
-                        : "")}
+                        : ""))}
+                  {!pending && fromCountry && c.finding ? c.finding : ""}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}

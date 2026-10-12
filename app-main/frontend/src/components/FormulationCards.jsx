@@ -198,7 +198,9 @@ export function FormulationFlags({ flags }) {
  * "safe for everyone".
  */
 export function AdvisoryFlags({ flags }) {
-  const list = flags || [];
+  // Climate is answered in "How this suits you", after the reader chooses one.
+  // A country on the product form is not that answer.
+  const list = (flags || []).filter((f) => f.type !== "climate_texture");
   if (!list.length) return null;
   return (
     <div style={{ marginTop: 14 }} data-testid="advisory-flags">

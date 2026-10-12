@@ -27,6 +27,11 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+input, textarea, select {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
 body {
   /* Rose mist. Keeps the warmth and the pink identity of the original, but
      at much lower saturation than the old #FFF4F4 -> #F9F6FE gradient, so it
@@ -37,6 +42,8 @@ body {
   font-family: 'Nunito', sans-serif;
   color: var(--charcoal);
   min-height: 100vh;
+  -webkit-user-select: none;
+  user-select: none;
   padding: 0;
 }
 body::before {
@@ -957,13 +964,19 @@ body::before {
   body > *:not(.print-report):not(.print-compare) { display: none !important; }
   body.print-compare .print-report { display: none !important; }
   body:not(.print-compare) .print-compare { display: none !important; }
-  body.print-compare .print-compare { display: block !important; }
+  body.print-compare .print-compare {
+    display: block !important;
+    color: #111 !important;
+    background: #fff !important;
+  }
   body::before { display: none !important; }
 
   body {
     background: #fff !important; color: #111;
     font-family: 'DM Sans', system-ui, sans-serif;
     font-size: 10.5pt; line-height: 1.5;
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   .print-report { display: block !important; }

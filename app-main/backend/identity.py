@@ -184,6 +184,7 @@ def verify_code(email, code):
 
     wallet._execute('DELETE FROM login_code WHERE email = ?', (email,), commit=True)
     account_id = wallet.get_or_create_account(email)
+    wallet.grant_trial(account_id)
     logger.info('login succeeded for %s', _email_fingerprint(email))
     return account_id
 

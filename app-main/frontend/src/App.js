@@ -304,6 +304,20 @@ function App() {
   }, [fetchInput]);
 
   useEffect(() => {
+    const block = (e) => {
+      const el = e.target;
+      if (el && el.closest && el.closest("input, textarea, select")) return;
+      e.preventDefault();
+    };
+    document.addEventListener("copy", block);
+    document.addEventListener("cut", block);
+    return () => {
+      document.removeEventListener("copy", block);
+      document.removeEventListener("cut", block);
+    };
+  }, []);
+
+  useEffect(() => {
     const onHash = () => setHashPage(legalPageName());
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -395,8 +409,9 @@ function App() {
               category={category}
               onUnlock={() => setUnlockOpen(true)}
               onSavePdf={savePdf}
-              pdfLocked={result.access?.tier === "free"}
+              pdfLocked={!account.pdfUnlocked}
               onAnswerQuestions={() => setPersonaliseOpen(true)}
+              questionsOpen={personaliseOpen}
               /* Rendered inside, directly under the formulation score, because
                  that is the number these four answers sharpen. Skin tone,
                  climate, sensitivities and routine are the paid product; when
@@ -422,12 +437,14 @@ function App() {
                 report rather than a picture of the page, because a saved PDF
                 is read weeks later by someone who was not here when it was
                 made. */}
-            <PrintReport
-              result={result}
-              productName={productName} brand={brand} category={category}
-              price={price} size={size} sizeUnit={sizeUnit}
-              currency={currency} skinType={skinType} concerns={concerns}
-            />
+            {account.pdfUnlocked && (
+              <PrintReport
+                result={result}
+                productName={productName} brand={brand} category={category}
+                price={price} size={size} sizeUnit={sizeUnit}
+                currency={currency} skinType={skinType} concerns={concerns}
+              />
+            )}
 
             {/* Seeded with the product just analysed, so comparing it against
                 something else does not mean typing it in again. */}

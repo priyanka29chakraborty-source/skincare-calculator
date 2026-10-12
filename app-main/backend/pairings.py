@@ -118,7 +118,7 @@ def _family_of(name, routine_actives):
 
 
 def suggest_pairings(ingredient_list, concern_fit=None, max_suggestions=MAX_SUGGESTIONS,
-                      skin_type=None):
+                      skin_type=None, category=None):
     """Actives worth using alongside this product.
 
     *concern_fit* is the per-concern scoring, used only for ranking: a partner
@@ -132,7 +132,7 @@ def suggest_pairings(ingredient_list, concern_fit=None, max_suggestions=MAX_SUGG
     recommendation is a missing nicety and a broken analysis is not.
     """
     try:
-        return _suggest(ingredient_list, concern_fit or {}, max_suggestions, skin_type)
+        return _suggest(ingredient_list, concern_fit or {}, max_suggestions, skin_type, category)
     except Exception:
         logger.exception('pairing suggestions failed')
         return []
@@ -190,7 +190,52 @@ def _blocked_for_skin(name, data, skin_type):
     return False
 
 
-def _suggest(ingredient_list, concern_fit, max_suggestions, skin_type=None):
+def _category_key(category):
+    c = _norm(category).replace('moisturiser', 'moisturizer')
+    if c in ('oil', 'facial oil'):
+        return 'facial oil'
+    return c
+
+
+# Actives that belong in a facial oil. Water-based serum staples (niacinamide,
+# hyaluronic acid, tranexamic acid) are left off on purpose: a face-oil
+# analysis was sending people to buy those serums.
+_OIL_SOLUBLE = {
+    'tetrahexyldecyl ascorbate', 'tocopherol', 'tocopheryl acetate',
+    'retinol', 'retinal', 'bakuchiol', 'squalane', 'ferulic acid',
+}
+
+
+def _fits_category(look_for, category):
+    """Keep a pairing only when it is the same kind of product.
+
+    A facial oil was told to go and buy a niacinamide serum. The format line
+    is the allowlist, so the analysed category has to be in that line.
+    """
+    key = _category_key(category)
+    text = _norm(look_for)
+    if not key:
+        return True
+    if key == 'facial oil':
+        return 'oil' in text
+    if key == 'serum':
+        return 'serum' in text or 'ampoule' in text
+    if key == 'moisturizer':
+        return 'moistur' in text or 'cream' in text
+    if key == 'cleanser':
+        return 'cleanser' in text or 'wash' in text
+    if key == 'toner':
+        return 'toner' in text
+    if key == 'sunscreen':
+        return 'sunscreen' in text
+    if key == 'eye cream':
+        return 'eye' in text
+    if key == 'treatment':
+        return 'treatment' in text or 'serum' in text or 'exfoliant' in text
+    return True
+
+
+def _suggest(ingredient_list, concern_fit, max_suggestions, skin_type=None, category=None):
     from data_loader import data_loader
     from personalization import ROUTINE_ACTIVES, ROUTINE_INTERACTIONS
 
@@ -230,6 +275,12 @@ def _suggest(ingredient_list, concern_fit, max_suggestions, skin_type=None):
             # the phrasing. Adding an entry there is how this feature grows.
             look_for = _TYPICAL_FORMAT.get(partner_n)
             if not look_for:
+                continue
+            if _category_key(category) == 'facial oil':
+                if partner_n not in _OIL_SOLUBLE:
+                    continue
+                look_for = 'a facial oil containing %s' % _display_name(partner_n)
+            elif not _fits_category(look_for, category):
                 continue
             if _blocked_for_skin(partner_n, data, skin_type):
                 skipped_for_skin.append(partner_n)

@@ -57,7 +57,7 @@ export default function PrintReport({
   const actives = result.identified_actives || [];
   const concernFit = result.skin_concern_fit || {};
   const details = result.skin_type_details || {};
-  const advisories = result.advisory_flags || [];
+  const advisories = (result.advisory_flags || []).filter((f) => f.type !== "climate_texture");
   const flags = result.formulation_flags || [];
   const compat = result.skin_type_compatibility;
   const pairings = result.pairs_well_with || [];

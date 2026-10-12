@@ -149,12 +149,17 @@ def test_credit_endpoints_require_a_session(client):
 def test_signing_in_starts_at_zero(client, signed_in):
     body = client.get('/api/auth/me').json()
     assert body['signed_in'] is True
-    assert body['balance'] == 0
+    assert body['balance'] == 4
+    assert body['pdf_unlocked'] is False
 
 
 def test_being_signed_in_is_not_being_paid(client, signed_in):
     """An account with no credits must still get the free tier, not an error
-    and certainly not the paid payload."""
+    and certainly not the paid payload. Sign-in includes 4 trial credits, so
+    this spends them first."""
+    import wallet
+    for i in range(wallet.get_balance(signed_in)):
+        wallet.spend(signed_in, reference='drain_%s' % i)
     body = client.post('/api/analyze', json=analysis_body()).json()
     assert body['access']['tier'] == 'free'
     assert 'skin_concern_fit' not in body
@@ -170,7 +175,9 @@ def test_a_verified_webhook_delivers_the_pack(client, signed_in):
     resp = client.post('/api/credits/webhook', content=body,
                        headers={'x-razorpay-signature': sig})
     assert resp.status_code == 200 and resp.json()['handled'] is True
-    assert client.get('/api/auth/me').json()['balance'] == 15
+    me = client.get('/api/auth/me').json()
+    assert me['balance'] == 12
+    assert me['pdf_unlocked'] is True
 
 
 def test_an_unsigned_webhook_delivers_nothing(client, signed_in):
@@ -180,14 +187,14 @@ def test_an_unsigned_webhook_delivers_nothing(client, signed_in):
     resp = client.post('/api/credits/webhook', content=body,
                        headers={'x-razorpay-signature': 'forged'})
     assert resp.status_code == 400
-    assert client.get('/api/auth/me').json()['balance'] == 0
+    assert client.get('/api/auth/me').json()['balance'] == 4
 
 
 def test_a_webhook_with_no_signature_delivers_nothing(client, signed_in):
     record_order('order_3', signed_in)
     body, _ = webhook_for('order_3', 'pay_3', signed_in)
     assert client.post('/api/credits/webhook', content=body).status_code == 400
-    assert client.get('/api/auth/me').json()['balance'] == 0
+    assert client.get('/api/auth/me').json()['balance'] == 4
 
 
 def test_a_retried_webhook_delivers_once(client, signed_in):
@@ -199,7 +206,7 @@ def test_a_retried_webhook_delivers_once(client, signed_in):
         resp = client.post('/api/credits/webhook', content=body,
                            headers={'x-razorpay-signature': sig})
         assert resp.status_code == 200
-    assert client.get('/api/auth/me').json()['balance'] == 15
+    assert client.get('/api/auth/me').json()['balance'] == 12
 
 
 def test_credits_are_delivered_to_the_order_s_account_not_the_caller(client, signed_in):
@@ -210,8 +217,8 @@ def test_credits_are_delivered_to_the_order_s_account_not_the_caller(client, sig
     body, sig = webhook_for('order_5', 'pay_5', other)
     client.post('/api/credits/webhook', content=body,
                 headers={'x-razorpay-signature': sig})
-    assert client.get('/api/auth/me').json()['balance'] == 0
-    assert wallet.get_balance(other) == 15
+    assert client.get('/api/auth/me').json()['balance'] == 4
+    assert wallet.get_balance(other) == 8
 
 
 def test_the_pack_delivered_comes_from_our_order_record(client, signed_in):
@@ -221,7 +228,7 @@ def test_the_pack_delivered_comes_from_our_order_record(client, signed_in):
     body, sig = webhook_for('order_6', 'pay_6', signed_in)  # claims the 15 pack
     client.post('/api/credits/webhook', content=body,
                 headers={'x-razorpay-signature': sig})
-    assert client.get('/api/auth/me').json()['balance'] == 5
+    assert client.get('/api/auth/me').json()['balance'] == 9
 
 
 def test_a_webhook_for_an_unknown_order_grants_nothing(client, signed_in):
@@ -229,7 +236,7 @@ def test_a_webhook_for_an_unknown_order_grants_nothing(client, signed_in):
     resp = client.post('/api/credits/webhook', content=body,
                        headers={'x-razorpay-signature': sig})
     assert resp.status_code == 200
-    assert client.get('/api/auth/me').json()['balance'] == 0
+    assert client.get('/api/auth/me').json()['balance'] == 4
 
 
 def test_a_checkout_confirmation_for_someone_elses_order_is_refused(client, signed_in):
@@ -242,7 +249,7 @@ def test_a_checkout_confirmation_for_someone_elses_order_is_refused(client, sign
         'razorpay_order_id': 'order_8', 'razorpay_payment_id': 'pay_8',
         'razorpay_signature': sig})
     assert resp.status_code == 400
-    assert client.get('/api/auth/me').json()['balance'] == 0
+    assert client.get('/api/auth/me').json()['balance'] == 4
 
 
 def test_a_genuine_checkout_confirmation_delivers(client, signed_in):
@@ -252,7 +259,7 @@ def test_a_genuine_checkout_confirmation_delivers(client, signed_in):
         'razorpay_order_id': 'order_9', 'razorpay_payment_id': 'pay_9',
         'razorpay_signature': sig})
     assert resp.status_code == 200
-    assert resp.json()['balance'] == 15
+    assert resp.json()['balance'] == 12
 
 
 def test_the_callback_and_the_webhook_together_deliver_once(client, signed_in):
@@ -265,7 +272,7 @@ def test_the_callback_and_the_webhook_together_deliver_once(client, signed_in):
     body, wsig = webhook_for('order_10', 'pay_10', signed_in)
     client.post('/api/credits/webhook', content=body,
                 headers={'x-razorpay-signature': wsig})
-    assert client.get('/api/auth/me').json()['balance'] == 15
+    assert client.get('/api/auth/me').json()['balance'] == 12
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +285,7 @@ def funded(client, signed_in):
     body, sig = webhook_for('order_fund', 'pay_fund', signed_in)
     client.post('/api/credits/webhook', content=body,
                 headers={'x-razorpay-signature': sig})
-    assert client.get('/api/auth/me').json()['balance'] == 15
+    assert client.get('/api/auth/me').json()['balance'] == 12
     return signed_in
 
 
@@ -290,7 +297,7 @@ def test_a_paid_analysis_returns_the_full_payload(client, funded):
 
 def test_a_paid_analysis_costs_one_credit(client, funded):
     client.post('/api/analyze', json=analysis_body())
-    assert client.get('/api/auth/me').json()['balance'] == 14
+    assert client.get('/api/auth/me').json()['balance'] == 11
 
 
 def test_re_analysing_the_same_product_is_free(client, funded):
@@ -301,18 +308,20 @@ def test_re_analysing_the_same_product_is_free(client, funded):
     for _ in range(4):
         resp = client.post('/api/analyze', json=body).json()
         assert resp['access']['tier'] == 'full'
-    assert client.get('/api/auth/me').json()['balance'] == 14
+    assert client.get('/api/auth/me').json()['balance'] == 11
 
 
 def test_each_new_product_costs_a_credit(client, funded):
     for _ in range(3):
         client.post('/api/analyze', json=analysis_body())
-    assert client.get('/api/auth/me').json()['balance'] == 12
+    assert client.get('/api/auth/me').json()['balance'] == 9
 
 
 def test_running_out_falls_back_to_the_free_tier(client, signed_in):
     """Not an error page. The free analysis is a real product."""
     import wallet
+    for i in range(wallet.get_balance(signed_in)):
+        wallet.spend(signed_in, reference='drain_run_%s' % i)
     wallet.grant(signed_in, 1, reference='manual_1')
     first = client.post('/api/analyze', json=analysis_body()).json()
     assert first['access']['tier'] == 'full'
@@ -360,7 +369,7 @@ def test_history_shows_the_purchase_and_the_spend(client, funded):
     history = client.get('/api/credits/history').json()
     reasons = [e['reason'] for e in history['entries']]
     assert 'purchase' in reasons and 'spend' in reasons
-    assert history['balance'] == 14
+    assert history['balance'] == 11
 
 
 # ---------------------------------------------------------------------------
@@ -473,14 +482,14 @@ def test_a_comparison_costs_one_credit_not_one_per_product(client, funded):
     nobody would expect from a button labelled "Compare"."""
     before = client.get('/api/auth/me').json()['balance']
     client.post('/api/compare', json=compare_body())
-    assert client.get('/api/auth/me').json()['balance'] == before - 1
+    assert client.get('/api/auth/me').json()['balance'] == before - 2
 
 
 def test_re_running_the_same_comparison_is_free(client, funded):
     before = client.get('/api/auth/me').json()['balance']
     for _ in range(3):
         client.post('/api/compare', json=compare_body())
-    assert client.get('/api/auth/me').json()['balance'] == before - 1
+    assert client.get('/api/auth/me').json()['balance'] == before - 2
 
 
 def test_order_does_not_make_it_a_new_comparison(client, funded):
@@ -500,13 +509,15 @@ def test_a_different_pair_is_a_new_comparison(client, funded):
     body = compare_body()
     body['products'][1]['ingredients'] = 'Aqua, Azelaic Acid, Glycerin, Phenoxyethanol'
     client.post('/api/compare', json=body)
-    assert client.get('/api/auth/me').json()['balance'] == before - 2
+    assert client.get('/api/auth/me').json()['balance'] == before - 4
 
 
 def test_running_out_locks_the_next_comparison(client, signed_in):
     """The same pair can be opened again. A different pair needs another credit."""
     import wallet
-    wallet.grant(signed_in, 1, reference='manual_cmp')
+    for i in range(wallet.get_balance(signed_in)):
+        wallet.spend(signed_in, reference='drain_cmp_%s' % i)
+    wallet.grant(signed_in, wallet.COST_PER_COMPARISON, reference='manual_cmp')
     assert client.post('/api/compare', json=compare_body()).json()['access']['tier'] == 'full'
     again = client.post('/api/compare',
                         json=compare_body(skin_concerns=['Dullness'])).json()
@@ -629,3 +640,31 @@ def test_the_comparison_gate_does_not_mutate_what_it_is_given(client):
     paid = server._filter_comparison(built, True)
     assert 'choose_if' in paid['verdict']
     assert all(k in paid for k in ('actives', 'concerns', 'tolerability', 'together'))
+
+
+def test_the_owner_is_not_charged_and_the_pdf_stays_open(client, signed_in, monkeypatch):
+    """OWNER_EMAIL is a short list, for life. It is not a credit pack."""
+    monkeypatch.setenv('OWNER_EMAIL', 'other@example.com, buyer@example.com')
+    import wallet
+    before = wallet.get_balance(signed_in)
+    body = client.post('/api/analyze', json=analysis_body()).json()
+    assert body['access']['tier'] == 'full'
+    assert 'skin_concern_fit' in body
+    data = client.post('/api/compare', json=compare_body()).json()
+    assert data['access']['tier'] == 'full'
+    assert wallet.get_balance(signed_in) == before
+    me = client.get('/api/auth/me').json()
+    assert me['owner'] is True
+    assert me['pdf_unlocked'] is True
+
+
+def test_another_address_is_not_the_owner(client, signed_in, monkeypatch):
+    monkeypatch.setenv('OWNER_EMAIL', 'someone-else@example.com, also-else@example.com')
+    import wallet
+    for i in range(wallet.get_balance(signed_in)):
+        wallet.spend(signed_in, reference='drain_owner_%s' % i)
+    body = client.post('/api/analyze', json=analysis_body()).json()
+    assert body['access']['tier'] == 'free'
+    me = client.get('/api/auth/me').json()
+    assert me['owner'] is False
+    assert me['pdf_unlocked'] is False

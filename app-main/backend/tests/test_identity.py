@@ -143,6 +143,14 @@ def test_the_same_address_always_reaches_the_same_account(ident):
     assert a == b
 
 
+def test_the_first_sign_in_includes_four_credits_once(ident):
+    import wallet
+    account = ident.verify_code('buyer@example.com', ident.issue_code('buyer@example.com'))
+    assert wallet.get_balance(account) == 4
+    ident.verify_code('buyer@example.com', ident.issue_code('buyer@example.com'))
+    assert wallet.get_balance(account) == 4
+
+
 def test_codes_are_not_stored_in_plain_text(ident):
     """A database read should not hand over a working code for every pending
     login."""

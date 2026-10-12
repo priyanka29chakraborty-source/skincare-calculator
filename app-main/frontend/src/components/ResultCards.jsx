@@ -621,7 +621,7 @@ function TreatmentIntensityBanner({ result, concerns }) {
 }
 
 // ── Main ResultCards Component ────────────────────────────────────────────────
-export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, bestPriceError, onRetryBestPrice, fetchInput, category, onUnlock, personalisePrompt, onAnswerQuestions, onSavePdf, pdfLocked,
+export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, bestPriceError, onRetryBestPrice, fetchInput, category, onUnlock, personalisePrompt, onAnswerQuestions, onSavePdf, pdfLocked, questionsOpen,
   productName, brand, price, size, sizeUnit }) {
   // Paid sections are stripped server-side, so the UI must branch on the
   // tier the server reported rather than on whether a field happens to be
@@ -864,7 +864,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
           onUnlock={onUnlock}
         />
       )}
-      {!isLocked && !hasAnswers && (
+      {!isLocked && !hasAnswers && !questionsOpen && (
         <div className="sc-card result-card suitability-waiting"
              data-testid="suitability-waiting">
           <h2 className="card-title">
@@ -903,7 +903,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
         >
           <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
         </button>
-        <p className="export-note">Included with the personal analysis. One credit covers this product.</p>
+        <p className="export-note">The product PDF is included once you buy a credit pack. The 4 sign-in credits do not include it.</p>
       </div>
 
       {/* What to use alongside this one. Free: derived from the product's

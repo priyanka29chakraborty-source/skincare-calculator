@@ -17,6 +17,8 @@ export default function useAccount() {
     loading: true,
     signedIn: false,
     balance: 0,
+    pdfUnlocked: false,
+    owner: false,
   });
 
   const refresh = useCallback(async () => {
@@ -26,12 +28,14 @@ export default function useAccount() {
         loading: false,
         signedIn: !!data.signed_in,
         balance: data.balance || 0,
+        pdfUnlocked: !!data.pdf_unlocked,
+        owner: !!data.owner,
       });
       return data;
     } catch {
       // Not signed in is the overwhelmingly common reason this fails, and it
       // is not an error worth showing anyone.
-      setState({ loading: false, signedIn: false, balance: 0 });
+      setState({ loading: false, signedIn: false, balance: 0, pdfUnlocked: false, owner: false });
       return null;
     }
   }, []);
@@ -49,7 +53,13 @@ export default function useAccount() {
   const verifyCode = useCallback(async (email, code) => {
     const { data } = await api.post(
       `${API}/auth/verify-code`, { email, code }, { withCredentials: true });
-    setState({ loading: false, signedIn: true, balance: data.balance || 0 });
+    setState({
+      loading: false,
+      signedIn: true,
+      balance: data.balance || 0,
+      pdfUnlocked: !!data.pdf_unlocked,
+      owner: !!data.owner,
+    });
     return data;
   }, []);
 
@@ -57,7 +67,7 @@ export default function useAccount() {
     try {
       await api.post(`${API}/auth/signout`, {}, { withCredentials: true });
     } finally {
-      setState({ loading: false, signedIn: false, balance: 0 });
+      setState({ loading: false, signedIn: false, balance: 0, pdfUnlocked: false, owner: false });
     }
   }, []);
 

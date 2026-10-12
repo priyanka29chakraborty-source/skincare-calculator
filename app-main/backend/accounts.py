@@ -147,6 +147,8 @@ async def verify_code(req: VerifyRequest, request: Request):
     response = JSONResponse(content={
         'signed_in': True,
         'balance': wallet.get_balance(account_id),
+        'pdf_unlocked': wallet.has_purchased(account_id) or wallet.is_owner(account_id),
+        'owner': wallet.is_owner(account_id),
     })
     response.set_cookie(identity.SESSION_COOKIE,
                         identity.make_session(account_id),
@@ -170,6 +172,9 @@ async def me(request: Request):
         'signed_in': True,
         'balance': wallet.get_balance(account_id),
         'cost_per_analysis': wallet.COST_PER_ANALYSIS,
+        'cost_per_comparison': wallet.COST_PER_COMPARISON,
+        'pdf_unlocked': wallet.has_purchased(account_id) or wallet.is_owner(account_id),
+        'owner': wallet.is_owner(account_id),
     }
 
 
