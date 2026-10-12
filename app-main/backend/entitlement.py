@@ -131,9 +131,10 @@ def filter_for_entitlement(result, entitled, reason=None):
         'preview': _preview(result),
         # Stated plainly so the paywall reads as honest rather than as a trick.
         'message': (
-            "The formulation analysis above is complete and free. What is "
-            "locked is the personal part - how well this suits your skin type, "
-            "your concerns and your existing routine."),
+            "The formulation analysis above is complete and free. The personal "
+            "part is locked: how well this suits your skin type, your concerns "
+            "and your existing routine. Sign in with your email to get 4 "
+            "credits. A personal analysis costs 1. A comparison costs 2."),
         'safety_note': (
             "Safety warnings are never locked. Anything we found that could "
             "affect you - including pregnancy guidance and ingredients you told "

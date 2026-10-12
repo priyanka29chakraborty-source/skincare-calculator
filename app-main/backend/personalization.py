@@ -48,15 +48,7 @@ CLIMATE = {
                        'occlusion_pref': 'rich',   'uv_band': 'low'},
 }
 
-# Best-guess default per country, offered to the user as a prefilled answer
-# rather than applied silently - India alone spans several of these.
-COUNTRY_CLIMATE = {
-    'India': 'tropical_humid', 'Singapore': 'tropical_humid',
-    'Brazil': 'tropical_humid', 'UAE': 'hot_arid',
-    'Australia': 'temperate', 'USA': 'temperate', 'UK': 'temperate',
-    'France': 'temperate', 'Germany': 'temperate', 'Japan': 'temperate',
-    'South Korea': 'temperate', 'Canada': 'cold_dry',
-}
+# A country is not a climate. The reader chooses one in "How this suits you".
 
 # --- Allergens the user can declare ----------------------------------------
 # Each maps to ingredient markers. These produce PERSONAL warnings and Fit
@@ -157,11 +149,16 @@ def _norm(s):
 
 
 def resolve_climate(profile, country=None):
-    """Climate the user confirmed, else a country-based default, else None."""
+    """Only a climate the user chose.
+
+    A country is not a climate. India is not all humid, and guessing one
+    from the shipping country was showing a weather note the reader never
+    asked for.
+    """
     explicit = (profile or {}).get('climate')
     if explicit in CLIMATE:
         return explicit
-    return COUNTRY_CLIMATE.get(country)
+    return None
 
 
 def detect_families(ingredient_list):
@@ -277,8 +274,8 @@ def fitzpatrick_context(profile, ingredient_list, concerns):
     return flags
 
 
-def climate_context(climate_key, ingredient_list, category):
-    """Humidity-appropriate texture guidance. Comfort and adherence, not safety."""
+def climate_context(climate_key, ingredient_list, category, skin_type=None):
+    """How this texture may feel in the climate the user chose."""
     data = CLIMATE.get(climate_key)
     if not data or category not in ('moisturizer', 'facial oil', 'mask'):
         return []
@@ -287,23 +284,33 @@ def climate_context(climate_key, ingredient_list, category):
              if any(m in _norm(i) for m in
                     ('petrolatum', 'paraffinum', 'lanolin', 'cera alba',
                      'beeswax', 'shea butter', 'butyrospermum'))]
+    skin = (skin_type or '').strip().lower()
     flags = []
     if data['humidity'] == 'high' and heavy:
+        if skin in ('oily', 'combination'):
+            feel = "On %s skin it can feel thick and sit on the surface." % skin
+        elif skin == 'dry':
+            feel = "On dry skin that heavier layer can still feel comfortable."
+        else:
+            feel = ("On oily or combination skin it can feel thick. "
+                    "On dry skin it can feel comfortable.")
         flags.append({
             'type': 'climate_texture', 'severity': 'info',
-            'message': "In a humid climate a rich occlusive like {} can feel "
-                       "heavy and sit on the skin. It is not a flaw in the "
-                       "formula - it may simply be more than your air requires."
-                       .format(heavy[0]),
+            'title': 'How this may feel',
+            'message': "%s is a heavy occlusive. %s" % (heavy[0], feel),
         })
     elif data['humidity'] == 'low' and not heavy and category != 'facial oil':
         # A facial oil is the sealing step. Telling someone to put a richer
         # layer over squalane or rosehip oil describes a gel, not an oil.
+        if skin == 'oily':
+            feel = "On oily skin a light texture is usually enough."
+        else:
+            feel = ("This formula is light on occlusives. On dry skin a "
+                    "richer layer over it will hold water in longer.")
         flags.append({
             'type': 'climate_texture', 'severity': 'info',
-            'message': "In dry air, humectants work best with something on top "
-                       "to seal them in. This formula is light on occlusives, "
-                       "so you may want a richer layer over it.",
+            'title': 'How this may feel',
+            'message': feel,
         })
     return flags
 
@@ -360,14 +367,8 @@ def _summarise_checks(profile, flags, climate_key, ingredient_list):
             # FITZPATRICK['label'] is a description ("Burns minimally, tans
             # easily"), not a name, so it reads as nonsense in this sentence.
             'Nothing in this formula raises dark-mark risk for type %s skin.' % tone),
-        # Climate is the one question that can answer itself: resolve_climate
-        # falls back to the country already collected on the main form. That is
-        # the intended design, but the row has to say where the value came
-        # from - presenting an inferred climate as something the reader told us
-        # claims an answer they never gave.
         row('climate', 'Climate',
-            ('%s (from your country)' % climate_label) if climate_label and not profile.get('climate')
-            else climate_label,
+            climate_label if profile.get('climate') else None,
             'Nothing about this texture works against a %s climate.'
             % (str(climate_label or '').lower() or 'your')),
         row('allergens', 'Sensitivities',
@@ -380,7 +381,8 @@ def _summarise_checks(profile, flags, climate_key, ingredient_list):
     ]
 
 
-def build_personal_context(profile, ingredient_list, concerns, category, country=None):
+def build_personal_context(profile, ingredient_list, concerns, category, country=None,
+                           skin_type=None):
     """Everything personal, in one call.
 
     Returns flags (advisory, user-facing) and fit_penalty (applies to the Fit
@@ -400,7 +402,9 @@ def build_personal_context(profile, ingredient_list, concerns, category, country
     flags.extend(fitzpatrick_context(profile, ingredient_list, concerns))
 
     climate_key = resolve_climate(profile, country)
-    flags.extend(climate_context(climate_key, ingredient_list, category))
+    if profile.get('climate'):
+        flags.extend(climate_context(
+            climate_key, ingredient_list, category, skin_type))
 
     answered = sum(1 for k in ('fitzpatrick', 'climate', 'allergens', 'current_routine')
                    if profile.get(k))

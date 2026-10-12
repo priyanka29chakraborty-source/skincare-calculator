@@ -607,7 +607,28 @@ async def _fetch_html_scraperapi(url, timeout=25):
 
 # ─── HTML Metadata Extraction ─────────────────────────────────────────
 
+def _empty_metadata():
+    return {
+        'product_name': None, 'brand': None, 'price': None,
+        'price_confidence': None, 'size_ml': None, 'size_unit': None,
+        'ingredients': None, 'category': None, 'country': None,
+        'currency': None, 'country_uncertain': True,
+        'active_concentrations': None,
+    }
+
+
 def _extract_metadata(html, url):
+    """Extract product metadata. A missing or changed page returns an empty result."""
+    try:
+        if not isinstance(html, str) or not html.strip():
+            raise TypeError('missing html')
+        return _extract_metadata_body(html, url)
+    except Exception as exc:
+        logger.warning('metadata extract failed: %s', type(exc).__name__)
+        return _empty_metadata()
+
+
+def _extract_metadata_body(html, url):
     """Extract product metadata from raw HTML page."""
     soup = BeautifulSoup(html, 'lxml')
     text = soup.get_text(' ', strip=True)

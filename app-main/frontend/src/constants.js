@@ -1,5 +1,5 @@
 export const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
-export const CREDIT_EXPIRY_HINT = "Credits expire one year after you buy them.";
+export const CREDIT_EXPIRY_HINT = "Credits expire one year after they are added, including the 4 from your first sign-in.";
 // Set REACT_APP_BACKEND_URL in Render environment to your backend URL e.g. https://your-backend.onrender.com
 
 export const CONCERNS_LIST = [

@@ -3876,8 +3876,8 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
                     if _lead else "Strong clinically supported ingredients present")
             elif comp_a >= 15:
                 explanation.append(
-                    "Contains {}, which does target this concern, though at a "
-                    "supporting rather than treatment strength.".format(_lead)
+                    "Contains {}. The dose is too low to treat this on its own."
+                    .format(_lead)
                     if _lead else "Some clinically supported ingredients present")
             else:
                 if _lead:
@@ -3906,7 +3906,14 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         if not worsening_found:
             explanation.append("No major irritation triggers detected")
         else:
-            explanation.append("Contains ingredients that may worsen condition")
+            _bother = []
+            for _item in worsening_found:
+                _name = str(_item).split(' (')[0].strip()
+                if _name and _name.lower() not in [x.lower() for x in _bother]:
+                    _bother.append(_name[:1].upper() + _name[1:] if _name.islower() else _name)
+            explanation.append(
+                "Can bother this concern: {}.".format(", ".join(_bother[:2]))
+                if _bother else "Contains an ingredient that can bother this concern.")
         suggest = _collapse_names(
             _drop_same_family(list(missing_actives), present_active_names))
         if (skin_type or '').strip().lower() == 'sensitive':
@@ -3927,7 +3934,7 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             # this product. A cleanser is not a worse cleanser for lacking
             # niacinamide; it simply is not the step that delivers it.
             explanation.append(
-                "Could be paired with {} for a stronger effect on this concern."
+                "A stronger option for this concern would add {}."
                 .format(' or '.join(suggest[:2])))
 
         # Supporting ingredient display
@@ -4471,7 +4478,7 @@ def _upgrade_already_present(suggestion, ingredient_list):
     return False
 
 
-def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None):
+def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=None):
     suggestions = []
     upgrade_map = data_loader.active_upgrade_map
     ing_lower_list = [i.lower() for i in ingredient_list]
@@ -4499,8 +4506,42 @@ def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None):
                     'concern': row.get('Skin_Concern'),
                 })
 
+    cat = (category or '').strip().lower().replace('moisturiser', 'moisturizer')
+    if cat in ('oil', 'facial oil'):
+        cat = 'facial oil'
+
+    oil_words = ('oil', 'squalane', 'tocopherol', 'vitamin e', 'retin',
+                 'bakuchiol', 'tetrahexyldecyl', 'ferulic')
+
+    def _same_kind(text):
+        t = (text or '').lower()
+        if not cat:
+            return True
+        if cat == 'facial oil':
+            if any(bad in t for bad in ('serum', 'cleanser', 'sunscreen', 'toner', 'wash')):
+                return False
+            return any(ok in t for ok in oil_words)
+        return True
+
+    suggestions = [s for s in suggestions if _same_kind(
+        '%s %s' % (s.get('upgrade') or '', s.get('suggested_active') or ''))]
+    if cat == 'facial oil':
+        for s in suggestions:
+            name = str(s.get('upgrade') or '')
+            if 'oil' not in name.lower():
+                s['upgrade'] = 'A facial oil with %s' % name
+
     if not suggestions and concerns:
-        concern_upgrades = {
+        oil_upgrades = {
+            'pigmentation': [{'upgrade': 'A facial oil with tetrahexyldecyl ascorbate', 'reason': 'An oil-soluble form of vitamin C, so it belongs in an oil.', 'suggested_active': 'Tetrahexyldecyl Ascorbate'}],
+            'dullness': [{'upgrade': 'A facial oil with vitamin E', 'reason': 'Vitamin E is already at home in an oil. It is a separate oil from this one.', 'suggested_active': 'Tocopherol'}],
+            'tanning': [{'upgrade': 'A facial oil with tetrahexyldecyl ascorbate', 'reason': 'An oil-soluble brightening active, used as another oil.', 'suggested_active': 'Tetrahexyldecyl Ascorbate'}],
+            'hydration': [{'upgrade': 'A squalane oil', 'reason': 'A light oil that sits with a facial oil.', 'suggested_active': 'Squalane'}],
+            'dry': [{'upgrade': 'A squalane oil', 'reason': 'A light oil that sits with a facial oil.', 'suggested_active': 'Squalane'}],
+            'dry skin': [{'upgrade': 'A squalane oil', 'reason': 'A light oil that sits with a facial oil.', 'suggested_active': 'Squalane'}],
+            'barrier': [{'upgrade': 'A facial oil with vitamin E', 'reason': 'Vitamin E belongs in an oil, so the next product is another oil.', 'suggested_active': 'Tocopherol'}],
+        }
+        concern_upgrades = oil_upgrades if cat == 'facial oil' else {
             'acne': [{'upgrade': 'Salicylic acid 2% serum', 'reason': 'A leave-on BHA clears congestion more directly than a moisturiser.', 'suggested_active': 'Salicylic acid'}],
             'pigmentation': [{'upgrade': 'Tranexamic acid serum', 'reason': 'Published work on dark spots, with less sting than a strong acid.', 'suggested_active': 'Tranexamic acid'}],
             'aging': [{'upgrade': 'Retinol treatment', 'reason': 'The ingredient with the most published work on lines. Start low if skin is reactive.', 'suggested_active': 'Retinol'}],
@@ -4817,6 +4858,7 @@ def analyze_product(product_data):
         product_data.get('concerns', []),
         _formulation.resolve_category(product_data.get('category', 'Serum')),
         product_data.get('country'),
+        skin_type=product_data.get('skin_type'),
     )
 
     concern_fit = calculate_skin_concern_fit(
@@ -4837,6 +4879,7 @@ def analyze_product(product_data):
         ingredient_list,
         product_data.get("concerns", []),
         skin_type=product_data.get("skin_type"),
+        category=product_data.get("category"),
     )
 
     concern_dict = concern_fit.get('concerns', {})
@@ -4920,7 +4963,8 @@ def analyze_product(product_data):
         # using concern fit where that exists, which only changes the order.
         "pairs_well_with": _suggest_pairings(
             ingredient_list, concern_dict,
-            skin_type=product_data.get("skin_type")),
+            skin_type=product_data.get("skin_type"),
+            category=product_data.get("category")),
 
         "main_worth_score": formulation_result['score'],
         "main_worth_tier": _formulation.formulation_tier(

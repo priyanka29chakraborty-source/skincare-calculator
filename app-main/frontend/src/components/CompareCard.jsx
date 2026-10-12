@@ -18,7 +18,7 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
 /**
  * Two to four products side by side.
  *
- * Paid. One credit covers this pair. Opening the same pair again does not
+ * Paid. Two credits cover this pair. Opening the same pair again does not
  * spend another. A single product's formulation score stays free.
  *
  * The first version of this was a scoreboard - two numbers and a winner. That
@@ -90,8 +90,8 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
         <div>
           <div className="card-label">Compare products</div>
           <p className="compare-lede">
-            Two to four products side by side. One credit covers this comparison.
-            Opening the same pair again does not spend another.
+            Two to four products side by side. Two credits cover this comparison.
+            Opening the same pair again does not spend another two.
           </p>
         </div>
         <button className="btn btn-primary compare-start" onClick={start}
@@ -205,7 +205,7 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
             <i className="fa-solid fa-lock-open"></i> Unlock this comparison
           </span>
           <span className="locked-cta-sub">
-            One credit &middot; covers this pair for good
+            Two credits &middot; covers this pair for good
           </span>
         </button>
       </section>
@@ -468,7 +468,7 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
           <div className="compare-choose">
             {verdict.choose_if.map((c) => (
               <div className="compare-choose-item" key={c.product_name}>
-                <h4>Choose {c.product_name} if…</h4>
+                <h4>Choose {c.product_name}</h4>
                 <ul>{c.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
               </div>
             ))}
@@ -481,11 +481,16 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
         <button type="button" className="export-btn" data-testid="compare-pdf"
                 onClick={() => {
                   document.body.classList.add("print-compare");
-                  window.print();
-                  document.body.classList.remove("print-compare");
+                  const done = () => {
+                    document.body.classList.remove("print-compare");
+                    window.removeEventListener("afterprint", done);
+                  };
+                  window.addEventListener("afterprint", done);
+                  window.requestAnimationFrame(() => window.print());
                 }}>
-          <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
+          <i className="fa-solid fa-file-arrow-down"></i> Save comparison as PDF
         </button>
+        <p className="export-note">This PDF is the comparison. It appears only after the comparison has run, and it is separate from the product report.</p>
       </div>
       <ComparePrint result={result} currency={currency} skinType={skinType} />
     </div>
@@ -550,6 +555,12 @@ function ComparePrint({ result, currency, skinType }) {
         </tbody>
       </table>
       {verdict?.note && <p>{verdict.note}</p>}
+      {(verdict?.choose_if || []).map((c) => (
+        <div key={c.product_name}>
+          <h2>Choose {c.product_name}</h2>
+          <ul>{(c.reasons || []).map((r, i) => <li key={i}>{r}</li>)}</ul>
+        </div>
+      ))}
       {result.method_note && <p>{result.method_note}</p>}
     </article>,
     document.body

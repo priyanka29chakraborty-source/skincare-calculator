@@ -16,6 +16,7 @@ they belong in your own logs, not in a third-party error tracker.
 
 import logging
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,20 @@ _ENABLED = False
 _SENSITIVE_FIELDS = (
     'ingredients', 'product_name', 'brand', 'url', 'barcode',
     'password', 'admin_session', 'x-csrf-token', 'cookie', 'authorization',
-    'active_concentrations',
+    'active_concentrations', 'email', 'current_routine', 'note', 'code',
+    'dsn', 'smtp_password', 'aiven_pg_url',
 )
+_SECRET_TEXT = re.compile(
+    r'(?i)(?:postgres|postgresql|mysql|mongodb|redis|amqp)://\S+'
+    r'|https?://[^\s/@]+:[^\s/@]+@[^\s]+'
+    r'|(?:password|secret|dsn)\s*[=:]\s*\S+'
+)
+
+
+def _redact_text(value):
+    if not isinstance(value, str):
+        return value
+    return _SECRET_TEXT.sub('[scrubbed]', value)
 
 
 def _scrub(event, _hint):
@@ -57,14 +70,19 @@ def _scrub(event, _hint):
                     req['query_string'] = '[scrubbed]'
                     break
 
-        # Local variables captured in stack frames
+        # Local variables and the exception text. A database error often
+        # quotes the connection address, which is not a field name.
         for exc in (event.get('exception') or {}).get('values') or []:
+            if isinstance(exc.get('value'), str):
+                exc['value'] = _redact_text(exc['value'])
             for frame in (exc.get('stacktrace') or {}).get('frames') or []:
                 vars_ = frame.get('vars')
                 if isinstance(vars_, dict):
                     for k in list(vars_):
                         if k.lower() in _SENSITIVE_FIELDS:
                             vars_[k] = '[scrubbed]'
+                        elif isinstance(vars_[k], str):
+                            vars_[k] = _redact_text(vars_[k])
     except Exception:
         # Never let scrubbing raise - a broken scrubber must not suppress the
         # error report, but it must also not send unscrubbed data. Dropping the

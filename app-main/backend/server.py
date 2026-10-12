@@ -133,8 +133,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.middleware("http")
 async def payload_limit_middleware(request: Request, call_next):
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > 1_048_576:
-        return JSONResponse(status_code=413, content={"error": "Payload too large. Maximum 1MB allowed."})
+    if content_length:
+        try:
+            length = int(content_length)
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "The request could not be read."})
+        if length > 1_048_576:
+            return JSONResponse(status_code=413, content={"error": "Payload too large. Maximum 1MB allowed."})
     return await call_next(request)
 
 
@@ -287,6 +292,8 @@ def _resolve_entitlement(request: Request, product_data: dict = None) -> bool:
     account_id = current_account(request)
     if not account_id:
         return False
+    if wallet.is_owner(account_id):
+        return True
 
     reference = _spend_reference(account_id, product_data)
     if wallet.already_spent(reference):
@@ -352,7 +359,7 @@ COMPARISON_PAID_SECTIONS = (
 
 
 def _comparison_reference(account_id, products):
-    """One credit per comparison, keyed on the set of products.
+    """Two credits per comparison, keyed on the set of products.
 
     Sorted, so comparing A against B and B against A is the same comparison
     and is not charged twice. Built from the same per-product fingerprint the
@@ -379,12 +386,15 @@ def _resolve_comparison_entitlement(request: Request, products) -> bool:
     account_id = current_account(request)
     if not account_id:
         return False
+    if wallet.is_owner(account_id):
+        return True
 
     reference = _comparison_reference(account_id, products)
     if wallet.already_spent(reference):
         return True
     try:
-        wallet.spend(account_id, reference=reference)
+        wallet.spend(
+            account_id, credits=wallet.COST_PER_COMPARISON, reference=reference)
         return True
     except wallet.InsufficientCredits:
         return False
@@ -408,11 +418,11 @@ def _filter_comparison(out, entitled):
             'tier': 'free',
             'locked_sections': list(COMPARISON_PAID_SECTIONS),
             'message': (
-                "A comparison costs one credit. It covers how each product is "
+                "A comparison costs two credits. It covers how each product is "
                 "made, price per ml, what each has that the others do not, "
                 "which treats your concern, irritation for your skin, and "
                 "whether you could use both. Opening the same pair again does "
-                "not spend another credit."),
+                "not spend another two credits."),
         },
     }
 
@@ -429,7 +439,7 @@ class CompareRequest(BaseModel):
 @api_router.post("/compare")
 @limiter.limit("6/minute")
 async def compare_endpoint(req: CompareRequest, request: Request):
-    """Two to four products side by side. One credit, same pair is free to reopen."""
+    """Two to four products side by side. Two credits, same pair is free to reopen."""
     products = req.products or []
     if len(products) > MAX_PRODUCTS:
         return JSONResponse(status_code=400, content={
@@ -882,6 +892,29 @@ async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request
     # ── Normalise category for locking ──────────────────────────────────────
     category_lock = req.product_category.lower().strip()
 
+    def _title_fits_category(name):
+        """Shop results have to be the same kind of product.
+
+        A facial-oil analysis was returning serums because a scraped page
+        often has no category of its own. The title is the check we still have.
+        """
+        n = (name or '').lower()
+        if category_lock in ('facial oil', 'oil'):
+            return 'oil' in n
+        if category_lock == 'serum':
+            return 'serum' in n or 'ampoule' in n
+        if category_lock in ('moisturizer', 'moisturiser'):
+            return 'cream' in n or 'moistur' in n or 'lotion' in n
+        if category_lock == 'cleanser':
+            return 'cleanser' in n or 'wash' in n or 'cleansing' in n
+        if category_lock == 'toner':
+            return 'toner' in n
+        if category_lock == 'sunscreen':
+            return 'sunscreen' in n or 'spf' in n
+        if category_lock == 'eye cream':
+            return 'eye' in n
+        return True
+
     # ── Normalise user's key actives for overlap check ──────────────────────
     user_actives_norm = {a.lower().strip() for a in (req.key_actives or []) if a}
 
@@ -979,6 +1012,8 @@ async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request
                 if _is_same_as_user_product(alt_name_candidate):
                     logger.info(f"Skipping same product as user: {alt_name_candidate}")
                     continue
+                if not _title_fits_category(alt_name_candidate):
+                    continue
 
                 # ── Category lock: skip if product page reports a different category ──
                 scraped_cat = (product_data.get('category') or '').lower().strip()
@@ -1034,7 +1069,7 @@ async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request
             if r['name'] not in seen:
                 deduped.append(r)
                 seen.add(r['name'])
-        basic_alternatives = deduped[:3]
+        basic_alternatives = [r for r in deduped if _title_fits_category(r.get('name'))][:3]
 
         serp_urls = [r['link'] for r in basic_alternatives if r.get('link')][:3]
         if serp_urls:
@@ -1065,6 +1100,8 @@ async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request
                     # Skip if this is the same product as the user's
                     if _is_same_as_user_product(basic_alternatives[i]['name']):
                         logger.info(f"Skipping same product as user (serp): {basic_alternatives[i]['name']}")
+                        continue
+                    if not _title_fits_category(basic_alternatives[i]['name']):
                         continue
 
                     if alt_score > (req.user_score or 0):
@@ -1320,19 +1357,25 @@ async def _best_price_impl(req: BestPriceRequest, request: Request):
     if req.country and req.country.lower() == 'india':
         validated = [v for v in validated if 'ebay' not in v.get('source', '').lower()]
 
+    # A shop that costs the same or more than the listing already in hand is
+    # not a better price. Desertcart at a higher figure was still shown under
+    # a Nykaa product the reader could already buy for less.
+    user_price = float(req.user_price or 0)
+    if user_price > 0:
+        validated = [v for v in validated if float(v['price']) < user_price - 0.5]
+
     # Sort by price ascending
     validated.sort(key=lambda x: float(x['price']) if x['price'] else 9999999)
 
     # Keep max 3
     validated = validated[:3]
 
-    user_price = float(req.user_price or 0)
-
     if not validated:
-        # Rule 10: no results found anywhere — still show card with user URL if available
+        # Nothing cheaper than the price already entered. Say so, and do not
+        # fill the table with dearer shops.
         return {
-            "is_user_cheapest": False,
-            "not_found": True,
+            "is_user_cheapest": user_price > 0,
+            "not_found": user_price <= 0,
             "user_url": req.user_url,
             "user_price": user_price,
             "all_prices": [],

@@ -131,11 +131,11 @@ export default function UnlockModal({ open, onClose, account, onPurchased }) {
         {step === "email" && (
           <form onSubmit={sendCode}>
             <p className="modal-lede">
-              The formulation score is free and always will be &mdash; how well
-              this product is <em>made</em> is the same for everyone. What costs
-              a credit is the part that is about <em>you</em>: whether it treats
-              the concerns you picked, whether it suits your skin type, and what
-              in it is likely to cause you trouble.
+              The formulation score stays free. The personal analysis and a
+              comparison are locked until you sign in. The first sign-in
+              includes 4 credits. A personal analysis costs 1 credit. A
+              comparison costs 2. The product PDF stays locked until you buy
+              a pack.
             </p>
             <div className="field-group">
               <label className="field-label" htmlFor="unlock-email">Email</label>

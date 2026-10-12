@@ -53,12 +53,17 @@ logger = logging.getLogger(__name__)
 # takes and because float rupees would eventually produce a 98.99999 charge.
 CREDIT_PACKS = {
     'starter': {'credits': 5,  'amount_paise': 9900,  'label': '5 analyses'},
-    'regular': {'credits': 15, 'amount_paise': 24900, 'label': '15 analyses'},
-    'bulk':    {'credits': 40, 'amount_paise': 39900, 'label': '40 analyses'},
+    'regular': {'credits': 8,  'amount_paise': 14900, 'label': '8 analyses'},
+    'bulk':    {'credits': 12, 'amount_paise': 19900, 'label': '12 analyses'},
 }
 
-# One personalised analysis costs one credit.
+# One personalised analysis costs one credit. A comparison costs two.
 COST_PER_ANALYSIS = 1
+COST_PER_COMPARISON = 2
+
+# First email sign-in. Four credits covers two analyses, or one analysis
+# and one comparison, or two comparisons.
+TRIAL_CREDITS = 4
 
 # Unused credits from a purchase lapse one year after that purchase.
 CREDIT_LIFETIME_SECONDS = 365 * 24 * 60 * 60
@@ -373,6 +378,54 @@ def _apply_expiry_locked(conn, account_id):
     return alive
 
 
+def has_purchased(account_id):
+    """True once this account has bought any credit pack.
+
+    The sign-in trial is a grant, not a purchase, so it does not unlock the
+    product PDF.
+    """
+    if not account_id:
+        return False
+    cur = _execute(
+        'SELECT 1 FROM wallet_ledger WHERE account_id = ? AND reason = ? '
+        'AND delta > 0 LIMIT 1',
+        (account_id, REASON_PURCHASE))
+    return cur.fetchone() is not None
+
+
+def account_email(account_id):
+    if not account_id:
+        return None
+    cur = _execute(
+        'SELECT email FROM wallet_account WHERE account_id = ?', (account_id,))
+    row = cur.fetchone()
+    if not row or not row[0]:
+        return None
+    return str(row[0]).strip().lower()
+
+
+def owner_emails():
+    """Addresses in OWNER_EMAIL. One address, or several separated by commas."""
+    raw = os.environ.get('OWNER_EMAIL', '')
+    return [part.strip().lower() for part in raw.split(',') if part.strip()]
+
+
+def is_owner(account_id):
+    """True for an address listed in OWNER_EMAIL.
+
+    This is a lifetime pass for the people who run the app. It is not a
+    credit grant, so it does not expire after a year, and it is not
+    DEV_UNLOCK_ALL, which would open the paid result to every visitor.
+    The list is read when the request arrives, from the environment, and
+    it is compared with the email on the signed-in account. A request cannot
+    name itself as the owner.
+    """
+    owners = owner_emails()
+    if not owners or not account_id:
+        return False
+    return account_email(account_id) in owners
+
+
 def get_balance(account_id):
     with _transaction() as conn:
         _apply_expiry_locked(conn, account_id)
@@ -426,6 +479,20 @@ def grant(account_id, credits, reason=REASON_PURCHASE, reference=None, metadata=
         raise
 
     return get_balance(account_id)
+
+
+def grant_trial(account_id):
+    """Four credits, once, the first time this email signs in.
+
+    The reference is the account, so signing in again does not add another
+    four. Returns the new balance, or None when this account already received
+    the trial.
+    """
+    return grant(
+        account_id, TRIAL_CREDITS,
+        reason=REASON_GRANT,
+        reference='trial:%s' % account_id,
+        metadata='signup_trial')
 
 
 def already_spent(reference):

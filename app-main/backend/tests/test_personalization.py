@@ -101,8 +101,9 @@ def test_empty_profile_is_completely_inert():
     assert ctx["personalisation_level"] == "none"
 
 
-def test_climate_is_suggested_from_country_but_never_invented():
-    assert build_personal_context({}, [], [], "serum", "India")["climate"] == "tropical_humid"
+def test_country_does_not_choose_a_climate():
+    """India is not one climate. A weather note waits until the reader picks one."""
+    assert build_personal_context({}, [], [], "serum", "India")["climate"] is None
     assert build_personal_context({}, [], [], "serum", "Atlantis")["climate"] is None
 
 
@@ -260,17 +261,17 @@ def test_new_concerns_are_scorable(concern):
     assert 0 <= score <= 100
 
 
-def test_an_inferred_climate_says_where_it_came_from():
-    """resolve_climate falls back to the country already collected on the main
-    form, which is the intended design - but the row sits under "What your
-    answers changed", so presenting an inferred value as something the reader
-    told us claims an answer they never gave."""
+def test_an_unanswered_climate_is_not_filled_in_from_the_country():
+    """A country on the main form used to become 'Tropical / humid (from your
+    country)'. The reader had not chosen a climate."""
     from personalization import build_personal_context
 
     ctx = build_personal_context({}, ['aqua', 'glycerin'], ['Hydration'],
                                  'serum', 'India')
     climate = next(c for c in ctx['checks'] if c['key'] == 'climate')
-    assert 'from your country' in (climate['answer'] or '')
+    assert climate['status'] == 'unanswered'
+    assert not climate['answer']
+    assert not any(f['type'] == 'climate_texture' for f in ctx['flags'])
 
     chosen = build_personal_context({'climate': 'hot_arid'}, ['aqua'], ['Hydration'],
                                     'serum', 'India')
@@ -286,5 +287,5 @@ def test_unanswered_questions_report_as_unanswered():
     ctx = build_personal_context({}, ['aqua', 'glycerin'], ['Hydration'],
                                  'serum', 'India')
     statuses = {c['key']: c['status'] for c in ctx['checks']}
-    for key in ('skin_tone', 'allergens', 'routine'):
+    for key in ('skin_tone', 'climate', 'allergens', 'routine'):
         assert statuses[key] == 'unanswered', statuses

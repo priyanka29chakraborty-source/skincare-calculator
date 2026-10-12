@@ -300,10 +300,8 @@ def _dose_sentence(name, estimate, known=False):
         return ("{} is high on the list. Usual ceiling is about {:g}%. "
                 "The label does not give the exact amount.".format(name, hi))
     if lo is not None and estimate < lo:
-        return ("{} at an estimated {:.1f}%. Published results for this "
-                "ingredient generally start around {:g}%. A 5% or 10% product "
-                "is above that line, not in conflict with it. This estimate "
-                "is under it.".format(name, estimate, lo))
+        return ("{} is estimated at {:.1f}%, below the usual starting dose "
+                "of about {:g}%.".format(name, estimate, lo))
     if lo is not None and hi is not None:
         return ("{} at an estimated {:.1f}% (within its evidenced range of "
                 "{:g}-{:g}%)".format(name, estimate, lo, hi))
@@ -431,9 +429,7 @@ def _score_actives(ingredient_list, concentrations, max_pts, category,
 
     if len(scored) > 1:
         explanations.append(
-            "{} further active{} contributing: {}.".format(
-                len(scored) - 1, "s" if len(scored) > 2 else "",
-                ", ".join(s[0] for s in scored[1:4]))
+            "Also present: {}.".format(", ".join(s[0] for s in scored[1:3]))
         )
 
     # Niacinamide is usually the highest contributor, so a reedle or an
