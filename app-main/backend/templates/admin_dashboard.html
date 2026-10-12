@@ -184,6 +184,17 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
         </table>
       </div>
     </div>
+    <div class="mt-16">
+      <div class="chart-title" style="margin-bottom:10px">
+        <i class="fa-solid fa-comment" style="color:var(--accent)"></i> Feedback
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Time</th><th>Email</th><th>Note</th></tr></thead>
+          <tbody id="feedback-body"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- Sites -->
@@ -487,6 +498,21 @@ async function loadAnalytics() {
         <td style="font-weight:700;color:${scoreColor}">${score}</td>
         <td>${badge}</td>
         <td>${esc(a.country||'—')}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const fb = await api('/feedback');
+  const fbBody = document.getElementById('feedback-body');
+  if (!fb || !fb.notes || !fb.notes.length) {
+    fbBody.innerHTML = '<tr><td colspan="3" class="empty-state">No feedback yet.</td></tr>';
+  } else {
+    fbBody.innerHTML = fb.notes.map(n => {
+      const when = n.created_at ? new Date(n.created_at * 1000).toISOString().substring(0, 16).replace('T', ' ') : '';
+      return `<tr>
+        <td style="white-space:nowrap;font-size:0.72rem">${when}</td>
+        <td>${n.email ? esc(n.email) : '<em style="color:var(--text-sub)">—</em>'}</td>
+        <td>${esc(n.message)}</td>
       </tr>`;
     }).join('');
   }

@@ -20,6 +20,7 @@ const PAGES = {
     title: "Privacy Policy",
     body: [
       "We store the email you sign in with, the products you choose to save, and the credit balance on that account. After you sign in, a saved product shows under Previously analysed, and you can remove it from that list.",
+      "If you send feedback and include an email for a reply, that note and address are stored so we can read them. They are not shown on the public site.",
       NON_REFUNDABLE,
     ],
   },
@@ -37,11 +38,12 @@ export function isLegalPage(page) {
   return Boolean(PAGES[page]);
 }
 
-export default function LegalPages({ page }) {
+export default function LegalPages({ page, header = null }) {
   const item = PAGES[page];
   if (!item) return null;
   return (
-    <main className="sc-app legal-page">
+    <main className="sc-app legal-page" data-testid="skincare-app">
+      {header}
       <h1>{item.title}</h1>
       {item.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
       {page === "feedback" && <FeedbackForm />}
@@ -62,6 +64,7 @@ function FeedbackForm() {
     try {
       await api.post(`${API}/feedback`, { email, message });
       setMessage("");
+      setEmail("");
       setMsg("Received. Thank you.");
     } catch (error) {
       setErr(describeError(error));

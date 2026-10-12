@@ -352,7 +352,24 @@ function App() {
     setAlternatives(null); setBestPrice(null); setBestPriceError(""); setActiveConcentrations({});
   };
 
-  if (isLegalPage(hashPage)) return <LegalPages page={hashPage} />;
+  if (isLegalPage(hashPage)) {
+    return (
+      <LegalPages
+        page={hashPage}
+        header={(
+          <>
+            <AccountBar account={account} onOpenUnlock={() => setUnlockOpen(true)} />
+            <UnlockModal
+              open={unlockOpen}
+              onClose={() => setUnlockOpen(false)}
+              account={account}
+              onPurchased={() => setUnlockOpen(false)}
+            />
+          </>
+        )}
+      />
+    );
+  }
 
   return (
     <div className="sc-app" data-testid="skincare-app">

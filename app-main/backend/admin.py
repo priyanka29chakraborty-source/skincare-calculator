@@ -341,6 +341,19 @@ async def get_ingredient_trends(request: Request):
     return {'trends': admin_db.get_ingredient_trends(days=7, limit=10)}
 
 
+@admin_router.get("/feedback")
+async def get_feedback(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    import events
+    try:
+        notes = events.recent_feedback()
+    except Exception:
+        logger.exception('could not read feedback')
+        notes = []
+    return {'notes': notes}
+
+
 @admin_router.get("/recent-analyses")
 async def get_recent_analyses(request: Request):
     if not _verify_session(request):

@@ -852,9 +852,7 @@ body::before {
 .affiliate-notice i { color: var(--dusty-rose-light); margin-top: 3px; flex-shrink: 0; }
 
 /* ========== ACCOUNT ========== */
-/* Above the header, and only once there is something to say. A signed-out
-   visitor who has not hit the paywall does not need an account control in
-   front of the thing they came for. */
+/* Above the header. Sign in is always available. */
 .account-bar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; flex-wrap: wrap;
