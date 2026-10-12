@@ -13,12 +13,9 @@ export default function AccountBar({ account, onOpenUnlock }) {
   if (!account.signedIn) {
     return (
       <div className="account-bar" data-testid="account-bar">
-        <span className="account-balance">Not signed in</span>
-        <span className="account-actions">
-          <button className="account-link" onClick={onOpenUnlock} data-testid="sign-in">
-            Sign in
-          </button>
-        </span>
+        <button className="sign-in-btn" onClick={() => onOpenUnlock("signin")} data-testid="sign-in">
+          Sign-in
+        </button>
       </div>
     );
   }
@@ -38,7 +35,7 @@ export default function AccountBar({ account, onOpenUnlock }) {
       )}
       <span className="account-actions">
         {!owner && (
-          <button className="account-link" onClick={onOpenUnlock} data-testid="top-up">
+          <button className="account-link" onClick={() => onOpenUnlock("credits")} data-testid="top-up">
             {balance === 0 ? "Get credits" : "Top up"}
           </button>
         )}

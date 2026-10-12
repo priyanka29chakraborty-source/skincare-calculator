@@ -40,6 +40,13 @@ function App() {
   const [alternatives, setAlternatives] = useState(null);
   const account = useAccount();
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [unlockPurpose, setUnlockPurpose] = useState("signin");
+  const afterSignIn = useRef(null);
+  const openUnlock = (purpose = "signin", after = null) => {
+    afterSignIn.current = after;
+    setUnlockPurpose(purpose);
+    setUnlockOpen(true);
+  };
   const [personaliseOpen, setPersonaliseOpen] = useState(false);
   const [pendingReopen, setPendingReopen] = useState(false);
   // Read through a ref inside handleAnalyze: adding `account` to its dependency
@@ -358,9 +365,10 @@ function App() {
         page={hashPage}
         header={(
           <>
-            <AccountBar account={account} onOpenUnlock={() => setUnlockOpen(true)} />
+            <AccountBar account={account} onOpenUnlock={openUnlock} />
             <UnlockModal
               open={unlockOpen}
+              purpose={unlockPurpose}
               onClose={() => setUnlockOpen(false)}
               account={account}
               onPurchased={() => setUnlockOpen(false)}
@@ -375,11 +383,17 @@ function App() {
     <div className="sc-app" data-testid="skincare-app">
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
-      <AccountBar account={account} onOpenUnlock={() => setUnlockOpen(true)} />
+      <AccountBar account={account} onOpenUnlock={openUnlock} />
 
       <UnlockModal
         open={unlockOpen}
+        purpose={unlockPurpose}
         onClose={() => setUnlockOpen(false)}
+        onSignedIn={() => {
+          const next = afterSignIn.current;
+          afterSignIn.current = null;
+          if (next) next();
+        }}
         account={account}
         /* Re-run the analysis straight after a purchase. The user pressed
            unlock on a result that is already on screen; making them press
@@ -424,7 +438,7 @@ function App() {
               bestPriceError={bestPriceError} onRetryBestPrice={fetchBestPrice}
               fetchInput={fetchInput}
               category={category}
-              onUnlock={() => setUnlockOpen(true)}
+              onUnlock={() => openUnlock("signin", () => handleAnalyze())}
               onSavePdf={savePdf}
               pdfLocked={!account.pdfUnlocked}
               onAnswerQuestions={() => setPersonaliseOpen(true)}
@@ -444,7 +458,7 @@ function App() {
                   personalisation={result.personalisation}
                   locked={result.access?.tier === "free"}
                   opened={personaliseOpen}
-                  onUnlock={() => setUnlockOpen(true)}
+                  onUnlock={() => openUnlock("signin", () => handleAnalyze())}
                 />
               }
             />
@@ -469,7 +483,7 @@ function App() {
               currency={currency}
               skinType={skinType}
               concerns={concerns}
-              onUnlock={() => setUnlockOpen(true)}
+              onUnlock={() => openUnlock("signin", () => handleAnalyze())}
               seed={{
                 product_name: productName, brand, category,
                 price: price || "", size_ml: size || "", ingredients,
