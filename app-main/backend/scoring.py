@@ -715,7 +715,62 @@ def infer_ph_and_check(ingredient_list):
         'confidence': confidence,
         'notes': notes[:4],
         'warnings': warnings[:3],
+        'headline': _ph_headline(ph_range, ing_str) if ph_range else None,
     }
+
+
+def _ph_headline(ph_range, ing_str):
+    """Name a pH-sensitive active only when it is actually in the list.
+
+    An alkaline formula with no vitamin C and no hydroxy acid used to say
+    those ingredients would work less well. That sentence is reserved for
+    the case where one of them is present and the inferred pH is outside
+    the range it needs.
+    """
+    lo, hi = ph_range
+    mid = (lo + hi) / 2
+    present = []
+    mismatched = []
+    for active, (eff_min, eff_max, _reason) in _PH_SENSITIVE_ACTIVES.items():
+        if active not in ing_str:
+            continue
+        label = 'Vitamin C' if active == 'ascorbic acid' else active.title()
+        present.append(label)
+        if lo > eff_max or hi < eff_min:
+            mismatched.append(label)
+
+    def names(items):
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f'{items[0]} and {items[1]}'
+        return ', '.join(items[:-1]) + f', and {items[-1]}'
+
+    if mismatched:
+        listed = names(mismatched)
+        verb = 'is' if len(mismatched) == 1 else 'are'
+        them = 'it' if len(mismatched) == 1 else 'them'
+        return (
+            f'Alkaline — {listed} {verb} in this list, and this pH looks '
+            f'too high for {them}.'
+            if mid > 7
+            else f'{listed} {verb} in this list, and this pH looks outside '
+                 f'the range {them} usually need.'
+        )
+    if mid <= 4.5 and present:
+        tone = 'Very acidic' if mid <= 3.5 else 'Acidic'
+        return f'{tone} — in range for {names(present)}.'
+    if mid <= 3.5:
+        return 'Very acidic. This list has no vitamin C or hydroxy acid.'
+    if mid <= 4.5:
+        return 'Acidic. This list has no vitamin C or hydroxy acid.'
+    if mid <= 5.5:
+        return "Mildly acidic — close to skin's usual pH."
+    if mid <= 6.5:
+        return 'Near-neutral.'
+    if mid <= 7.5:
+        return 'Neutral to slightly alkaline. This list has no vitamin C or hydroxy acid that needs a low pH.'
+    return 'Alkaline. This list has no vitamin C or hydroxy acid that needs a low pH.'
 
 
 # ─── Delivery Systems ─────────────────────────────────────────────────────────

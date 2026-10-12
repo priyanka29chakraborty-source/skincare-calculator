@@ -231,22 +231,19 @@ function OnePercentVisualiser({ marker, hideForOil }) {
 }
 
 // ── pH Analysis ──────────────────────────────────────────────────────────────
-function getPhInterpretation(phRange) {
-  if (!phRange) return null;
-  const [lo, hi] = phRange;
-  const mid = (lo + hi) / 2;
-  if (mid <= 3.5) return { text: "Very acidic — optimised for strong AHA/Vitamin C activity. May sting on sensitive skin.", color: '#C9A96E' };
-  if (mid <= 4.5) return { text: "Acidic — ideal range for AHAs, BHAs, and Vitamin C serums. Good efficacy window.", color: '#267C36' };
-  if (mid <= 5.5) return { text: "Mildly acidic — close to skin's natural pH. Gentle and well-tolerated by most skin types.", color: '#267C36' };
-  if (mid <= 6.5) return { text: "Near-neutral — suitable for barrier-focused and ceramide-based formulas.", color: '#2D7FD3' };
-  if (mid <= 7.5) return { text: "Neutral to slightly alkaline — fine for most moisturisers but not ideal for acid actives.", color: '#C9A96E' };
-  return { text: "Alkaline — could reduce efficacy of pH-sensitive actives like AHAs and Vitamin C.", color: '#D06030' };
+function getPhInterpretation(ph) {
+  if (!ph?.ph_range && !ph?.headline) return null;
+  if (ph.headline) {
+    const mismatch = /too high|outside the range/.test(ph.headline);
+    return { text: ph.headline, color: mismatch ? '#D06030' : '#5c5346' };
+  }
+  return null;
 }
 
 function PhAnalysisSection({ ph }) {
   if (!ph || !ph.ph_range) return null;
   const hasWarnings = ph.warnings && ph.warnings.length > 0;
-  const interp = getPhInterpretation(ph.ph_range);
+  const interp = getPhInterpretation(ph);
   return (
     <div style={{ marginTop: '14px', borderRadius: '10px', background: hasWarnings ? '#fffaf0' : '#f7fbff', border: `1px solid ${hasWarnings ? '#fde8b0' : '#c8e0f4'}`, padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>

@@ -71,6 +71,12 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, bestPriceEr
         </div>
       )}
 
+      {!bestPriceLoading && bestPrice?.search_unavailable && (
+        <p className="alt-empty" role="alert" data-testid="best-price-unavailable">
+          {bestPrice.message}
+        </p>
+      )}
+
       {!bestPriceLoading && bestPriceError && (
         <p className="alt-empty" role="alert" data-testid="best-price-error">
           {bestPriceError}{" "}
@@ -82,7 +88,7 @@ export default function BestPriceCard({ bestPrice, bestPriceLoading, bestPriceEr
         </p>
       )}
 
-      {!bestPriceLoading && !bestPriceError && bestPrice?.not_found && (
+      {!bestPriceLoading && !bestPriceError && !bestPrice?.search_unavailable && bestPrice?.not_found && (
         <div style={{ marginBottom: "0.5rem" }}>
           {userUrl ? (
             <div className="best-price-badge user-cheapest" data-testid="not-found-message">

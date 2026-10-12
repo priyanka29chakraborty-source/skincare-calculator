@@ -113,6 +113,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
   <div class="tab" data-tab="logs"><i class="fa-solid fa-list"></i> Fetch Logs</div>
   <div class="tab" data-tab="credits"><i class="fa-solid fa-coins"></i> Credits</div>
   <div class="tab" data-tab="analytics"><i class="fa-solid fa-chart-line"></i> Analytics</div>
+  <div class="tab" data-tab="feedback"><i class="fa-solid fa-comment"></i> Feedback</div>
   <div class="tab" data-tab="sites"><i class="fa-solid fa-globe"></i> Sites</div>
   <div class="tab" data-tab="scrapers"><i class="fa-solid fa-robot"></i> Scrapers</div>
   <div class="tab" data-tab="flagged"><i class="fa-solid fa-flag"></i> Flagged <span class="tab-badge" id="flag-badge">0</span></div>
@@ -184,16 +185,16 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
         </table>
       </div>
     </div>
-    <div class="mt-16">
-      <div class="chart-title" style="margin-bottom:10px">
-        <i class="fa-solid fa-comment" style="color:var(--accent)"></i> Feedback
-      </div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr><th>Time</th><th>Email</th><th>Note</th></tr></thead>
-          <tbody id="feedback-body"></tbody>
-        </table>
-      </div>
+  </div>
+
+  <!-- Feedback -->
+  <div class="section" id="sec-feedback">
+    <div class="section-title"><i class="fa-solid fa-comment"></i> Feedback</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Time</th><th>Email</th><th>Note</th></tr></thead>
+        <tbody id="feedback-body"></tbody>
+      </table>
     </div>
   </div>
 
@@ -502,8 +503,12 @@ async function loadAnalytics() {
     }).join('');
   }
 
+}
+
+async function loadFeedback() {
   const fb = await api('/feedback');
   const fbBody = document.getElementById('feedback-body');
+  if (!fbBody) return;
   if (!fb || !fb.notes || !fb.notes.length) {
     fbBody.innerHTML = '<tr><td colspan="3" class="empty-state">No feedback yet.</td></tr>';
   } else {
@@ -711,6 +716,7 @@ async function clearOldLogs() {
 // ── Loader map ───────────────────────────────────────────────────────────
 const _loaders = {
   health:loadHealth, logs:loadLogs, credits:loadCredits, analytics:loadAnalytics,
+  feedback:loadFeedback,
   sites:loadSites, scrapers:loadScrapers, flagged:loadFlagged, config:loadConfig,
 };
 

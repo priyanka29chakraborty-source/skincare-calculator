@@ -170,6 +170,10 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
         </>
       )}
 
+      {!altLoading && !alternatives?.scored_alternatives?.length && !alternatives?.basic_alternatives?.length && alternatives?.search_message && (
+        <p className="alt-empty" data-testid="alt-search-message">{alternatives.search_message}</p>
+      )}
+
       {!altLoading && alternatives?.basic_alternatives?.length > 0 && !alternatives?.scored_alternatives?.length && (
         <>
           <div className="alt-section-label">Products to consider</div>

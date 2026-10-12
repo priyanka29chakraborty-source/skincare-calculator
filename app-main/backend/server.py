@@ -774,27 +774,33 @@ SITE_MAP = {
 }
 
 
+# The search client picks a browser name at random. Several of those names
+# are rejected on the server ("Invalid impersonate"), and every price and
+# product search then comes back empty. These names open.
+_DDG_BROWSERS = ("chrome_120", "chrome_127", "chrome_131", "safari_18", "edge_127")
+
+
 def _ddg_search(query, max_results=8):
-    """Search using DuckDuckGo with retry on rate limit."""
-    import time
+    """Search DuckDuckGo. Returns (results, error).
+
+    error is None on a normal answer, including a real empty one. It is
+    "limited" when the search is refused, and "down" when the client fails.
+    """
     try:
         from duckduckgo_search import DDGS
         from duckduckgo_search.exceptions import RatelimitException
     except ImportError:
-        return []
+        return [], "down"
+    DDGS._impersonates = _DDG_BROWSERS
     try:
         with DDGS() as ddgs:
-            return list(ddgs.text(query, max_results=max_results))
+            return list(ddgs.text(query, max_results=max_results)), None
     except RatelimitException:
-        time.sleep(3)
-        try:
-            with DDGS() as ddgs:
-                return list(ddgs.text(query, max_results=min(5, max_results)))
-        except Exception:
-            return []
+        logger.error("DDG search refused: rate limit")
+        return [], "limited"
     except Exception as e:
         logger.error(f"DDG search error: {e}")
-        return []
+        return [], "down"
 
 
 def _serp_shopping_search(query, country, serp_key, num=10):
@@ -976,9 +982,12 @@ async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request
 
     # ── Step 1: DDG search ───────────────────────────────────────────────────
     ddg_urls = []
+    ddg_error = None
     for term in search_terms[:3]:
         ddg_query = f"best {term} skincare {site_filter}"
-        results = _ddg_search(ddg_query, max_results=5)
+        results, ddg_error = _ddg_search(ddg_query, max_results=5)
+        if ddg_error:
+            break
         for r in results:
             url = r.get('href', '')
             if url and url not in ddg_urls:
@@ -1139,7 +1148,17 @@ async def _find_alternatives_impl(req: FindAlternativesRequest, request: Request
 
     search_message = None
     if not scored_alternatives and not basic_alternatives:
-        if not serp_key:
+        if ddg_error == "limited":
+            search_message = (
+                "Shop search was refused for a moment, so no products are listed. "
+                "This is not a judgement of the formula."
+            )
+        elif ddg_error:
+            search_message = (
+                "Shop search did not run, so no products are listed. "
+                "This is not a judgement of the formula."
+            )
+        elif not serp_key:
             search_message = (
                 "Live product search requires a SerpAPI key (SERPER_API_KEY). "
                 "Search the upgrade suggestions above on Nykaa, Amazon, or your preferred site."
@@ -1286,12 +1305,12 @@ async def _best_price_impl(req: BestPriceRequest, request: Request):
 
     # Step 1: DDG search for exact product on country-specific sites
     ddg_query = f"{query} {size_query} buy {site_filter}"
-    ddg_results = _ddg_search(ddg_query, max_results=10)
+    ddg_results, ddg_error = _ddg_search(ddg_query, max_results=10)
     ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href')]
-    if not ddg_urls:
+    if not ddg_urls and not ddg_error:
         # The site-limited query often comes back empty. A plain buy query
         # still has to pass the same product and size check below.
-        ddg_results = _ddg_search(f"{query} {size_query} buy", max_results=6)
+        ddg_results, ddg_error = _ddg_search(f"{query} {size_query} buy", max_results=6)
         ddg_urls = [r.get('href', '') for r in ddg_results if r.get('href')]
 
     if ddg_urls:
@@ -1317,9 +1336,8 @@ async def _best_price_impl(req: BestPriceRequest, request: Request):
             })
 
     # Step 2: Fallback to SerpAPI if DDG didn't yield 3 results
-    if len(validated) < 3:
-        serp_key = os.environ.get('SERPER_API_KEY', '')
-        if serp_key:
+    serp_key = os.environ.get('SERPER_API_KEY', '')
+    if len(validated) < 3 and serp_key:
             serp_query = f"{query} {size_query}"
             serp_results = _serp_shopping_search(serp_query, req.country, serp_key, num=12)
             # Normalize DDG domains and SerpAPI brand names to a bare keyword for comparison
@@ -1369,6 +1387,23 @@ async def _best_price_impl(req: BestPriceRequest, request: Request):
 
     # Keep max 3
     validated = validated[:3]
+
+    if not validated and ddg_error and not serp_key:
+        # The search client failed or was refused. Do not describe that as
+        # "no shop sells this".
+        return {
+            "search_unavailable": True,
+            "not_found": True,
+            "message": (
+                "Shop search was refused for a moment."
+                if ddg_error == "limited"
+                else "Shop search did not run."
+            ) + " No price from this search should be read as the best price.",
+            "user_url": req.user_url,
+            "user_price": user_price,
+            "all_prices": [],
+            "savings": 0,
+        }
 
     if not validated:
         # Nothing cheaper than the price already entered. Say so, and do not
