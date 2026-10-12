@@ -102,13 +102,17 @@ CREATE TABLE IF NOT EXISTS feedback_note (
 """
 
 
-@events_router.post('/feedback')
-async def post_feedback(body: FeedbackIn):
-    wallet = _wallet()
+def _ensure_feedback_table(wallet):
     sql = _FEEDBACK_SCHEMA if wallet.storage_is_durable() else _FEEDBACK_SCHEMA.replace(
         'DOUBLE PRECISION', 'REAL')
+    wallet._execute(sql, (), commit=True)
+
+
+@events_router.post('/feedback')
+async def post_feedback(body: FeedbackIn):
     try:
-        wallet._execute(sql, (), commit=True)
+        wallet = _wallet()
+        _ensure_feedback_table(wallet)
         wallet._execute(
             'INSERT INTO feedback_note (note_id, email, message, created_at) '
             'VALUES (?, ?, ?, ?)',
@@ -119,6 +123,20 @@ async def post_feedback(body: FeedbackIn):
         logger.exception('could not store feedback')
         return JSONResponse(status_code=500, content={'error': 'Could not save that.'})
     return {'received': True}
+
+
+def recent_feedback(limit=50):
+    """Notes people sent from the feedback page, newest first."""
+    wallet = _wallet()
+    _ensure_feedback_table(wallet)
+    cur = wallet._execute(
+        'SELECT created_at, email, message FROM feedback_note '
+        'ORDER BY created_at DESC LIMIT ?',
+        (int(limit),))
+    return [
+        {'created_at': row[0], 'email': row[1] or '', 'message': row[2] or ''}
+        for row in cur.fetchall()
+    ]
 
 
 @events_router.get('/events/summary')

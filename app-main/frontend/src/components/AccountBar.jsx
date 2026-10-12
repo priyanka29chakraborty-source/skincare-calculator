@@ -2,14 +2,26 @@ import React from "react";
 import { CREDIT_EXPIRY_HINT } from "../constants";
 
 /**
- * Balance and sign-out, above the header.
+ * Sign-in, balance, and sign-out, above the header.
  *
- * Shown only once there is something to say. A signed-out visitor who has not
- * hit the paywall does not need an account control in front of the thing they
- * came for - the unlock prompt appears in context, on the card that is locked.
+ * Sign in stays visible while signed out. The credit count appears only
+ * after an account exists.
  */
 export default function AccountBar({ account, onOpenUnlock }) {
-  if (account.loading || !account.signedIn) return null;
+  if (account.loading) return null;
+
+  if (!account.signedIn) {
+    return (
+      <div className="account-bar" data-testid="account-bar">
+        <span className="account-balance">Not signed in</span>
+        <span className="account-actions">
+          <button className="account-link" onClick={onOpenUnlock} data-testid="sign-in">
+            Sign in
+          </button>
+        </span>
+      </div>
+    );
+  }
 
   const { balance, owner } = account;
 
