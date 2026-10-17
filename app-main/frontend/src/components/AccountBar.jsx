@@ -4,13 +4,11 @@ import { CREDIT_EXPIRY_HINT } from "../constants";
 /**
  * Sign-in, balance, and sign-out, above the header.
  *
- * Sign in stays visible while signed out. The credit count appears only
- * after an account exists.
+ * Sign in stays visible while the account check is running and while signed
+ * out. The credit count appears only after an account exists.
  */
 export default function AccountBar({ account, onOpenUnlock }) {
-  if (account.loading) return null;
-
-  if (!account.signedIn) {
+  if (account.loading || !account.signedIn) {
     return (
       <div className="account-bar" data-testid="account-bar">
         <button className="sign-in-btn" onClick={() => onOpenUnlock("signin")} data-testid="sign-in">
