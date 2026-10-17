@@ -27,6 +27,7 @@ function App() {
   const [brand, setBrand] = useState("");
   const [activeConcentrations, setActiveConcentrations] = useState({});
   const [result, setResult] = useState(null);
+  const [comparePreset, setComparePreset] = useState(null);
   const [loading, setLoading] = useState(false);
   // Personal context, gathered AFTER a first result rather than before it.
   const [userProfile, setUserProfile] = useState({});
@@ -365,7 +366,15 @@ function App() {
         page={hashPage}
         header={(
           <>
-            <AccountBar account={account} onOpenUnlock={openUnlock} />
+            <AccountBar
+              account={account}
+              onOpenUnlock={openUnlock}
+              onReopen={reopenSaved}
+              onCompareAgain={(products) => {
+                setComparePreset({ at: Date.now(), products });
+                window.location.hash = "";
+              }}
+            />
             <UnlockModal
               open={unlockOpen}
               purpose={unlockPurpose}
@@ -383,7 +392,12 @@ function App() {
     <div className="sc-app" data-testid="skincare-app">
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
-      <AccountBar account={account} onOpenUnlock={openUnlock} />
+      <AccountBar
+        account={account}
+        onOpenUnlock={openUnlock}
+        onReopen={reopenSaved}
+        onCompareAgain={(products) => setComparePreset({ at: Date.now(), products })}
+      />
 
       <UnlockModal
         open={unlockOpen}
@@ -483,6 +497,7 @@ function App() {
               currency={currency}
               skinType={skinType}
               concerns={concerns}
+              preset={comparePreset}
               onUnlock={() => openUnlock("signin", () => handleAnalyze())}
               seed={{
                 product_name: productName, brand, category,
@@ -495,6 +510,19 @@ function App() {
                 and in the way before that. */}
             <MethodCard />
           </section>
+        )}
+        {!result && comparePreset && (
+          <CompareCard
+            currency={currency}
+            skinType={skinType}
+            concerns={concerns}
+            preset={comparePreset}
+            onUnlock={() => openUnlock("signin")}
+            seed={{
+              product_name: productName, brand, category,
+              price: price || "", size_ml: size || "", ingredients,
+            }}
+          />
         )}
       </main>
       <LegalFooter />

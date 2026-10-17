@@ -8,10 +8,10 @@ const PAGES = {
   terms: {
     title: "Terms of Service",
     body: [
-      "The first time you sign in with your email, the account includes 4 credits. A personal analysis costs 1 credit. A comparison costs 2 credits. Opening the same product or the same pair again does not spend another credit. After those credits are used, further analyses and comparisons need a credit pack.",
+      "The first time you sign in with your email, the account includes 4 credits. Signing in again with the same email does not add another 4. A personal analysis costs 1 credit. A comparison always includes at least two products, so it starts at 2 credits. Three products cost 3, four cost 4, five cost 5, and six cost 6. Opening the same product or the same comparison again does not spend another credit. After those credits are used, further analyses and comparisons need a credit pack.",
       "The product PDF is included once you buy any credit pack. The 4 sign-in credits do not include it. The comparison PDF is a separate document, and it is available only after that comparison has been run.",
       "The formulation score, the ingredient list, and safety warnings for a single product stay free.",
-      "Unused credits expire one year after they are added.",
+      "Unused credits expire one year after they are added. If you buy more while some are still left, those remaining credits last until the new credits expire. Credits that have already expired are not restored.",
       NON_REFUNDABLE,
       "This is an ingredient assessment from the label you entered. It is not a diagnosis or a prescription. If you are pregnant, breastfeeding, or on a prescription treatment, check with your doctor before changing what you use.",
     ],

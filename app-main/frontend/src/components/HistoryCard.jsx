@@ -87,7 +87,7 @@ export default function HistoryCard({ account, onReopen }) {
                         .filter(Boolean).join(" · ")}
                     </span>
                   </span>
-                  <span className="history-score">{entry.score}</span>
+                  <span className="history-score">Score {entry.score}</span>
                 </button>
                 <button className="history-forget" disabled={busy}
                         onClick={(e) => forget(entry, e)}

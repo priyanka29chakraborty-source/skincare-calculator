@@ -57,7 +57,8 @@ CREDIT_PACKS = {
     'bulk':    {'credits': 12, 'amount_paise': 19900, 'label': '12 analyses'},
 }
 
-# One personalised analysis costs one credit. A comparison costs two.
+# One personalised analysis costs one credit. A comparison costs one credit
+# for each product in it.
 COST_PER_ANALYSIS = 1
 COST_PER_COMPARISON = 2
 
@@ -300,19 +301,31 @@ def get_or_create_account(email):
         raise
 
 
+def comparison_cost(product_count):
+    """One credit for each product in the comparison."""
+    return max(COST_PER_COMPARISON, int(product_count or 0))
+
+
 def _remaining_lots(rows, now):
     """Replay the ledger. A credit lasts one year from the row that added it.
 
     Spends consume the oldest credits that had not already lapsed at the
-    moment of the spend. What is left after that, and is past its year, is
-    no longer part of the balance.
+    moment of the spend. A later purchase moves every credit that is still
+    valid at that moment onto the new purchase's expiry. Credits that had
+    already lapsed stay lapsed.
     """
     lots = []
-    for delta, created_at in rows:
-        delta = int(delta)
-        created_at = float(created_at)
+    for row in rows:
+        delta = int(row[0])
+        created_at = float(row[1])
+        reason = row[2] if len(row) > 2 else ''
         if delta > 0:
-            lots.append([delta, created_at + CREDIT_LIFETIME_SECONDS, created_at])
+            expires = created_at + CREDIT_LIFETIME_SECONDS
+            if reason == REASON_PURCHASE:
+                for lot in lots:
+                    if lot[0] > 0 and lot[1] > created_at:
+                        lot[1] = expires
+            lots.append([delta, expires, created_at])
             continue
         need = -delta
         for lot in lots:
@@ -326,6 +339,7 @@ def _remaining_lots(rows, now):
     alive = 0
     expired = 0
     stamps = []
+    soonest = None
     for remaining, expires_at, created_at in lots:
         if remaining <= 0:
             continue
@@ -334,7 +348,9 @@ def _remaining_lots(rows, now):
             stamps.append(str(int(created_at)))
         else:
             alive += remaining
-    return alive, expired, stamps
+            if soonest is None or expires_at < soonest:
+                soonest = expires_at
+    return alive, expired, stamps, soonest
 
 
 def _apply_expiry_locked(conn, account_id):
@@ -353,10 +369,10 @@ def _apply_expiry_locked(conn, account_id):
     if not row:
         return 0
     cur.execute(_q(
-        'SELECT delta, created_at FROM wallet_ledger '
+        'SELECT delta, created_at, reason FROM wallet_ledger '
         'WHERE account_id = ? ORDER BY created_at ASC'), (account_id,))
     now = _now()
-    alive, expired, stamps = _remaining_lots(cur.fetchall(), now)
+    alive, expired, stamps, _soonest = _remaining_lots(cur.fetchall(), now)
     if expired > 0:
         import hashlib
         reference = 'expiry:%s:%s' % (
@@ -444,6 +460,18 @@ def is_owner(account_id):
     if not owners or not account_id:
         return False
     return account_email(account_id) in owners
+
+
+def credit_expires_at(account_id):
+    """When the credits still on this account lapse. None when none remain."""
+    if not account_id:
+        return None
+    cur = _execute(
+        'SELECT delta, created_at, reason FROM wallet_ledger '
+        'WHERE account_id = ? ORDER BY created_at ASC',
+        (account_id,))
+    _alive, _expired, _stamps, soonest = _remaining_lots(cur.fetchall(), _now())
+    return soonest
 
 
 def get_balance(account_id):
