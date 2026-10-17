@@ -9,10 +9,12 @@ wrong is login codes printed into production logs. If SMTP is missing and
 MAIL_DEV_ECHO is not set, sending fails loudly.
 """
 
+import json
 import logging
 import os
 import smtplib
 import ssl
+import urllib.request
 from email.message import EmailMessage
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,20 @@ def _cfg(name, default=''):
 
 
 def is_configured():
-    return bool(_cfg('SMTP_HOST') and _cfg('SMTP_FROM'))
+    return bool((_cfg('SMTP_HOST') or _brevo_api_key()) and _cfg('SMTP_FROM'))
+
+
+def _brevo_api_key():
+    """HTTPS key for Brevo. Render cannot open the SMTP ports, so the mail
+    relay times out. The API uses port 443, which is open.
+    """
+    key = _cfg('BREVO_API_KEY')
+    if key:
+        return key
+    password = _cfg('SMTP_PASSWORD')
+    if 'brevo.com' in _cfg('SMTP_HOST') and password.startswith('xkeysib-'):
+        return password
+    return ''
 
 
 def dev_echo_enabled():
@@ -49,7 +64,11 @@ def send_login_code(email, code):
         'account.\n'
     ).format(code=code)
 
-    if is_configured():
+    if _brevo_api_key() and _cfg('SMTP_FROM'):
+        _send_brevo(email, subject, body)
+        return 'brevo'
+
+    if _cfg('SMTP_HOST') and _cfg('SMTP_FROM'):
         _send_smtp(email, subject, body)
         return 'smtp'
 
@@ -60,6 +79,34 @@ def send_login_code(email, code):
 
     raise MailNotConfigured(
         'SMTP_HOST and SMTP_FROM are not set, and MAIL_DEV_ECHO is off')
+
+
+def _send_brevo(to_address, subject, body):
+    payload = json.dumps({
+        'sender': {'email': _cfg('SMTP_FROM'), 'name': 'Urancal'},
+        'to': [{'email': to_address}],
+        'subject': subject,
+        'textContent': body,
+    }).encode()
+    request = urllib.request.Request(
+        'https://api.brevo.com/v3/smtp/email',
+        data=payload,
+        headers={
+            'accept': 'application/json',
+            'content-type': 'application/json',
+            'api-key': _brevo_api_key(),
+        },
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if response.status >= 300:
+                raise MailFailed('could not send the email')
+    except MailFailed:
+        raise
+    except Exception as exc:
+        logger.error('Brevo API send failed: %s: %s', type(exc).__name__, exc)
+        raise MailFailed('could not send the email')
 
 
 def _send_smtp(to_address, subject, body):
