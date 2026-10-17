@@ -126,6 +126,13 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
                        placeholder="e.g. Niacinamide 10%" />
               </div>
               <div className="field-group">
+                <label className="field-label">Brand</label>
+                <input className="field-input" value={row.brand}
+                       onChange={(e) => update(i, "brand", e.target.value)}
+                       placeholder="e.g. Minimalist"
+                       data-testid={`compare-brand-${i}`} />
+              </div>
+              <div className="field-group">
                 <label className="field-label">Category</label>
                 <select className="field-select full-w" value={row.category}
                         onChange={(e) => update(i, "category", e.target.value)}>

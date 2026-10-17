@@ -393,6 +393,26 @@ def has_purchased(account_id):
     return cur.fetchone() is not None
 
 
+def list_accounts(limit=100):
+    """Recent sign-ins: email, credits left, and when the account was created."""
+    cur = _execute(
+        'SELECT email, balance, created_at FROM wallet_account '
+        'ORDER BY created_at DESC LIMIT ?',
+        (int(limit),))
+    return [
+        {'email': row[0], 'balance': row[1], 'created_at': row[2]}
+        for row in cur.fetchall()
+    ]
+
+
+def count_accounts_since(since_ts):
+    cur = _execute(
+        'SELECT COUNT(*) FROM wallet_account WHERE created_at >= ?',
+        (float(since_ts),))
+    row = cur.fetchone()
+    return int(row[0] or 0) if row else 0
+
+
 def account_email(account_id):
     if not account_id:
         return None

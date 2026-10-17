@@ -105,6 +105,11 @@ if _USE_PG:
             CREATE INDEX IF NOT EXISTS idx_fetch_ts ON fetch_logs(timestamp);
             CREATE INDEX IF NOT EXISTS idx_fetch_domain ON fetch_logs(domain);
             CREATE INDEX IF NOT EXISTS idx_analysis_ts ON analysis_logs(timestamp);
+            CREATE TABLE IF NOT EXISTS comparison_logs (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMPTZ DEFAULT NOW(),
+                products JSONB
+            );
             """)
             for col, coltype in [
                 ('product_name', 'TEXT'), ('brand', 'TEXT'), ('price', 'REAL'),
@@ -149,6 +154,43 @@ if _USE_PG:
                      bool(is_flagged), flag_reason))
             except Exception as e:
                 logger.warning(f"log_analysis failed: {e}")
+
+        def log_comparison(products):
+            try:
+                _pg_exec(
+                    "INSERT INTO comparison_logs (products) VALUES (%s)",
+                    (Jsonb(products or []),))
+            except Exception as e:
+                logger.warning(f"log_comparison failed: {e}")
+
+        def list_comparisons(limit=50):
+            try:
+                rows = _pg_exec(
+                    "SELECT timestamp, products FROM comparison_logs "
+                    "ORDER BY timestamp DESC LIMIT %s",
+                    (limit,), fetch=True)
+                out = []
+                for ts, products in rows:
+                    out.append({
+                        'timestamp': str(ts),
+                        'products': products if isinstance(products, list) else [],
+                    })
+                return out
+            except Exception:
+                return []
+
+        def count_since(start):
+            """Counts of analyses and comparisons at or after *start* (UTC)."""
+            try:
+                analyses = _pg_exec(
+                    "SELECT COUNT(*) FROM analysis_logs WHERE timestamp >= %s",
+                    (start,), fetch=True)[0][0]
+                comparisons = _pg_exec(
+                    "SELECT COUNT(*) FROM comparison_logs WHERE timestamp >= %s",
+                    (start,), fetch=True)[0][0]
+                return {'analyses': int(analyses or 0), 'comparisons': int(comparisons or 0)}
+            except Exception:
+                return {'analyses': 0, 'comparisons': 0}
 
         def increment_credits(api_name, amount=1):
             month = datetime.now(timezone.utc).strftime('%Y-%m')
@@ -508,6 +550,11 @@ if not _USE_PG:
         CREATE INDEX IF NOT EXISTS idx_fetch_domain ON fetch_logs(domain);
         CREATE INDEX IF NOT EXISTS idx_analysis_ts ON analysis_logs(timestamp);
         CREATE INDEX IF NOT EXISTS idx_credits_month ON api_credits(month);
+        CREATE TABLE IF NOT EXISTS comparison_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            products TEXT
+        );
         """)
         existing = [r[1] for r in conn.execute("PRAGMA table_info(analysis_logs)").fetchall()]
         for col, coltype in [
@@ -556,6 +603,48 @@ if not _USE_PG:
             conn.commit()
         except Exception as e:
             logger.warning(f"log_analysis failed: {e}")
+
+    def log_comparison(products):
+        try:
+            conn = _get_conn()
+            conn.execute(
+                "INSERT INTO comparison_logs (timestamp, products) VALUES (?, ?)",
+                (_now(), json.dumps(products or [])))
+            conn.commit()
+        except Exception as e:
+            logger.warning(f"log_comparison failed: {e}")
+
+    def list_comparisons(limit=50):
+        try:
+            conn = _get_conn()
+            rows = conn.execute(
+                "SELECT timestamp, products FROM comparison_logs "
+                "ORDER BY timestamp DESC LIMIT ?",
+                (limit,)).fetchall()
+            out = []
+            for ts, products in rows:
+                try:
+                    parsed = json.loads(products or '[]')
+                except Exception:
+                    parsed = []
+                out.append({'timestamp': ts, 'products': parsed})
+            return out
+        except Exception:
+            return []
+
+    def count_since(start):
+        """Counts of analyses and comparisons at or after *start* (ISO UTC)."""
+        try:
+            conn = _get_conn()
+            analyses = conn.execute(
+                "SELECT COUNT(*) FROM analysis_logs WHERE timestamp >= ?",
+                (start,)).fetchone()[0]
+            comparisons = conn.execute(
+                "SELECT COUNT(*) FROM comparison_logs WHERE timestamp >= ?",
+                (start,)).fetchone()[0]
+            return {'analyses': int(analyses or 0), 'comparisons': int(comparisons or 0)}
+        except Exception:
+            return {'analyses': 0, 'comparisons': 0}
 
     def increment_credits(api_name, amount=1):
         month = _current_month()

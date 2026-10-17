@@ -5,7 +5,7 @@ import asyncio
 import aiohttp
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from fastapi import APIRouter, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
@@ -249,8 +249,6 @@ async def health_check(request: Request):
          {}),
         ('scraperapi', f"http://api.scraperapi.com/account?api_key={os.environ.get('SCRAPERAPI_KEY', '')}",
          {}),
-        ('huggingface', 'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
-         {'Authorization': f"Bearer {os.environ.get('HUGGINGFACE_API_KEY', '')}"}),
         ('exchangerate', f"https://v6.exchangerate-api.com/v6/{os.environ.get('EXCHANGE_RATE_API_KEY', '')}/latest/USD",
          {}),
         ('openbeautyfacts', 'https://world.openbeautyfacts.org/api/v0/product/737628064502.json',
@@ -263,10 +261,12 @@ async def health_check(request: Request):
             try:
                 async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
                     ms = round((time.time() - t0) * 1000)
-                    if resp.status < 500:
-                        status = 'yellow' if ms > 3000 else 'green'
-                    else:
+                    if resp.status >= 400:
                         status = 'red'
+                    elif ms > 3000:
+                        status = 'yellow'
+                    else:
+                        status = 'green'
                     results[name] = {'status': status, 'time_ms': ms, 'checked': _now(),
                                      'http_status': resp.status}
             except Exception as e:
@@ -290,7 +290,7 @@ async def health_check(request: Request):
     except Exception as e:
         ms = round((time.time() - t0) * 1000)
         results['duckduckgo'] = {'status': 'yellow', 'time_ms': ms, 'checked': _now(),
-                                  'error': 'Rate limited (normal)'}
+                                  'error': str(e)[:80]}
 
     return results
 
@@ -353,6 +353,41 @@ async def get_feedback(request: Request):
         logger.exception('could not read feedback')
         notes = []
     return {'notes': notes}
+
+
+def _india_midnight():
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist)
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+@admin_router.get("/today")
+async def get_today(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    start = _india_midnight()
+    counts = admin_db.count_since(start.astimezone(timezone.utc).isoformat())
+    import wallet
+    return {
+        'analyses': counts['analyses'],
+        'comparisons': counts['comparisons'],
+        'signins': wallet.count_accounts_since(start.timestamp()),
+    }
+
+
+@admin_router.get("/accounts")
+async def get_accounts(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    import wallet
+    return {'accounts': wallet.list_accounts()}
+
+
+@admin_router.get("/comparisons")
+async def get_comparisons(request: Request):
+    if not _verify_session(request):
+        raise HTTPException(401)
+    return {'comparisons': admin_db.list_comparisons()}
 
 
 @admin_router.get("/recent-analyses")
@@ -422,8 +457,9 @@ async def get_db_info(request: Request):
     # Check config keys
     keys_status = {}
     for key_name in ['FIRECRAWL_API_KEY', 'SCRAPDO_API_KEY', 'SCRAPERAPI_KEY',
-                     'HUGGINGFACE_API_KEY', 'EXCHANGE_RATE_API_KEY', 'ADMIN_PASSWORD',
-                     'SERPER_API_KEY', 'SESSION_SECRET']:
+                     'EXCHANGE_RATE_API_KEY', 'SERPER_API_KEY', 'BREVO_API_KEY',
+                     'SMTP_FROM', 'AIVEN_PG_URL', 'SENTRY_DSN', 'SESSION_SECRET',
+                     'ADMIN_PASSWORD']:
         keys_status[key_name] = bool(os.environ.get(key_name, ''))
 
     # Memory estimate

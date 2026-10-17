@@ -23,7 +23,7 @@ import history
 from compare import compare as compare_products, CompareError, MAX_PRODUCTS
 from data_loader import data_loader
 from admin import admin_router
-from admin_db import log_fetch, log_analysis, increment_credits
+from admin_db import log_fetch, log_analysis, increment_credits, log_comparison
 from bs4 import BeautifulSoup
 from slowapi import Limiter
 from slowapi.middleware import SlowAPIMiddleware
@@ -478,6 +478,16 @@ async def compare_endpoint(req: CompareRequest, request: Request):
         out = compare_products(cleaned, analyze_product)
     except CompareError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
+
+    log_comparison([
+        {
+            'product_name': row.get('product_name') or '',
+            'brand': row.get('brand') or '',
+            'category': row.get('category') or '',
+            'score': row.get('formulation_score'),
+        }
+        for row in (out.get('products') or [])
+    ])
 
     return _filter_comparison(out, _resolve_comparison_entitlement(request, cleaned))
 
