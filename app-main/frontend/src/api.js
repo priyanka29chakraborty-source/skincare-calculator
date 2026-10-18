@@ -40,10 +40,7 @@ export function describeError(e) {
   if (serverMessage) return serverMessage;
 
   if (e?.code === "ECONNABORTED" || /timeout/i.test(e?.message || "")) {
-    return (
-      "This is taking longer than expected. The server may be waking up after " +
-      "a period of inactivity - please try again in a moment."
-    );
+    return "This is taking longer than expected. Please try again in a moment.";
   }
 
   const status = e?.response?.status;

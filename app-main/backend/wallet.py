@@ -58,9 +58,15 @@ CREDIT_PACKS = {
 }
 
 # One personalised analysis costs one credit. A comparison costs one credit
-# for each product in it.
+# per product compared, with a pair as the minimum: two products cost two,
+# three cost three, and so on up to six.
 COST_PER_ANALYSIS = 1
 COST_PER_COMPARISON = 2
+
+
+def comparison_cost(product_count):
+    """Credits for comparing this many products: one each, two at the least."""
+    return max(COST_PER_COMPARISON, int(product_count or 0))
 
 # First email sign-in. Four credits covers two analyses, or one analysis
 # and one comparison, or two comparisons.
@@ -299,11 +305,6 @@ def get_or_create_account(email):
         if row:
             return row[0]
         raise
-
-
-def comparison_cost(product_count):
-    """One credit for each product in the comparison."""
-    return max(COST_PER_COMPARISON, int(product_count or 0))
 
 
 def _remaining_lots(rows, now):

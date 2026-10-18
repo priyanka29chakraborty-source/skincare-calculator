@@ -4,6 +4,8 @@ import { API, api, describeError } from "../api";
 import { CREDIT_EXPIRY_HINT } from "../constants";
 import { openCheckout } from "../lib/razorpay";
 import { track } from "../track";
+import { Check, CircleCheck, Lock, X } from "lucide-react";
+import { Button, Callout, Meter, ScoreRing, cx } from "./ds";
 
 /**
  * Sign in, then buy credits.
@@ -18,7 +20,31 @@ import { track } from "../track";
  * free, because that is true and because the alternative is someone
  * discovering it only after they feel double-charged.
  */
-export default function UnlockModal({ open, onClose, account, onPurchased, onSignedIn, purpose = "signin" }) {
+// The sign-in heading follows what the person was trying to do.
+const SIGN_IN_HEADS = {
+  account: {
+    eyebrow: "Sign in",
+    title: <>Welcome to Urancal</>,
+    body: "See how products suit your skin, compare them side by side, and keep everything you analyse in one place.",
+  },
+  fit: {
+    eyebrow: "Personal fit",
+    title: <>Is this product <em>right for you?</em></>,
+    body: "Sign in to see how well it treats your concerns and whether it suits your skin type.",
+  },
+  compare: {
+    eyebrow: "Compare",
+    title: <>Find the one that’s <em>worth it</em></>,
+    body: "Sign in to put products side by side — formulation, fit for your skin and price per ml.",
+  },
+  pdf: {
+    eyebrow: "PDF report",
+    title: <>Keep this report <em>for later</em></>,
+    body: "Sign in, then any credit pack adds the PDF report to your analyses.",
+  },
+};
+
+export default function UnlockModal({ open, onClose, account, onPurchased, onSignedIn, purpose = "signin", topic = "account" }) {
   const [step, setStep] = useState("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -97,7 +123,7 @@ export default function UnlockModal({ open, onClose, account, onPurchased, onSig
 
       const result = await openCheckout({
         order,
-        description: `${pack.credits} personalised analyses`,
+        description: `${pack.credits} Urancal credits`,
         prefillEmail: email || undefined,
       });
 
@@ -109,7 +135,7 @@ export default function UnlockModal({ open, onClose, account, onPurchased, onSig
 
       await account.refresh();
       track("checkout_completed");
-      setNotice(`${pack.credits} analyses added.`);
+      setNotice(`${pack.credits} credits added.`);
       if (onPurchased) onPurchased();
     } catch (err) {
       if (err?.dismissed) {
@@ -133,184 +159,181 @@ export default function UnlockModal({ open, onClose, account, onPurchased, onSig
     if (onSignedIn) onSignedIn();
   }
 
+  const close = (
+    <button className="modal__close" onClick={onClose} aria-label="Close" type="button"><X /></button>
+  );
+
   if (step !== "packs") {
+    const head = SIGN_IN_HEADS[topic] || SIGN_IN_HEADS.account;
     return (
-      <div className="signin-overlay" role="presentation" data-testid="unlock-modal">
-        <div className="signin-modal" role="dialog" aria-modal="true" aria-labelledby="signin-title">
-          <button className="signin-close" onClick={onClose} aria-label="Close" type="button">&times;</button>
-          <Bottle />
+      <div className="overlay" role="presentation" data-testid="unlock-modal"
+           onMouseDown={(e) => { if (e.target === e.currentTarget && step === "done") onClose(); }}>
+        <div className="modal modal--auth" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+          {close}
+          <AuthAside />
 
-          {step === "email" && (
-            <section className="signin-step">
-              <p className="signin-hi">Hello, gorgeous</p>
-              <h2 id="signin-title">Is this product <em>right for you?</em></h2>
-              <p className="signin-lede">Your formulation score is always free. Sign in and we'll tell you how this product matches your skin.</p>
-              <ul className="signin-chips" aria-label="What each feature costs">
-                <li className="free">Score <span>Free</span></li>
-                <li>Personal analysis <span>1 credit</span></li>
-                <li>Comparison <span>2 credits</span></li>
-                <li>Product PDF report <span>Unlocks with a credit pack</span></li>
-              </ul>
-              <div className="signin-gift">
-                <div className="signin-num" aria-hidden="true">4</div>
-                <p>Free credits are added to your account the first time you sign in.</p>
-              </div>
-              <form onSubmit={sendCode}>
-                <label htmlFor="unlock-email">Your email</label>
-                <input id="unlock-email" type="email" autoComplete="email" required
-                       value={email} onChange={(e) => setEmail(e.target.value)}
-                       placeholder="you@example.com" autoFocus data-testid="unlock-email" />
-                {error && <p className="signin-error" role="alert" data-testid="unlock-error">{error}</p>}
-                <button className="signin-btn" disabled={busy} type="submit">
-                  {busy ? "Sending your code…" : "Sign-in"}
-                </button>
-              </form>
-              <p className="signin-fine">We'll email you a one-time code to sign in.</p>
-            </section>
-          )}
+          <div className="auth__main">
+            <span className="wordmark wordmark--sm auth__brand" aria-hidden="true">
+              <span>urancal</span><span className="wordmark__dot" />
+            </span>
 
-          {step === "code" && (
-            <section className="signin-step">
-              <p className="signin-hi">Almost there</p>
-              <h2 id="signin-title">Check your <em>inbox</em></h2>
-              <p className="signin-lede">We sent a sign-in code to <strong>{email}</strong>. Can't see it? Peek in your spam folder.</p>
-              <form onSubmit={confirmCode}>
-                <label htmlFor="unlock-code">Sign-in code</label>
-                <input id="unlock-code" className="signin-code" inputMode="numeric"
-                       autoComplete="one-time-code" maxLength={6} required
-                       value={code} onChange={(e) => setCode(e.target.value)}
-                       placeholder="Enter code" autoFocus data-testid="unlock-code" />
-                {error && <p className="signin-error" role="alert" data-testid="unlock-error">{error}</p>}
-                <button className="signin-btn" disabled={busy} type="submit">
-                  {busy ? "Signing you in…" : "Sign-in"}
-                </button>
-              </form>
-              <p className="signin-fine">
-                Wrong email?{" "}
-                <button className="signin-link" type="button" onClick={() => { setStep("email"); setError(""); }}>
-                  Change it
-                </button>
-              </p>
-            </section>
-          )}
+            {step === "email" && (
+              <>
+                <div className="auth__head">
+                  <p className="t-eyebrow c-accent">{head.eyebrow}</p>
+                  <h2 id="signin-title" className="t-display-s">{head.title}</h2>
+                  <p className="t-body-m c-secondary">{head.body}</p>
+                </div>
+                <p className="auth__gift-pill"><span aria-hidden="true">4</span>Free credits on your first sign-in</p>
+                <form onSubmit={sendCode} className="stack" style={{ "--stack-gap": "14px" }}>
+                  <div className="field">
+                    <label className="field__label" htmlFor="unlock-email">Email address</label>
+                    <div className="field__control">
+                      <input id="unlock-email" type="email" autoComplete="email" required value={email}
+                             onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoFocus
+                             data-testid="unlock-email" />
+                    </div>
+                  </div>
+                  {error && <Callout tone="negative" role="alert" data-testid="unlock-error"><p className="callout__text">{error}</p></Callout>}
+                  <Button type="submit" variant="primary" size="lg" block arrow loading={busy} loadingText="Sending your code…">
+                    Continue with email
+                  </Button>
+                  <p className="field__help auth__help">We’ll email you a 6-digit code to sign in.</p>
+                </form>
+                <p className="t-caption c-tertiary auth__legal">
+                  By continuing you agree to the <a className="link" href="#terms" onClick={onClose}>Terms</a> and <a className="link" href="#privacy" onClick={onClose}>Privacy policy</a>.
+                </p>
+              </>
+            )}
 
-          {step === "done" && (
-            <section className="signin-step">
-              <p className="signin-hi">You're in</p>
-              <h2 id="signin-title">
-                {account.owner ? "Signed in" : <>Your <em>{signedBalance} credits</em> are ready</>}
-              </h2>
-              <p className="signin-lede">A personal analysis uses 1 credit. A comparison uses 2. Let's see what your skin thinks.</p>
-              <button className="signin-btn" type="button" onClick={finishSignIn}>
-                Start my personal analysis
-              </button>
-            </section>
-          )}
+            {step === "code" && (
+              <>
+                <div className="auth__head">
+                  <p className="t-eyebrow c-accent">Almost there</p>
+                  <h2 id="signin-title" className="t-display-s">Check your <em>inbox</em></h2>
+                  <p className="t-body-m c-secondary">We sent a 6-digit code to <strong className="c-primary">{email}</strong>. Can’t see it? Look in spam or promotions.</p>
+                </div>
+                <form onSubmit={confirmCode} className="stack" style={{ "--stack-gap": "14px" }}>
+                  <div className="field">
+                    <label className="field__label" htmlFor="unlock-code">Sign-in code</label>
+                    <div className="field__control">
+                      <input id="unlock-code" className="code-input" inputMode="numeric" autoComplete="one-time-code"
+                             maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                             placeholder="••••••" autoFocus data-testid="unlock-code" />
+                    </div>
+                  </div>
+                  {error && <Callout tone="negative" role="alert" data-testid="unlock-error"><p className="callout__text">{error}</p></Callout>}
+                  <Button type="submit" variant="primary" size="lg" block arrow loading={busy} loadingText="Signing you in…">
+                    Sign in
+                  </Button>
+                  <p className="t-caption c-tertiary auth__legal">
+                    Wrong email? <button className="link" type="button" onClick={() => { setStep("email"); setError(""); }}>Change it</button>
+                  </p>
+                </form>
+              </>
+            )}
+
+            {step === "done" && (
+              <>
+                <div className="auth__head">
+                  <span className="auth__done" aria-hidden="true"><CircleCheck /></span>
+                  <p className="t-eyebrow c-accent">You’re in</p>
+                  <h2 id="signin-title" className="t-display-s">
+                    {account.owner || signedBalance < 1 ? <>You’re <em>signed in</em></>
+                      : signedBalance === 1 ? <>Your <em>1 credit</em> is ready</>
+                      : <>Your <em>{signedBalance} credits</em> are ready</>}
+                  </h2>
+                  <p className="t-body-m c-secondary">
+                    {!account.owner && signedBalance < 1
+                      ? "Top up whenever you want a personal analysis or a comparison. Opening something you’ve already paid for is always free."
+                      : "A personal analysis uses 1 credit, and comparing starts at 2. Opening something you’ve already paid for is always free."}
+                  </p>
+                </div>
+                <Button variant="primary" size="lg" block arrow onClick={finishSignIn}>Continue</Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true"
-         aria-label="Credits" data-testid="unlock-modal">
-      <div className="modal-card">
-        <button className="modal-close" onClick={onClose} aria-label="Close">
-          <i className="fa-solid fa-xmark"></i>
-        </button>
-        <div className="card-label">Personal analysis</div>
-          <>
-            <p className="modal-lede">
-              <strong>One credit per product, once.</strong> Re-opening it,
-              answering the personalisation questions, exporting the report or
-              correcting a price all cost nothing &mdash; you have already paid
-              for that product, and that does not expire.
-            </p>
+    <div className="overlay" role="presentation" data-testid="unlock-modal"
+         onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="packs-title">
+        {close}
+        <div className="modal__head">
+          <span className="mark" aria-hidden="true">u</span>
+          <p className="t-eyebrow c-accent">Credits</p>
+          <h2 id="packs-title" className="t-display-s">Top up your <em>credits</em></h2>
+          <p className="t-body-m c-secondary">
+            A personal analysis uses 1 credit, and comparing starts at 2. Reopening something you’ve paid for, answering the four questions or correcting a price costs nothing more.
+          </p>
+        </div>
 
-            {packs && !packs.payments_enabled && (
-              <p className="modal-fineprint" data-testid="payments-off">
-                Card and UPI payments are not connected yet, so these packs
-                cannot be bought today. Your account and any credits on it are
-                saved.
-              </p>
-            )}
+        {packs && !packs.payments_enabled && (
+          <Callout tone="info" title="Payments open soon" data-testid="payments-off">
+            <p className="callout__text">Card and UPI payments aren’t switched on yet, so packs can’t be bought today. Your account and any credits on it are saved.</p>
+          </Callout>
+        )}
 
-            <div className="pack-grid">
-              {(packs?.packs || []).map((pack) => (
-                <button key={pack.pack_id} className="pack-card" disabled={busy}
-                        onClick={() => buy(pack)}
-                        data-testid={`pack-${pack.pack_id}`}>
-                  <span className="pack-credits">{pack.credits}</span>
-                  <span className="pack-unit">analyses</span>
-                  <span className="pack-price">&#8377;{pack.amount_display}</span>
-                  <span className="pack-each">
-                    &#8377;{(pack.amount_paise / 100 / pack.credits).toFixed(1)} each
-                  </span>
-                </button>
-              ))}
-            </div>
+        <div className="packs">
+          {(packs?.packs || []).map((pack, i) => (
+            <button key={pack.pack_id} type="button" className={cx("pack", i === 1 && "pack--featured")} disabled={busy || (packs && !packs.payments_enabled)}
+                    onClick={() => buy(pack)} data-testid={`pack-${pack.pack_id}`}>
+              {i === 1 && <span className="pack__tag">Popular</span>}
+              <span className="pack__credits">{pack.credits}</span>
+              <span className="t-eyebrow c-tertiary">credits</span>
+              <span className="pack__price">₹{pack.amount_display}</span>
+            </button>
+          ))}
+          {!packs && [0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 156, borderRadius: 14 }} />)}
+        </div>
 
-            <p className="modal-fineprint">
-              Signed in{email ? ` as ${email}` : ""}.{" "}
-              <span title={CREDIT_EXPIRY_HINT}>
-                <strong data-testid="modal-balance">{account.balance}</strong>
-                {" "}
-                {account.balance === 1 ? "credit" : "credits"}
-              </span>
-            </p>
-            {notice && <p className="modal-notice" data-testid="unlock-notice">{notice}</p>}
-          </>
+        <ul className="pack-perks">
+          <li><Check aria-hidden="true" />PDF report included with every pack</li>
+          <li><Check aria-hidden="true" />Credits last a year</li>
+          <li><Lock aria-hidden="true" />UPI and cards via Razorpay</li>
+        </ul>
 
-        {error && <p className="modal-error" role="alert" data-testid="unlock-error">{error}</p>}
+        <p className="t-caption c-tertiary" style={{ textAlign: "center" }}>
+          Signed in{email ? ` as ${email}` : ""} ·{" "}
+          <span title={CREDIT_EXPIRY_HINT}><strong className="c-primary" data-testid="modal-balance">{account.balance}</strong> {account.balance === 1 ? "credit" : "credits"}</span>
+        </p>
+        {notice && <Callout tone="positive" data-testid="unlock-notice"><p className="callout__text">{notice}</p></Callout>}
+        {error && <Callout tone="negative" role="alert" data-testid="unlock-error"><p className="callout__text">{error}</p></Callout>}
       </div>
     </div>
   );
 }
 
-function Spark() {
+/*
+ * The left half of the sign-in card: what signing in gets you, shown rather
+ * than listed. Every number is the engine's real output for this formula on
+ * oily skin, with acne and pigmentation chosen as concerns.
+ */
+function AuthAside() {
   return (
-    <svg viewBox="0 0 20 20" aria-hidden="true">
-      <path fill="currentColor" d="M10 0c.6 5.2 4.8 9.4 10 10-5.2.6-9.4 4.8-10 10-.6-5.2-4.8-9.4-10-10C5.2 9.4 9.4 5.2 10 0z" />
-    </svg>
-  );
-}
-
-function Bottle() {
-  return (
-    <div className="signin-hero">
-      <div className="signin-halo" aria-hidden="true"></div>
-      <span className="signin-spark s1"><Spark /></span>
-      <span className="signin-spark s2"><Spark /></span>
-      <span className="signin-spark s3"><Spark /></span>
-      <svg className="signin-product" viewBox="0 0 140 230" role="img" aria-label="Serum dropper bottle">
-        <defs>
-          <linearGradient id="signin-glass" x1="0" x2="1">
-            <stop offset="0" stopColor="#c98f8c" /><stop offset=".45" stopColor="#e9c2bf" /><stop offset="1" stopColor="#a86f6f" />
-          </linearGradient>
-          <linearGradient id="signin-liquid" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#f3d6c9" /><stop offset="1" stopColor="#d99a8e" />
-          </linearGradient>
-          <linearGradient id="signin-bulb" x1="0" x2="1">
-            <stop offset="0" stopColor="#232a40" /><stop offset=".5" stopColor="#46507020" /><stop offset=".5" stopColor="#3a4462" /><stop offset="1" stopColor="#1e2438" />
-          </linearGradient>
-          <linearGradient id="signin-collar" x1="0" x2="1">
-            <stop offset="0" stopColor="#b98a6a" /><stop offset=".4" stopColor="#f1d4b3" /><stop offset="1" stopColor="#9c6f52" />
-          </linearGradient>
-        </defs>
-        <rect x="52" y="2" width="36" height="52" rx="18" fill="url(#signin-bulb)" />
-        <rect x="58" y="10" width="6" height="34" rx="3" fill="#ffffff" opacity=".22" />
-        <rect x="44" y="50" width="52" height="28" rx="6" fill="url(#signin-collar)" />
-        <rect x="44" y="60" width="52" height="2" fill="#000" opacity=".12" />
-        <rect x="54" y="76" width="32" height="12" fill="#c58c89" />
-        <path d="M30 98c0-6 4-10 10-10h60c6 0 10 4 10 10v108c0 12-8 20-20 20H50c-12 0-20-8-20-20z" fill="url(#signin-glass)" />
-        <path d="M34 128h72v76c0 10-6 17-16 17H50c-10 0-16-7-16-17z" fill="url(#signin-liquid)" opacity=".85" />
-        <rect x="66" y="88" width="8" height="112" rx="4" fill="#ffffff" opacity=".35" />
-        <rect x="42" y="140" width="56" height="54" rx="6" fill="#fffaf8" />
-        <text x="70" y="162" textAnchor="middle" fontFamily="Georgia, serif" fontSize="13" fontStyle="italic" fill="#9b6b6c">serum</text>
-        <rect x="56" y="169" width="28" height="1.5" fill="#d8aaa8" />
-        <text x="70" y="184" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="7" letterSpacing="1.5" fill="#2c3550">30 ML</text>
-        <rect x="36" y="96" width="6" height="104" rx="3" fill="#ffffff" opacity=".45" />
-      </svg>
-    </div>
+    <aside className="auth__aside" aria-hidden="true">
+      <span className="wordmark wordmark--sm"><span>urancal</span><span className="wordmark__dot" /></span>
+      <div className="auth__card">
+        <p className="t-eyebrow c-tertiary">Example · your fit</p>
+        <p className="auth__product">Niacinamide 10% + Zinc 1%</p>
+        <div className="auth__fit">
+          <ScoreRing score={97} size="sm" animate={false} label="Oily skin match" />
+          <div>
+            <p className="t-label-s">Suits oily skin</p>
+            <p className="t-caption c-secondary">Low irritation risk</p>
+          </div>
+        </div>
+        <Meter label="Acne & oily skin" value="77" pct={77} />
+        <Meter label="Pigmentation" value="50" pct={50} />
+      </div>
+      <div className="auth__gift">
+        <span className="auth__gift-num">4</span>
+        <p className="t-body-s">free credits on your<br />first sign-in</p>
+      </div>
+    </aside>
   );
 }

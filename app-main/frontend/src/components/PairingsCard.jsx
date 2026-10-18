@@ -1,69 +1,33 @@
 import React from "react";
+import { Search, TriangleAlert } from "lucide-react";
+
+import { Badge, Card } from "./ds";
 
 /**
- * What to use alongside this product.
- *
- * Free, because it is derived from the product's own actives and says nothing
- * about the person. Concern fit only changes the order.
- *
- * The suggestions are deliberately few. The database holds synergy partners
- * for 815 ingredients, and almost none of it survives the question "could
- * somebody actually buy this?" - niacinamide alone pairs with entries like
- * aegle marmelos fruit extract. The server only returns partners it can name
- * a format for, so every line here ends in something you could put in a
- * search box.
+ * What to use alongside this product. Free: it is derived from the product's
+ * own actives. The server only returns partners it can name a format for, so
+ * every line ends in something you could actually search for.
  */
 export default function PairingsCard({ pairings }) {
   if (!pairings || pairings.length === 0) return null;
-
   return (
-    <div className="sc-card result-card pairings-card" data-testid="pairings-card">
-      <h2 className="card-title">
-        <i className="fa-solid fa-link"></i> What to pair this with
-      </h2>
-      <p className="pairings-lede">
-        These work with what is already in this product, and with the skin
-        type you selected. Nothing here is required. The product stands on
-        its own.
-      </p>
-
-      <ul className="pairings-list">
+    <Card eyebrow="Routine" title="Pairs well with"
+          sub="These work with what’s already in this product and with your skin type. The product stands on its own — these are additions, not requirements."
+          data-testid="pairings-card">
+      <ul className="pairings">
         {pairings.map((p, i) => (
           <li className="pairing" key={i} data-testid={`pairing-${i}`}>
-            <div className="pairing-head">
-              <strong className="pairing-name">{p.ingredient}</strong>
-              {p.addresses_concern && (
-                <span className="pairing-gap">
-                  fills a gap on {p.addresses_concern.toLowerCase()}
-                </span>
-              )}
-            </div>
-
-            <p className="pairing-why">
-              Works with the <strong>{p.works_with}</strong> already here
-              {p.adds ? ` — adds ${String(p.adds).toLowerCase()}` : ""}.
+            <p className="t-heading-s">{p.ingredient}</p>
+            {p.addresses_concern && <Badge tone="positive">Fills a gap · {p.addresses_concern.toLowerCase()}</Badge>}
+            <p className="t-body-s c-secondary">
+              Works with the <strong className="c-primary">{p.works_with}</strong> already here{p.adds ? ` — adds ${String(p.adds).toLowerCase()}` : ""}.
             </p>
-
-            {p.look_for && (
-              <p className="pairing-where">
-                <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                Look for {p.look_for}.
-              </p>
-            )}
-
-            {p.caution && (
-              <p className="pairing-caution">
-                <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                {p.caution}
-              </p>
-            )}
+            {p.look_for && <p className="pairing__meta"><Search aria-hidden="true" />Look for {p.look_for}.</p>}
+            {p.caution && <p className="pairing__meta pairing__meta--caution"><TriangleAlert aria-hidden="true" />{p.caution}</p>}
           </li>
         ))}
       </ul>
-
-      <p className="pairings-foot">
-        Pairings come from how these ingredients are documented to work together.
-      </p>
-    </div>
+      <p className="t-caption c-tertiary" style={{ marginTop: 16 }}>Pairings come from how these ingredients are documented to work together.</p>
+    </Card>
   );
 }

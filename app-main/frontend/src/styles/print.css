@@ -1,0 +1,142 @@
+/* Print / PDF. Only PrintReport (or the comparison print) is printed; the app itself never is. */
+
+/* ========== PRINT / PDF EXPORT ========== */
+/* Export is the browser's own "Save as PDF", which needs no PDF library, no
+   render job and no round trip, works offline, and produces selectable text
+   rather than a picture of a result.
+
+   What prints is PrintReport, a separate document - not the app. Printing the
+   page produced a picture of an interface: collapsed accordions stayed
+   collapsed, empty states printed as empty boxes, and nothing identified the
+   product once the header had scrolled away. */
+.print-report { display: none; }
+
+@media print {
+  @page { margin: 16mm 14mm; }
+
+  /* The interface does not print at all. */
+  body > *:not(.print-report):not(.print-compare) { display: none !important; }
+  body.print-compare .print-report { display: none !important; }
+  body:not(.print-compare) .print-compare { display: none !important; }
+  body.print-compare .print-compare {
+    display: block !important;
+    color: #111 !important;
+    background: #fff !important;
+  }
+  body::before { display: none !important; }
+
+  body {
+    background: #fff !important; color: #111;
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 10.5pt; line-height: 1.5;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  .print-report { display: block !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  a[href]:after { content: ''; }
+}
+
+/* Rendered the same way on screen and on paper, so the layout can be checked
+   without a print dialog - see .print-preview below. */
+.print-report .pr-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 24px; padding-bottom: 14px; border-bottom: 2px solid #1B1916;
+}
+.print-report .pr-eyebrow {
+  font-size: 8pt; letter-spacing: 0.18em; text-transform: uppercase;
+  color: #96543F; font-weight: 700; margin-bottom: 5px;
+}
+.print-report .pr-product {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 20pt; font-weight: 600; line-height: 1.15; color: #111;
+}
+.print-report .pr-sub { font-size: 9.5pt; color: #555; margin-top: 4px; }
+.print-report .pr-score-block { text-align: right; flex-shrink: 0; }
+.print-report .pr-score {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 30pt; font-weight: 700; line-height: 1; color: #111;
+}
+.print-report .pr-score span { font-size: 12pt; font-weight: 400; color: #666; }
+.print-report .pr-tier { font-size: 9pt; color: #96543F; font-weight: 600; margin-top: 3px; }
+
+.print-report .pr-facts {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px 20px; margin: 14px 0 0; padding-bottom: 14px;
+  border-bottom: 1px solid #ddd;
+}
+.print-report .pr-facts dt {
+  font-size: 7.5pt; letter-spacing: 0.1em; text-transform: uppercase; color: #888;
+}
+.print-report .pr-facts dd { font-size: 10pt; margin: 1px 0 0; color: #111; }
+
+.print-report .pr-summary {
+  font-size: 11.5pt; line-height: 1.55; margin: 16px 0 0;
+  padding-left: 12px; border-left: 3px solid #E7C3B8; color: #222;
+}
+
+.print-report .pr-section { margin-top: 22px; break-inside: avoid; page-break-inside: avoid; }
+.print-report .pr-section h2 {
+  font-size: 9pt; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #96543F; font-weight: 700;
+  padding-bottom: 5px; margin-bottom: 10px; border-bottom: 1px solid #ECE6DD;
+}
+.print-report .pr-section h3 { font-size: 10pt; font-weight: 700; margin: 12px 0 5px; color: #111; }
+.print-report .pr-section p { margin-bottom: 7px; }
+.print-report .pr-rationale { color: #555; font-style: italic; margin-bottom: 10px; }
+.print-report .pr-muted { color: #777; font-size: 9.5pt; }
+
+.print-report .pr-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+.print-report .pr-table th {
+  text-align: left; font-size: 7.5pt; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #888; font-weight: 600; padding: 0 8px 5px 0; border-bottom: 1px solid #ddd;
+}
+.print-report .pr-table td {
+  padding: 6px 8px 6px 0; vertical-align: top; border-bottom: 1px solid #f0f0f0;
+}
+.print-report .pr-table .pr-comp { font-weight: 600; color: #111; white-space: nowrap; }
+.print-report .pr-table .pr-num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.print-report .pr-list { margin: 4px 0 8px 16px; }
+.print-report .pr-list li { margin-bottom: 3px; }
+.print-report .pr-advisory { margin-bottom: 12px; }
+.print-report .pr-limits p { color: #555; font-size: 9.5pt; }
+.print-report .pr-foot {
+  margin-top: 26px; padding-top: 12px; border-top: 1px solid #ddd;
+  font-size: 8pt; color: #777; line-height: 1.5;
+}
+.print-report .pr-foot p { margin-bottom: 5px; }
+
+/* On-screen preview of the printed document, so the layout can be checked
+   without opening a print dialog every time. */
+.print-preview .print-report {
+  display: block; background: #fff; color: #111;
+  font-family: 'Geist', system-ui, sans-serif; font-size: 10.5pt; line-height: 1.5;
+  max-width: 760px; margin: 0 auto; padding: 42px 46px;
+  border: 1px solid var(--border-subtle); border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(27,25,22,0.12);
+}
+
+
+.print-compare { display: none; }
+.print-compare table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.print-compare th, .print-compare td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 10pt; }
+
+/* ---- print report: free vs full ---- */
+.print-report .pr-tier-badge {
+  display: inline-block; margin-bottom: 5px; padding: 2px 8px;
+  border: 1px solid #DDD5C9; border-radius: 50px;
+  font-size: 7pt; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #96543F; font-weight: 700;
+}
+.print-report .pr-upgrade {
+  background: #F5F1EB; border: 1px solid #ECE6DD; border-radius: 8px;
+  padding: 12px 14px;
+}
+.print-report .pr-upgrade h2 { border-bottom: none; margin-bottom: 7px; }
+
+
+@media print {
+  .no-print, .appbar, .result-tabs, .footer, .toast, .overlay { display: none !important; }
+}

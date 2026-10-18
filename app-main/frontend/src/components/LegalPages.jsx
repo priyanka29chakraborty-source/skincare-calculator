@@ -1,11 +1,15 @@
-import { useState } from "react";
-import { API, api, describeError } from "../api";
+import { useLayoutEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 
-const NON_REFUNDABLE =
-  "Payments for personalised analysis are non-refundable.";
+import { API, api, describeError } from "../api";
+import { Button, Callout } from "./ds";
+import { MarketingNav, SiteFooter } from "./SiteChrome";
+
+const NON_REFUNDABLE = "Payments for personalised analysis are non-refundable.";
 
 const PAGES = {
   terms: {
+    eyebrow: "Legal",
     title: "Terms of Service",
     body: [
       "The first time you sign in with your email, the account includes 4 credits. Signing in again with the same email does not add another 4. A personal analysis costs 1 credit. A comparison always includes at least two products, so it starts at 2 credits. Three products cost 3, four cost 4, five cost 5, and six cost 6. Opening the same product or the same comparison again does not spend another credit. After those credits are used, further analyses and comparisons need a credit pack.",
@@ -17,16 +21,18 @@ const PAGES = {
     ],
   },
   privacy: {
+    eyebrow: "Legal",
     title: "Privacy Policy",
     body: [
-      "We store the email you sign in with, the products you choose to save, and the credit balance on that account. After you sign in, a saved product shows under Previously analysed, and you can remove it from that list.",
+      "We store the email you sign in with, the products you choose to save, and the credit balance on that account. After you sign in, a saved product shows under Saved, and you can remove it from that list.",
       "If you send feedback and include an email for a reply, that note and address are stored so we can read them. They are not shown on the public site.",
       NON_REFUNDABLE,
     ],
   },
   feedback: {
-    title: "Feedback",
-    body: ["Tell us what was unclear or wrong on a result. A short note is enough."],
+    eyebrow: "Feedback",
+    title: "Tell us what to fix",
+    body: ["Tell us what was unclear or wrong on a result. A short note is enough — a person reads every one."],
   },
 };
 
@@ -38,17 +44,31 @@ export function isLegalPage(page) {
   return Boolean(PAGES[page]);
 }
 
-export default function LegalPages({ page, header = null }) {
+function goBack() {
+  if (window.history.length > 1) window.history.back();
+  else window.location.hash = "";
+}
+
+export default function LegalPages({ page, account, openUnlock }) {
   const item = PAGES[page];
+  // A hash link keeps the scroll position of the page it came from (often the
+  // footer), so start every legal page at the top.
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, [page]);
   if (!item) return null;
   return (
-    <main className="sc-app legal-page" data-testid="skincare-app">
-      {header}
-      <h1>{item.title}</h1>
-      {item.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-      {page === "feedback" && <FeedbackForm />}
-      <a className="legal-back" href="#app">Back</a>
-    </main>
+    <div className="page" data-testid="skincare-app">
+      <MarketingNav account={account} onSignIn={() => openUnlock("signin")} />
+      <main className="container legal">
+        <button type="button" className="link" onClick={goBack}><ArrowLeft aria-hidden="true" />Back</button>
+        <p className="t-eyebrow c-accent">{item.eyebrow}</p>
+        <h1 className="t-display-m">{item.title}</h1>
+        <div className="legal__body">
+          {item.body.map((paragraph) => <p key={paragraph} className="t-body-l c-secondary">{paragraph}</p>)}
+        </div>
+        {page === "feedback" && <FeedbackForm />}
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
 
@@ -57,41 +77,40 @@ function FeedbackForm() {
   const [message, setMessage] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
-    setErr(""); setMsg("");
+    setErr(""); setMsg(""); setBusy(true);
     try {
       await api.post(`${API}/feedback`, { email, message });
       setMessage("");
       setEmail("");
-      setMsg("Received. Thank you.");
+      setMsg("Received — thank you.");
     } catch (error) {
       setErr(describeError(error));
-    }
+    } finally { setBusy(false); }
   }
 
   return (
-    <form onSubmit={submit} className="legal-form">
-      <label className="field-label" htmlFor="feedback-message">What should we look at?</label>
-      <textarea id="feedback-message" className="field-input" required minLength={3}
-                value={message} onChange={(e) => setMessage(e.target.value)} />
-      <label className="field-label" htmlFor="feedback-email">Email, if you want a reply</label>
-      <input id="feedback-email" className="field-input" type="email" value={email}
-             onChange={(e) => setEmail(e.target.value)} />
-      <button className="personalise-update" type="submit">Send</button>
-      {msg && <p>{msg}</p>}
-      {err && <p role="alert">{err}</p>}
+    <form onSubmit={submit} className="card legal__form">
+      <div className="field">
+        <label className="field__label" htmlFor="feedback-message">What should we look at?</label>
+        <div className="field__control field__control--textarea">
+          <textarea id="feedback-message" required minLength={3} rows={5} value={message}
+                    onChange={(e) => setMessage(e.target.value)} style={{ fontFamily: "var(--font-sans)", fontSize: 15 }} />
+        </div>
+      </div>
+      <div className="field">
+        <label className="field__label" htmlFor="feedback-email">Your email</label>
+        <div className="field__control">
+          <input id="feedback-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+        </div>
+        <p className="field__help">So we can reply. We never share it.</p>
+      </div>
+      <Button type="submit" variant="primary" arrow loading={busy} loadingText="Sending…">Send feedback</Button>
+      {msg && <Callout tone="positive"><p className="callout__text">{msg}</p></Callout>}
+      {err && <Callout tone="negative" role="alert"><p className="callout__text">{err}</p></Callout>}
     </form>
-  );
-}
-
-export function LegalFooter() {
-  return (
-    <footer className="no-print legal-footer">
-      <a href="#terms">Terms of Service</a>
-      <a href="#privacy">Privacy Policy</a>
-      <a href="#feedback">Feedback</a>
-    </footer>
   );
 }

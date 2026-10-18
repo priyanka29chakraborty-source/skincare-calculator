@@ -1,942 +1,501 @@
 import React, { useState } from "react";
-import { getBarColor, money, categoryLabel } from "../constants";
-import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
-import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
-import LockedCard from "./LockedCard";
-import SuitabilityCard from "./SuitabilityCard";
-import PairingsCard from "./PairingsCard";
-import AlternativesCard from "./AlternativesCard";
-import BestPriceCard from "./BestPriceCard";
+import {
+  BookOpen, Check, ChevronDown, CircleCheck, Clock, Droplet, Droplets, Feather, FlaskConical,
+  Info, Layers, Leaf, Shield, ShieldCheck, Sparkles, Sun, TestTube, Umbrella, X, Zap,
+} from "lucide-react";
 
-// ── Value chip ──────────────────────────────────────────────────────────────
+import { money, categoryLabel } from "../constants";
+import { Badge, Callout, Card, Meter, ScoreRing, StatTile, scoreBadgeTone, cx } from "./ds";
+import { ConfidenceNote, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
+
+/* ------------------------------------------------------------- helpers */
+
+function catFlags(category) {
+  const cat = String(category || "").toLowerCase();
+  return {
+    cat,
+    isSunscreen: cat === "sunscreen",
+    isCleanser: cat === "cleanser",
+    isMoisturizer: cat === "moisturizer" || cat === "moisturiser",
+    isFacialOil: cat === "facial oil" || cat === "oil",
+    isTreatment: cat === "treatment",
+    isSerum: cat === "serum",
+    isToner: cat === "toner",
+    isMask: cat === "mask",
+  };
+}
+
+/** The API sometimes sends finished sentences, sometimes "; "-joined labels. */
 function benefitText(raw) {
-  if (!raw) return "—";
+  if (!raw) return "";
   const text = String(raw).trim();
-  // The API already sends one finished sentence. Splitting on the period
-  // used to leave the column as a pile of cut-off labels.
   if (/[.!?]$/.test(text) && text.split(/\s+/).length >= 3) return text;
   const dangling = /\b(a|an|the|is|of|to|and|or|for|with)$/i;
   const cutOff = /\bis an?\s+\w+$/i;
-  const parts = text.split(/[;]/).map((s) => s.trim()).filter((s) => {
-    if (s.length < 3) return false;
-    if (dangling.test(s) || cutOff.test(s)) return false;
-    return true;
-  });
-  if (!parts.length) return "—";
+  const parts = text.split(/[;]/).map((s) => s.trim())
+    .filter((s) => s.length >= 3 && !dangling.test(s) && !cutOff.test(s));
+  if (!parts.length) return "";
   const lead = (s) => s.replace(/ \/ /g, " and ").replace(/^([A-Z])(?=[a-z])/, (m) => m.toLowerCase());
   if (parts.length === 1) return `Used for ${lead(parts[0])}.`;
   const bits = parts.map(lead);
-  const body = bits.length === 2
-    ? `${bits[0]} and ${bits[1]}`
-    : `${bits.slice(0, -1).join(", ")}, and ${bits[bits.length - 1]}`;
+  const body = bits.length === 2 ? `${bits[0]} and ${bits[1]}` : `${bits.slice(0, -1).join(", ")}, and ${bits[bits.length - 1]}`;
   return `Used for ${body}.`;
 }
 
-function getValueChip(valueTier, ratio) {
-  switch (valueTier) {
-    case 'underpriced':      return { label: 'Good Value',         subtitle: 'Priced below category average for the formula quality.',          color: '#267C36' };
-    case 'fair':             return { label: 'Average Value',      subtitle: `Priced around category average (~${(ratio || 1).toFixed(1)}×).`,  color: '#2D7FD3' };
-    case 'slightly_overpriced': return { label: 'Below Average Value', subtitle: "Priced somewhat above category average for what's inside.",   color: '#E6A817' };
-    case 'overpriced':       return { label: 'Poor Value',         subtitle: 'Significantly overpriced relative to active ingredient content.',  color: '#D06030' };
-    default:                 return { label: 'Analysed',           subtitle: '',                                                                 color: '#7A7168' };
-  }
+const VALUE_BADGE = {
+  excellent: ["positive", "Good value"],
+  good: ["positive", "Good value"],
+  fair: ["neutral", "Fair price"],
+  premium: ["caution", "Premium price"],
+  luxury: ["caution", "Luxury price"],
+};
+
+/* ------------------------------------------------------------- Verdict */
+
+export function VerdictCard({ result, productName, brand, category, price, size, sizeUnit, currency, skinType }) {
+  const { isFacialOil, isTreatment } = catFlags(category);
+  const score = result.main_worth_score;
+  const eyebrow = [brand, categoryLabel(category), price && money(currency, price), size && `${size} ${sizeUnit || "ml"}`]
+    .filter(Boolean).join(" · ");
+  const verdict = String(result.formulation_summary || result.score_title || "").replace(/ - /g, " — ");
+  const value = VALUE_BADGE[result.value_assessment?.tier];
+  const compat = result.skin_type_compatibility;
+  const skin = String(skinType || "").toLowerCase();
+
+  return (
+    <article className="card card--raised verdict reveal" data-testid="card-main-worth">
+      <div className="verdict__copy">
+        {eyebrow && <p className="t-eyebrow c-accent">{eyebrow}</p>}
+        <h1 className="t-display-m verdict__name">{productName || `Your ${categoryLabel(category).toLowerCase()}`}</h1>
+        {verdict && <p className="t-body-l c-secondary">{verdict}</p>}
+        <div className="row wrap verdict__badges">
+          {result.main_worth_tier && (
+            <Badge tone={scoreBadgeTone(score)} data-testid="tier-badge">{result.main_worth_tier}</Badge>
+          )}
+          {value && <Badge tone={value[0]}>{value[1]}</Badge>}
+          {typeof compat === "number" && skin && compat >= 70 && <Badge tone="accent">Suits {skin} skin</Badge>}
+          {typeof compat === "number" && skin && compat < 50 && <Badge tone="caution">May not suit {skin} skin</Badge>}
+          {isTreatment && result.is_high_intensity && <Badge tone="caution">High intensity</Badge>}
+        </div>
+        {(isFacialOil || result.score_confidence) && (
+          <p className="verdict__confidence">
+            <Info aria-hidden="true" />
+            <span>{isFacialOil ? "Amounts are estimated from list position and how oil-based formulas are built." : result.score_confidence}</span>
+          </p>
+        )}
+        {result.worth_multipliers_applied?.length > 0 && (
+          <p className="t-caption c-positive">Bonus applied: {result.worth_multipliers_applied.join(", ")}</p>
+        )}
+      </div>
+      <div className="verdict__score">
+        <ScoreRing score={score} size="lg" />
+        <p className="t-eyebrow c-tertiary">Formulation score</p>
+      </div>
+    </article>
+  );
 }
 
-// ── MoA Tooltip ─────────────────────────────────────────────────────────────
-function MoATooltip({ text }) {
+/* --------------------------------------------------------------- Stats */
+
+function comp(result, key) {
+  const c = (result.formulation_breakdown || []).find((x) => x.key === key);
+  if (!c || !c.max) return null;
+  return { score: c.score, max: c.max, pct: (c.score / c.max) * 100, label: c.label, notes: c.notes || [] };
+}
+
+function priceStat(pa, currency, category) {
+  return {
+    label: "Price per ml",
+    value: pa?.price_per_ml ? money(currency, pa.price_per_ml) : "—",
+    note: pa?.vs_average ? `${pa.vs_average} the usual ${categoryLabel(category).toLowerCase()} price` : null,
+  };
+}
+
+export function StatsRow({ result, category, currency }) {
+  const { isSunscreen, isCleanser, isMoisturizer, isFacialOil } = catFlags(category);
+  const pa = result.price_analysis || {};
+  let stats;
+
+  if (isSunscreen) {
+    const sa = result.skin_concern_fit?.["Sun Protection"]?.sunscreen_analysis;
+    const filters = sa?.filters_detected?.length ?? pa.active_count ?? 0;
+    const { uvb_covered: uvb, uva1_covered: uva1, uva2_covered: uva2 } = sa || {};
+    const photo = sa?.score_breakdown?.photostability ?? 0;
+    const spectrum = (!uvb && !uva1 && !uva2) ? "No coverage"
+      : (uvb && uva1 && uva2) ? "Full broad spectrum"
+      : (uvb && (uva1 || uva2)) ? "Broad spectrum" : uvb ? "UVB only" : "Partial";
+    stats = [
+      { label: "UV filters", value: filters, note: sa?.spf_estimate ? `Lab SPF on pack: ${sa.spf_estimate}` : null },
+      { label: "Spectrum", value: spectrum, text: true, note: `UVB ${uvb ? "✓" : "✗"} · UVA ${uva1 ? "✓" : uva2 ? "partial" : "✗"}` },
+      { label: "Photostability", value: photo >= 16 ? "High" : photo >= 10 ? "Medium" : "Low", text: true, note: "How well the filters hold up in sunlight" },
+      priceStat(pa, currency, category),
+    ];
+  } else if (isCleanser) {
+    const surf = comp(result, "surfactant");
+    const ph = comp(result, "ph");
+    const idx = surf ? Math.round(surf.pct) / 10 : null;
+    const mild = idx === null ? "—" : idx >= 8 ? "Gentle" : idx >= 6 ? "Mild" : idx >= 4 ? "Moderate" : "Harsh";
+    const lather = /sulfate|soap/i.test(surf?.notes?.[0] || "") ? "High foam, can strip" : "Gentle, low foam";
+    stats = [
+      { label: "Surfactant mildness", value: idx === null ? "—" : `${idx}/10`, note: mild },
+      { label: "Lather", value: lather, text: true },
+      { label: "pH suitability", value: ph ? `${Math.round(ph.pct)}%` : "—", note: "For a rinse-off cleanser" },
+      priceStat(pa, currency, category),
+    ];
+  } else if (isMoisturizer) {
+    const barrier = comp(result, "barrier");
+    const bi = barrier ? Math.round(barrier.pct) : null;
+    stats = [
+      { label: "Barrier support", value: bi === null ? "—" : bi >= 75 ? "Strong" : bi >= 50 ? "Moderate" : "Low", text: true, note: bi === null ? null : `${bi}% of what’s possible` },
+      priceStat(pa, currency, category),
+      { label: "Actives found", value: pa.active_count ?? "—", note: pa.active_ratio ? `${pa.active_ratio} of the ingredients` : null },
+      { label: "Usual price", value: pa.category_avg ? money(currency, pa.category_avg) : "—", note: "Per ml, for a moisturiser" },
+    ];
+  } else if (isFacialOil) {
+    const meta = result.oil_metadata || {};
+    const aox = meta.antioxidant_count ?? 0;
+    const fa = (meta.linoleic_count ?? 0) > (meta.oleic_count ?? 0) ? "Linoleic-rich"
+      : (meta.oleic_count ?? 0) > (meta.linoleic_count ?? 0) ? "Oleic-rich" : "Balanced";
+    stats = [
+      { label: "Oils in the blend", value: meta.oil_diversity ?? pa.active_count ?? 0 },
+      { label: "Antioxidants", value: aox, note: aox >= 5 ? "High protection" : aox >= 3 ? "Some protection" : aox >= 1 ? "Low protection" : "None found" },
+      { label: "Fatty acid type", value: fa, text: true, note: fa === "Linoleic-rich" ? "Lighter, often better for oily skin" : fa === "Oleic-rich" ? "Richer, often better for dry skin" : null },
+      priceStat(pa, currency, category),
+    ];
+  } else {
+    stats = [
+      priceStat(pa, currency, category),
+      { label: "Usual price", value: pa.category_avg ? money(currency, pa.category_avg) : "—", note: `Per ml, for a ${categoryLabel(category).toLowerCase()}` },
+      { label: "Actives found", value: pa.active_count ?? "—", note: pa.active_ratio ? `${pa.active_ratio} of the ingredients` : null },
+      { label: "Price per active", value: pa.price_per_active ? money(currency, pa.price_per_active) : "—", note: "What each active costs you" },
+    ];
+  }
+
+  return (
+    <div className="stats reveal" style={{ "--i": 1 }} data-testid="price-grid">
+      {stats.map((s) => <StatTile key={s.label} label={s.label} value={s.value} note={s.note} textValue={s.text} />)}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------- Advisories */
+
+export function Advisories({ result, category, concerns }) {
+  const { isTreatment } = catFlags(category);
+  const highIntensity = isTreatment && result.is_high_intensity;
+  const flags = (result.advisory_flags || []).filter((f) => f.type !== "climate_texture");
+  const redFlags = result.red_flags || [];
+  const priceNote = result.price_analysis?.price_note;
+  if (!highIntensity && !flags.length && !redFlags.length && !priceNote) return null;
+  const actives = result.high_intensity_actives || [];
+  return (
+    <div className="stack reveal" style={{ "--i": 2, "--stack-gap": "12px" }}>
+      {highIntensity && (
+        <Callout tone="caution" icon={Zap} title="High-intensity formula" data-testid="high-intensity-banner">
+          <p className="callout__text">
+            {actives.length > 0 && <><strong>{actives.join(", ")}</strong> works fast. </>}
+            It can cause purging or dryness at first. Best suited for {concerns?.length ? concerns.join(", ") : "the concern you chose"}.
+            Introduce it slowly and always follow with sunscreen.
+          </p>
+        </Callout>
+      )}
+      <AdvisoryFlags flags={flags} />
+      {redFlags.length > 0 && (
+        <Callout tone="negative" title="Worth knowing before you buy" data-testid="red-flags-section">
+          <ul className="callout__list">{redFlags.map((rf, i) => <li key={i} data-testid={`red-flag-${i}`}>{rf}</li>)}</ul>
+        </Callout>
+      )}
+      {priceNote && <Callout tone="info" title="About the price" data-testid="price-note"><p className="callout__text">{priceNote}</p></Callout>}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------- Breakdown */
+
+const PART_ICONS = {
+  actives: FlaskConical, evidence: BookOpen, integrity: ShieldCheck, tolerability: Feather,
+  hydration: Droplet, barrier: Layers, soothing: Leaf, surfactant: Droplets, ph: TestTube,
+  post_cleanse: Sparkles, stability: Shield, uva: Sun, photostability: Clock, uvb: Umbrella,
+};
+
+function BreakdownRow({ c }) {
+  const [open, setOpen] = useState(false);
+  const Icon = PART_ICONS[c.key] || FlaskConical;
+  const notes = c.notes || [];
+  const pct = c.max ? (c.score / c.max) * 100 : 0;
+  const fmt = (n) => (Number.isInteger(n) ? n : Number(n).toFixed(1));
+  return (
+    <div className="part" data-testid={`formulation-${c.key}`}>
+      <Meter icon={<Icon aria-hidden="true" />} label={c.label} value={`${fmt(c.score)} / ${c.max}`} pct={pct} />
+      {notes[0] && <p className="part__note">{notes[0]}</p>}
+      {notes.length > 1 && (
+        <>
+          <div className="reveal-panel" data-open={open}>
+            <div><ul className="part__more">{notes.slice(1).map((n, i) => <li key={i}>{n}</li>)}</ul></div>
+          </div>
+          <button type="button" className="link part__toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            {open ? "Less" : `${notes.length - 1} more ${notes.length - 1 === 1 ? "detail" : "details"}`}
+            <ChevronDown aria-hidden="true" style={{ transform: open ? "rotate(180deg)" : "none" }} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function BreakdownCard({ result }) {
+  const parts = result.formulation_breakdown || [];
+  if (!parts.length) return null;
+  const score = result.formulation_score ?? result.main_worth_score;
+  return (
+    <Card className="reveal" style={{ "--i": 3 }} eyebrow="Formulation breakdown" title={`How the ${score} is made`}
+          sub={`${parts.length} parts, weighted for this product type. They always add up to the score — and price is never one of them.`}
+          data-testid="breakdown-details">
+      {result.formulation_rationale && <p className="t-body-m c-secondary breakdown__intro">{result.formulation_rationale}</p>}
+      <div className="parts">{parts.map((c) => <BreakdownRow key={c.key} c={c} />)}</div>
+      <div className="stack" style={{ "--stack-gap": "12px", marginTop: 24 }}>
+        <ConfidenceNote level={result.formulation_confidence} note={result.formulation_confidence_note} />
+        <FormulationFlags flags={result.formulation_flags} />
+      </div>
+    </Card>
+  );
+}
+
+/* --------------------------------------------------------- Ingredients */
+
+function evidenceBadge(raw) {
+  const e = String(raw || "").toLowerCase();
+  if (e.startsWith("strong")) return ["positive", "Strong"];
+  if (e.startsWith("moderate")) return ["caution", "Moderate"];
+  if (e.startsWith("limited")) return ["neutral", "Limited"];
+  if (e.startsWith("early")) return ["neutral", "Emerging"];
+  return ["neutral", "Minimal"];
+}
+
+function MechanismTip({ text }) {
   const [show, setShow] = useState(false);
   if (!text) return null;
   return (
-    <span style={{ position: 'relative', display: 'inline-block', marginLeft: '4px' }}>
-      <i
-        className="fa-solid fa-flask fa-xs"
-        style={{ color: '#5B4FBE', cursor: 'pointer', fontSize: '0.65rem' }}
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-        onClick={() => setShow(s => !s)}
-        title="Technical mechanism"
-      />
-      {show && (
-        <span style={{
-          position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)',
-          background: '#1e1a2e', color: '#e8e0ff', fontSize: '0.7rem', borderRadius: '8px',
-          padding: '6px 10px', maxWidth: '220px', whiteSpace: 'normal',
-          zIndex: 100, lineHeight: '1.4', boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-          pointerEvents: 'none',
-        }}>
-          <span style={{ fontWeight: 700, color: '#c8b8ff', display: 'block', marginBottom: '2px' }}>
-            Mechanism of Action
-          </span>
-          {text}
-        </span>
-      )}
+    <span className="tip">
+      <button type="button" className="tip__btn" aria-label="How it works" aria-expanded={show}
+              onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
+              onFocus={() => setShow(true)} onBlur={() => setShow(false)} onClick={() => setShow((s) => !s)}>
+        <Info aria-hidden="true" />
+      </button>
+      {show && <span className="tip__bubble" role="tooltip"><strong>How it works</strong>{text}</span>}
     </span>
   );
 }
 
-// ── Ingredient Breakdown Table (with MoA + MW depth) ─────────────────────────
-function IngredientBreakdownTable({ actives, isFacialOil = false }) {
-  if (!actives || actives.length === 0) return null;
-  return (
-    <div className="ingredient-breakdown-table" style={{ marginTop: "1rem", overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-        <thead>
-          <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid var(--border)" }}>
-            <th style={{ padding: "6px 10px", textAlign: "left" }}>#</th>
-            <th style={{ padding: "6px 10px", textAlign: "left" }}>{isFacialOil ? "Botanical Contributor" : "Active Ingredient"}</th>
-            <th style={{ padding: "6px 10px", textAlign: "center" }}>Evidence</th>
-            <th style={{ padding: "6px 10px", textAlign: "left" }}>What It Does</th>
-            <th style={{ padding: "6px 10px", textAlign: "center" }}>Concentration Est.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {actives.map((a, i) => (
-            <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "var(--bg-deep)" }}>
-              <td style={{ padding: "5px 10px", color: "var(--text-sub)" }} title="Position in ingredient list">#{a.position}</td>
-              <td style={{ padding: "5px 10px", fontWeight: 500 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px' }}>
-                  {a.name}
-                  {/* MoA tooltip — only shown for Tier 1/2 (mechanism_of_action populated by backend) */}
-                  {a.mechanism_of_action && <MoATooltip text={a.mechanism_of_action} />}
-                  {/* Activity tier badge — small pill */}
-                  {a.activity_tier && (
-                    <span style={{
-                      fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '6px',
-                      background: a.activity_tier.startsWith('Tier 1') ? '#5B4FBE22' : a.activity_tier.startsWith('Tier 2') ? '#267C3622' : '#88888822',
-                      color: a.activity_tier.startsWith('Tier 1') ? '#5B4FBE' : a.activity_tier.startsWith('Tier 2') ? '#267C36' : '#888',
-                      border: `1px solid ${a.activity_tier.startsWith('Tier 1') ? '#5B4FBE44' : a.activity_tier.startsWith('Tier 2') ? '#267C3644' : '#88888844'}`,
-                      letterSpacing: '0.3px',
-                    }}>
-                      {a.activity_tier.split(':')[0]}
-                    </span>
-                  )}
-                </span>
-                {a.targets?.length > 0 && (
-                  <div style={{ marginTop: "2px", display: "flex", flexWrap: "wrap", gap: "3px" }}>
-                    {a.targets.filter(t => t && t.trim()).map((t, ti) => (
-                      <span key={ti} style={{ fontSize: "10px", background: "var(--rose)", border: "1px solid var(--dusty-rose-light)", padding: "2px 6px", borderRadius: "4px", color: "var(--dusty-rose-dark)", fontWeight: 500 }}>{t}</span>
-                    ))}
-                  </div>
-                )}
-                {/* MW depth label where available */}
-                {a.mw_depth && (
-                  <div style={{ fontSize: '9px', color: 'var(--text-sub)', marginTop: '2px', fontStyle: 'italic' }}>
-                    {a.mw_depth}
-                  </div>
-                )}
-                {a.provenance?.source && (
-                  <div style={{ fontSize: '9px', color: 'var(--text-sub)', marginTop: '2px' }}>
-                    {[a.provenance.evidence_level, a.provenance.source, a.provenance.reviewed_at && `reviewed ${a.provenance.reviewed_at}`].filter(Boolean).join(" · ")}
-                  </div>
-                )}
-              </td>
-              <td style={{ padding: "5px 10px", textAlign: "center" }}>
-                <span style={{
-                  fontSize: "0.75rem", fontWeight: 600,
-                  color: a.evidence?.toLowerCase().startsWith("strong") ? "#267C36" : a.evidence?.toLowerCase().startsWith("moderate") ? "#C9A96E" : "#BF8888"
-                }} title={a.evidence}>{
-                  a.evidence?.toLowerCase().startsWith("strong") ? "Strong" :
-                  a.evidence?.toLowerCase().startsWith("moderate") ? "Moderate" :
-                  a.evidence?.toLowerCase().startsWith("limited") ? "Limited" :
-                  a.evidence?.toLowerCase().startsWith("early") ? "Emerging" : "Minimal"
-                }</span>
-              </td>
-              <td style={{ padding: "5px 10px", color: "var(--text-sub)", fontSize: "0.78rem", whiteSpace: "normal", lineHeight: 1.45, minWidth: "180px" }}>
-                {benefitText(a.primary_benefits || a.functional_category)}
-              </td>
-              <td style={{ padding: "5px 10px", textAlign: "center", fontSize: "0.78rem" }}>
-                {a.concentration_known && a.concentration_pct != null ? (
-                  <span style={{ color: '#267C36', fontWeight: 700 }} title="Confirmed from product page or INCI annotation">
-                    ✓ {a.concentration_pct}%
-                  </span>
-                ) : (
-                  <span style={{ color: 'var(--text-sub)' }}>{a.concentration}</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p style={{ fontSize: "0.72rem", color: "var(--text-sub)", marginTop: "8px", fontStyle: "italic" }}>
-        {actives.some(a => a.concentration_known) ? (
-          <><span style={{ color: '#267C36', fontWeight: 600 }}>Green figures are stated on the product page.</span> Everything else is estimated from its place in the list.</>
-        ) : (
-          <>Amounts in this table are estimated from each ingredient's place in the list.</>
-        )}
-        &nbsp;<span style={{ color: '#5B4FBE' }}><i className="fa-solid fa-flask fa-xs" /> = Technical mechanism (Tier 1/2 only)</span>
-      </p>
-    </div>
-  );
-}
-
-// ── 1% Line Visualiser ───────────────────────────────────────────────────────
-function OnePercentVisualiser({ marker, hideForOil }) {
-  const [open, setOpen] = React.useState(false);
-  // Rule: hide for pure oils — irrelevant (no water phase to anchor 1% rule)
-  if (!marker || hideForOil) return null;
+function OnePercentLine({ marker }) {
+  const [open, setOpen] = useState(false);
+  if (!marker) return null;
   const above = marker.above_marker || [];
   const below = marker.below_marker || [];
   return (
-    <div style={{ marginTop: '14px', borderRadius: '10px', border: '1px solid var(--border)', overflow: 'hidden' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{ width: '100%', background: 'var(--bg-deep)', border: 'none', padding: '9px 14px',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)' }}>
-        <span><i className="fa-solid fa-layer-group" style={{ marginRight: '6px', color: '#5B4FBE' }}></i>
-          INCI 1% Threshold Visualiser
-        </span>
-        <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'} fa-xs`} style={{ color: 'var(--text-sub)' }}></i>
+    <div className="onepct">
+      <button type="button" className="onepct__toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="row" style={{ "--row-gap": "10px" }}><Layers aria-hidden="true" />
+          <span>The 1% line{marker.ingredient ? ` falls around ${marker.ingredient}` : ""}</span></span>
+        <ChevronDown aria-hidden="true" style={{ transform: open ? "rotate(180deg)" : "none" }} />
       </button>
-      {open && (
-        <div style={{ padding: '12px 14px', fontSize: '0.76rem' }}>
-          <div style={{ marginBottom: '8px', color: 'var(--text-sub)', lineHeight: '1.5' }}>
-            Ingredients above about 1% are usually listed from highest to lowest.
-            A thickener or preservative often sits near that line. It is a guide
-            to the list, not a measured percentage.
-          </div>
-          {above.length > 0 && (
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontWeight: 700, color: '#267C36', marginBottom: '5px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Before this line — usually the larger amounts
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {above.map((ing, i) => (
-                  <span key={i} style={{ background: '#f0faf2', border: '1px solid #a8dab5', borderRadius: '6px', padding: '3px 8px', color: '#1a5c2a', fontSize: '0.72rem' }}>{ing}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0', fontSize: '0.7rem', color: '#5B4FBE', fontWeight: 700 }}>
-            <div style={{ flex: 1, height: '1px', background: '#5B4FBE', opacity: 0.4 }}></div>
-            <span>≈1% line · {marker.ingredient}</span>
-            <div style={{ flex: 1, height: '1px', background: '#5B4FBE', opacity: 0.4 }}></div>
-          </div>
-          {below.length > 0 && (
-            <div>
-              <div style={{ fontWeight: 700, color: '#8B7355', marginBottom: '5px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                From this line on — order does not show the amount
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {below.map((ing, i) => (
-                  <span key={i} style={{ background: '#faf8f3', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px 8px', color: 'var(--text-sub)', fontSize: '0.72rem' }}>{ing}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── pH Analysis ──────────────────────────────────────────────────────────────
-function getPhInterpretation(ph) {
-  if (!ph?.ph_range && !ph?.headline) return null;
-  if (ph.headline) {
-    const mismatch = /too high|outside the range/.test(ph.headline);
-    return { text: ph.headline, color: mismatch ? '#D06030' : '#5c5346' };
-  }
-  return null;
-}
-
-function PhAnalysisSection({ ph }) {
-  if (!ph || !ph.ph_range) return null;
-  const hasWarnings = ph.warnings && ph.warnings.length > 0;
-  const interp = getPhInterpretation(ph);
-  return (
-    <div style={{ marginTop: '14px', borderRadius: '10px', background: hasWarnings ? '#fffaf0' : '#f7fbff', border: `1px solid ${hasWarnings ? '#fde8b0' : '#c8e0f4'}`, padding: '12px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-        <i className="fa-solid fa-flask-vial" style={{ color: hasWarnings ? '#C9A96E' : '#2D7FD3', fontSize: '0.9rem' }}></i>
-        <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-main)' }}>Formula pH Inference</span>
-        <span style={{ fontSize: '0.68rem', background: 'var(--border)', padding: '2px 7px', borderRadius: '10px', color: 'var(--text-sub)' }}>
-          {ph.confidence === 'medium' ? 'Medium confidence' : 'Estimate only'}
-        </span>
-        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: '0.82rem', color: hasWarnings ? '#C9A96E' : '#2D7FD3' }}>
-          pH {ph.ph_range[0]}–{ph.ph_range[1]}
-        </span>
-      </div>
-      {interp && (
-        <div style={{ fontSize: '0.76rem', fontWeight: 600, color: interp.color, background: interp.color + '11', border: `1px solid ${interp.color}33`, borderRadius: '6px', padding: '6px 10px', marginBottom: '8px' }}>
-          {interp.text}
-        </div>
-      )}
-      {ph.notes && ph.notes.map((n, i) => (
-        <div key={i} style={{ fontSize: '0.74rem', color: 'var(--text-sub)', marginBottom: '4px', paddingLeft: '4px' }}>{n}</div>
-      ))}
-      {hasWarnings && ph.warnings.map((w, i) => (
-        <div key={i} style={{ fontSize: '0.75rem', color: '#856404', background: '#fff3cd', border: '1px solid #fde8b0', borderRadius: '6px', padding: '6px 10px', marginTop: '6px' }}>⚠ {w}</div>
-      ))}
-      <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', marginTop: '8px', fontStyle: 'italic' }}>
-        pH is inferred from buffering/adjusting ingredients — not a lab measurement.
-      </div>
-    </div>
-  );
-}
-
-// ── Ingredient Conflicts ─────────────────────────────────────────────────────
-function ConflictsSection({ conflicts }) {
-  if (!conflicts || conflicts.length === 0) return null;
-  const severityStyle = {
-    high:     { bg: '#fff0f0', border: '#f5c6cb', text: '#721C24', icon: '🚨' },
-    moderate: { bg: '#fffaf0', border: '#fde8b0', text: '#856404', icon: '⚠️' },
-    low:      { bg: '#f0f8ff', border: '#bee5eb', text: '#0c5460', icon: 'ℹ️' },
-  };
-  return (
-    <div style={{ marginTop: '14px' }}>
-      <div style={{ fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <i className="fa-solid fa-triangle-exclamation" style={{ color: '#C9A96E' }}></i>
-        In-Formula Interactions
-      </div>
-      {conflicts.map((c, i) => {
-        const s = severityStyle[c.severity] || severityStyle.low;
-        return (
-          <div key={i} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '8px', padding: '9px 12px', marginBottom: '6px', fontSize: '0.76rem', color: s.text, lineHeight: '1.5' }}>
-            {s.icon} {c.message}
-          </div>
-        );
-      })}
-      <div style={{ fontSize: '0.67rem', color: 'var(--text-sub)', fontStyle: 'italic', marginTop: '4px' }}>
-        These interactions are within a single product formula. For routine layering, consult a dermatologist.
-      </div>
-    </div>
-  );
-}
-
-// ── Delivery Systems ─────────────────────────────────────────────────────────
-function DeliveryBadge({ systems }) {
-  if (!systems || systems.length === 0) return null;
-  return (
-    <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-      <span style={{ fontSize: '0.72rem', color: 'var(--text-sub)', fontWeight: 600 }}>Advanced delivery:</span>
-      {systems.map((d, i) => (
-        <span key={i} style={{ fontSize: '0.72rem', background: '#f0ecff', border: '1px solid #d0c8f5', borderRadius: '8px', padding: '3px 9px', color: '#5B4FBE', fontWeight: 600 }} title={d.ingredient}>
-          ⚡ {d.label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-// ── Sunscreen Analysis Card ──────────────────────────────────────────────────
-function SunscreenAnalysisCard({ data }) {
-  const [open, setOpen] = useState(false);
-  if (!data) return null;
-  const sa = data.sunscreen_analysis;
-  if (!sa) return null;
-  const overallScore = sa.overall_score ?? 0;
-  const sunburnScore = sa.sunburn_score ?? 0;
-  const spf = sa.spf_estimate || '—';
-  const pa  = sa.pa_estimate  || '—';
-  const broad = sa.broad_spectrum;
-  const uvb = sa.uvb_covered;
-  const uva1 = sa.uva1_covered;
-  const uva2 = sa.uva2_covered;
-  const reefSafe = sa.reef_safe !== false;
-  const filters = sa.filters_detected || [];
-  const warnings = sa.warnings || [];
-  const flags = sa.flags || [];
-  const breakdown = sa.score_breakdown || {};
-
-  const pillStyle = (active, color) => ({
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-    background: active ? color + '22' : '#f0e8df',
-    color: active ? color : 'var(--text-sub)',
-    border: `1px solid ${active ? color + '55' : 'var(--border)'}`,
-  });
-  const overallColor = overallScore >= 85 ? 'var(--sage)' : overallScore >= 70 ? '#2D7FD3' : overallScore >= 55 ? 'var(--gold)' : overallScore >= 40 ? 'var(--orange)' : 'var(--red)';
-  const overallLabel = overallScore >= 85 ? 'Excellent' : overallScore >= 70 ? 'Good' : overallScore >= 55 ? 'Average' : overallScore >= 40 ? 'Weak' : 'Poor';
-
-  return (
-    <div className="sc-card result-card" data-testid="card-sunscreen-analysis" style={{ "--anim-delay": "0.2s", borderTop: "3px solid var(--dusty-rose)" }}>
-      <h2 className="card-title"><i className="fa-solid fa-sun"></i> Sunscreen Analysis</h2>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 120px', background: overallColor + '11', border: `1.5px solid ${overallColor}33`, borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: overallColor, lineHeight: 1 }}>{overallScore}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Overall Quality</div>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: overallColor, marginTop: '4px' }}>{overallLabel}</div>
-        </div>
-        <div style={{ flex: '1 1 100px', background: '#fff8f0', border: '1.5px solid var(--gold)', borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gold)', lineHeight: 1.2 }}>{spf}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Lab SPF</div>
-        </div>
-        <div style={{ flex: '1 1 100px', background: '#f0f8ff', border: '1.5px solid #5BA4CF', borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: '#2D7FD3', lineHeight: 1.2 }}>{pa}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Lab PA</div>
-        </div>
-        <div style={{ flex: '1 1 100px', background: '#fff5f5', border: '1.5px solid #e07070', borderRadius: '12px', padding: '12px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: '#C0392B', lineHeight: 1 }}>{sunburnScore}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Sunburn (UVB)</div>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-        <span style={pillStyle(uvb, '#2D7FD3')}><i className="fa-solid fa-circle fa-xs"></i> UVB</span>
-        <span style={pillStyle(uva1, '#267C36')}><i className="fa-solid fa-circle fa-xs"></i> UVA1</span>
-        <span style={pillStyle(uva2, '#A87373')}><i className="fa-solid fa-circle fa-xs"></i> UVA2</span>
-        <span style={pillStyle(broad, '#5B4FBE')}><i className={`fa-solid ${broad ? 'fa-check' : 'fa-xmark'}`}></i> {broad ? 'Broad Spectrum' : 'Not Broad Spectrum'}</span>
-        <span style={pillStyle(reefSafe, '#267C36')}><i className="fa-solid fa-fish"></i> {reefSafe ? 'Reef Safe' : 'Not Reef Safe'}</span>
-      </div>
-      <div style={{ marginBottom: '14px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-sub)', marginBottom: '4px' }}>
-          <span>Score Breakdown</span><span style={{ fontSize: '10px' }}>max 100</span>
-        </div>
-        <div style={{ display: 'flex', gap: '3px', height: '8px', borderRadius: '6px', overflow: 'hidden', background: 'var(--border)' }}>
-          {[
-            { label: 'UV Coverage', val: breakdown.uv_coverage ?? 0, max: 40, color: '#2D7FD3' },
-            { label: 'Filter Strength', val: breakdown.filter_strength ?? 0, max: 30, color: '#267C36' },
-            { label: 'Photostability', val: breakdown.photostability ?? 0, max: 20, color: '#C9A96E' },
-            { label: 'Formulation', val: breakdown.formulation ?? 0, max: 10, color: '#A87373' },
-          ].map(seg => (
-            <div key={seg.label} title={`${seg.label}: ${seg.val}/${seg.max}`}
-              style={{ width: `${(seg.val / 100) * 100}%`, background: seg.color, minWidth: seg.val > 0 ? '4px' : '0' }} />
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '6px' }}>
-          {[
-            { label: 'UV Coverage', val: breakdown.uv_coverage ?? 0, max: 40, color: '#2D7FD3' },
-            { label: 'Filter Strength', val: breakdown.filter_strength ?? 0, max: 30, color: '#267C36' },
-            { label: 'Photostability', val: breakdown.photostability ?? 0, max: 20, color: '#C9A96E' },
-            { label: 'Formulation', val: breakdown.formulation ?? 0, max: 10, color: '#A87373' },
-          ].map(seg => (
-            <span key={seg.label} style={{ fontSize: '10px', color: seg.color, fontWeight: 600 }}>{seg.label}: {seg.val}/{seg.max}</span>
-          ))}
-        </div>
-      </div>
-      {[...warnings, ...flags].length > 0 && (
-        <div style={{ marginBottom: '12px' }}>
-          {[...warnings, ...flags].map((w, i) => (
-            <div key={i} style={{ fontSize: '12px', padding: '7px 10px', borderRadius: '8px', marginBottom: '5px', background: w.startsWith('🚨') ? '#fff0f0' : '#fffaf0', border: `1px solid ${w.startsWith('🚨') ? '#f5c6cb' : '#fde8b0'}`, color: w.startsWith('🚨') ? '#721C24' : '#856404' }}>{w}</div>
-          ))}
-        </div>
-      )}
-      {filters.length > 0 && (
+      <div className="reveal-panel" data-open={open}>
         <div>
-          <button onClick={() => setOpen(!open)} style={{ background: 'none', border: 'none', padding: '6px 0', fontSize: '12px', color: 'var(--text-sub)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'} fa-xs`}></i>
-            UV Filters Detected ({filters.length})
-          </button>
-          {open && (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-              {filters.map((f, i) => (
-                <span key={i} style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '12px', background: 'var(--rose)', color: 'var(--dusty-rose-dark)', border: '1px solid var(--border)' }}>{f}</span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      <p style={{ fontSize: '10px', color: 'var(--text-sub)', marginTop: '12px', fontStyle: 'italic' }}>
-        SPF and PA are lab grades of the finished product. This card describes the filters. It does not assign either grade.
-      </p>
-    </div>
-  );
-}
-
-// ── Category-Specific Card 1 Headline Stats ──────────────────────────────────
-
-function SunscreenHeadlineStats({ result }) {
-  const sa = result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis;
-  const filterCount = sa?.filters_detected?.length ?? result.price_analysis?.active_count ?? 0;
-  const uvb = sa?.uvb_covered;
-  const uva1 = sa?.uva1_covered;
-  const uva2 = sa?.uva2_covered;
-  const spf = sa?.spf_estimate || '—';
-  const photostab = sa?.score_breakdown?.photostability ?? 0;
-  const photostabLabel = photostab >= 16 ? 'High' : photostab >= 10 ? 'Medium' : 'Low';
-  const spectrumLabel = (!uvb && !uva1 && !uva2) ? 'No coverage' :
-    (uvb && uva1 && uva2) ? 'Full broad spectrum' :
-    (uvb && (uva1 || uva2)) ? 'Broad spectrum' :
-    uvb ? 'UVB only' : 'Partial';
-
-  return (
-    <div className="price-grid-sep" data-testid="sunscreen-headline-stats">
-      <div className="pg-box"><div className="pg-val">{filterCount}</div><div className="pg-lbl">UV filters</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ fontSize: '0.75rem' }}>{spectrumLabel}</div><div className="pg-lbl">protection spectrum</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ color: photostab >= 16 ? '#267C36' : photostab >= 10 ? '#C9A96E' : '#D06030' }}>{photostabLabel}</div><div className="pg-lbl">photostability</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val" style={{ fontSize: '0.72rem' }}>{spf}</div><div className="pg-lbl">Lab SPF</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{uvb ? '✓' : '✗'}</div><div className="pg-lbl">UVB covered</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{uva1 ? '✓' : uva2 ? '~' : '✗'}</div><div className="pg-lbl">UVA covered</div></div>
-    </div>
-  );
-}
-
-/**
- * Read a component from the authoritative formulation breakdown.
- *
- * The headline stat cards used to derive from the legacy A-E component_scores,
- * which is now a lossy rescaling of the new rubric rather than a source of
- * truth. For a cleanser, component_scores.A was `formula_quality * 0.45` on the
- * old 0-100 scale, which has no fixed relationship to the new
- * "Surfactant Mildness 38.4/40" - so the card showed 0/10 "Harsh" for a formula
- * built entirely on gentle surfactants.
- *
- * formulation_breakdown carries the real per-component values and maxima, so
- * these cards now read from it directly.
- */
-function comp(result, key) {
-  const c = (result.formulation_breakdown || []).find((x) => x.key === key);
-  if (!c || !c.max) return null;
-  return { score: c.score, max: c.max, pct: (c.score / c.max) * 100, label: c.label };
-}
-
-function CleanserHeadlineStats({ result }) {
-  // Surfactant mildness is its own scored component for cleansers (40 pts).
-  const surf = comp(result, 'surfactant');
-  const ph = comp(result, 'ph');
-  const safetyIndex = surf ? Math.round(surf.pct) / 10 : null;
-  const safetyLabel = safetyIndex === null ? '—'
-    : safetyIndex >= 8 ? 'Gentle' : safetyIndex >= 6 ? 'Mild'
-    : safetyIndex >= 4 ? 'Moderate' : 'Harsh';
-  const safetyColor = safetyIndex === null ? 'var(--text-sub)'
-    : safetyIndex >= 8 ? '#267C36' : safetyIndex >= 6 ? '#2D7FD3'
-    : safetyIndex >= 4 ? '#C9A96E' : '#D06030';
-  // Read the engine's own note rather than guessing from a rescaled number.
-  const surfNote = (surf && (result.formulation_breakdown || [])
-    .find((x) => x.key === 'surfactant')?.notes?.[0]) || '';
-  const latherLabel = /sulfate|soap/i.test(surfNote)
-    ? 'High foam / stripping' : 'Gentle low-foam';
-
-  return (
-    <div className="price-grid-sep" data-testid="cleanser-headline-stats">
-      <div className="pg-box"><div className="pg-val" style={{ color: safetyColor }}>{safetyIndex === null ? '—' : `${safetyIndex}/10`}</div><div className="pg-lbl">surfactant safety</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ color: safetyColor, fontSize: '0.8rem' }}>{safetyLabel}</div><div className="pg-lbl">mildness</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ fontSize: '0.75rem' }}>{latherLabel}</div><div className="pg-lbl">lather profile</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.price_per_ml}</div><div className="pg-lbl">per ml</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div><div className="pg-lbl">vs average</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{ph ? `${Math.round(ph.pct)}%` : '—'}</div><div className="pg-lbl">pH suitability</div></div>
-    </div>
-  );
-}
-
-function MoisturizerHeadlineStats({ result }) {
-  // Barrier Recovery Index: from formula_quality component A (barrier-weighted for moisturizer)
-  const barrier = comp(result, 'barrier');
-  const barrierIndex = barrier ? Math.round(barrier.pct) : null;
-  const barrierLabel = barrierIndex === null ? '—'
-    : barrierIndex >= 75 ? 'Strong' : barrierIndex >= 50 ? 'Moderate' : 'Low';
-  const barrierColor = barrierIndex === null ? 'var(--text-sub)'
-    : barrierIndex >= 75 ? '#267C36' : barrierIndex >= 50 ? '#2D7FD3' : '#C9A96E';
-  return (
-    <div className="price-grid-sep pg-quad" data-testid="moisturizer-headline-stats">
-      <div className="pg-box">
-        <div className="pg-val" style={{ color: barrierColor, fontSize: '0.95rem' }}>{barrierLabel}</div>
-        <div className="pg-lbl">barrier{barrierIndex !== null ? ` · ${barrierIndex}%` : ''}</div>
-      </div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.price_per_ml}</div><div className="pg-lbl">per ml</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div><div className="pg-lbl">vs average</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.active_count}</div><div className="pg-lbl">actives found</div></div>
-    </div>
-  );
-}
-
-function FacialOilHeadlineStats({ result }) {
-  const meta = result.oil_metadata || {};
-  const oilDiversity   = meta.oil_diversity   ?? result.price_analysis?.active_count ?? 0;
-  const aoxCount       = meta.antioxidant_count ?? 0;
-  const faScore        = meta.fa_score   ?? 0;
-  const linoleic       = meta.linoleic_count ?? 0;
-  const oleic          = meta.oleic_count    ?? 0;
-
-  // Fatty acid balance label
-  const faLabel = linoleic > oleic ? 'Linoleic-rich' : oleic > linoleic ? 'Oleic-rich' : 'Balanced';
-  const faColor = faScore >= 35 ? '#267C36' : faScore >= 20 ? '#C9A96E' : '#D06030';
-
-  // Antioxidant shield label
-  const aoxLabel = aoxCount >= 5 ? 'High' : aoxCount >= 3 ? 'Medium' : aoxCount >= 1 ? 'Low' : 'None';
-  const aoxColor = aoxCount >= 5 ? '#267C36' : aoxCount >= 3 ? '#C9A96E' : aoxCount >= 1 ? '#E6A817' : '#D06030';
-
-  return (
-    <div className="price-grid-sep" data-testid="facialoil-headline-stats">
-      <div className="pg-box">
-        <div className="pg-val" style={{ fontSize: '0.8rem' }}>{oilDiversity}</div>
-        <div className="pg-lbl">oil diversity</div>
-      </div>
-      <div className="pg-box">
-        <div className="pg-val" style={{ color: aoxColor }}>{aoxCount}</div>
-        <div className="pg-lbl">oxidative shield</div>
-      </div>
-      <div className="pg-box">
-        <div className="pg-val" style={{ color: faColor, fontSize: '0.75rem' }}>{faLabel}</div>
-        <div className="pg-lbl">fatty acid type</div>
-      </div>
-      <div className="pg-box pg-bot">
-        <div className="pg-val">{result.price_analysis?.price_per_ml}</div>
-        <div className="pg-lbl">per ml</div>
-      </div>
-      <div className="pg-box pg-bot">
-        <div className="pg-val" style={{ color: '#267C36' }}>{result.price_analysis?.vs_average}</div>
-        <div className="pg-lbl">price premium</div>
-      </div>
-      <div className="pg-box pg-bot">
-        <div className="pg-val" style={{ color: aoxColor, fontSize: '0.75rem' }}>{aoxLabel}</div>
-        <div className="pg-lbl">antioxidant load</div>
-      </div>
-    </div>
-  );
-}
-
-function DefaultHeadlineStats({ result }) {
-  return (
-    <div className="price-grid-sep" data-testid="price-grid">
-      <div className="pg-box"><div className="pg-val">{result.price_analysis?.price_per_ml}</div><div className="pg-lbl">per ml</div></div>
-      <div className="pg-box"><div className="pg-val">{result.price_analysis?.category_avg}</div><div className="pg-lbl">category avg</div></div>
-      <div className="pg-box"><div className="pg-val" style={{ color: "#267C36" }}>{result.price_analysis?.vs_average}</div><div className="pg-lbl">vs average</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.price_per_active}</div><div className="pg-lbl">per active</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.active_count}</div><div className="pg-lbl">actives found</div></div>
-      <div className="pg-box pg-bot"><div className="pg-val">{result.price_analysis?.active_ratio}</div><div className="pg-lbl">active ratio <i className="fa-solid fa-circle-info" title="Percentage of total ingredients classified as therapeutic actives in the database" style={{ fontSize: "0.65rem", color: "var(--text-sub)", cursor: "help" }}></i></div></div>
-    </div>
-  );
-}
-
-// ── Treatment High Intensity Banner ──────────────────────────────────────────
-function TreatmentIntensityBanner({ result, concerns }) {
-  if (!result.is_high_intensity) return null;
-  const actives = result.high_intensity_actives || [];
-  const concernText = concerns?.length > 0 ? concerns.join(', ') : 'your selected concern';
-  return (
-    <div style={{
-      margin: '12px 0', padding: '12px 16px', borderRadius: '10px',
-      background: 'linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%)',
-      border: '1.5px solid #C9A96E', display: 'flex', gap: '12px', alignItems: 'flex-start',
-    }} data-testid="high-intensity-banner">
-      <i className="fa-solid fa-bolt" style={{ color: '#C9A96E', fontSize: '1.2rem', flexShrink: 0, marginTop: '2px' }}></i>
-      <div>
-        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#856404', marginBottom: '4px' }}>
-          High Intensity Formula
-        </div>
-        <div style={{ fontSize: '0.78rem', color: '#856404', lineHeight: '1.5' }}>
-          {actives.length > 0 && (
-            <span><strong>{actives.join(', ')}</strong> — a high-intensity active for rapid results. </span>
-          )}
-          May cause initial purging or dryness.{' '}
-          <strong>Best suited for: {concernText}.</strong>{' '}
-          Introduce slowly and always follow with SPF.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main ResultCards Component ────────────────────────────────────────────────
-export default function ResultCards({ result, concerns, skinType, currency, alternatives, altLoading, bestPrice, bestPriceLoading, bestPriceError, onRetryBestPrice, fetchInput, category, onUnlock, personalisePrompt, onAnswerQuestions, onSavePdf, pdfLocked, questionsOpen,
-  productName, brand, price, size, sizeUnit }) {
-  // Paid sections are stripped server-side, so the UI must branch on the
-  // tier the server reported rather than on whether a field happens to be
-  // truthy - an absent field is a locked state, not a zero.
-  const isLocked = result?.access?.tier === "free";
-  // Unlocked is not the same as answered. Without the four answers this
-  // section can only go on the skin type picked from a dropdown, which the
-  // reader already knows - so it says what it is waiting for instead.
-  const hasAnswers = (result?.personalisation?.level || "none") !== "none";
-  const [showBreakdown, setShowBreakdown] = useState(false);
-
-  const cat = (category || '').toLowerCase();
-  const isSunscreen   = cat === 'sunscreen';
-  const isCleanser    = cat === 'cleanser';
-  const isMoisturizer = cat === 'moisturizer' || cat === 'moisturiser';
-  const isFacialOil   = cat === 'facial oil' || cat === 'oil';
-  const isTreatment   = cat === 'treatment';
-  const isSerum       = cat === 'serum';
-  const isToner       = cat === 'toner';
-  const isMask        = cat === 'mask';
-  const isEyeCream    = cat === 'eye cream';
-
-  const valueChip = getValueChip(result.price_analysis?.value_tier, result.price_analysis?.ratio);
-
-  return (
-    <>
-      {/* CARD 1: MAIN WORTH SCORE */}
-      <div className="sc-card result-card card-1" data-testid="card-main-worth" style={{ "--anim-delay": "0s" }}>
-        <h2 className="card-title">
-          <i className={`fa-solid ${
-            isFacialOil   ? 'fa-droplet' :
-            isCleanser    ? 'fa-soap' :
-            isMoisturizer ? 'fa-shield-halved' :
-            isSunscreen   ? 'fa-sun' :
-            isTreatment   ? 'fa-flask-vial' :
-            isSerum       ? 'fa-chart-line' :
-            isToner       ? 'fa-tint' :
-            isMask        ? 'fa-spa' :
-            isEyeCream    ? 'fa-eye' :
-            'fa-chart-line'
-          }`}></i>
-          {/* The headline number is the FORMULATION score - how well the
-              product is made for its category. The previous per-category
-              names described something narrower than what is actually
-              measured: "Active Strength Index" on a figure that includes
-              tolerability, formulation integrity and evidence quality told
-              the user the wrong thing about their own result. Each title now
-              names the category and the thing being scored. */}
-          {isFacialOil  ? ' Facial Oil — Formulation Score'
-            : isCleanser    ? ' Cleanser — Formulation Score'
-            : isMoisturizer ? ' Moisturiser — Formulation Score'
-            : isSunscreen   ? ' Sunscreen — Formulation Score'
-            : isTreatment   ? ' Treatment — Formulation Score'
-            : isSerum       ? ' Serum — Formulation Score'
-            : isToner       ? ' Toner — Formulation Score'
-            : isMask        ? ' Mask — Formulation Score'
-            : isEyeCream    ? ' Eye Cream — Formulation Score'
-            : ' Formulation Score'}
-        </h2>
-
-        {/* Product identity leads, score sits to the right.
-            Previously the card opened with "Serum - Formulation Score" and the
-            product the user actually asked about never appeared as a heading,
-            while the plain-language verdict - the one thing no competitor
-            produces - sat underneath as small grey caption text. Name first,
-            verdict second, number alongside. */}
-        <div className="result-ident">
-          <div className="result-ident-text">
-            {(brand || category) && (
-              <div className="result-brand">
-                {[brand, categoryLabel(category)].filter(Boolean).join(' · ')}
-              </div>
-            )}
-            {productName && <h3 className="result-name">{productName}</h3>}
-            {(() => {
-              const bits = [];
-              if (price) bits.push(money(currency, price));
-              if (size) bits.push(`${size} ${sizeUnit || 'ml'}`);
-              const ppm = result.price_analysis?.price_per_ml;
-              if (ppm) bits.push(`${money(currency, ppm)} per ${sizeUnit === 'g' ? 'g' : 'ml'}`);
-              if (skinType) bits.push(`analysed for ${String(skinType).toLowerCase()} skin`);
-              return bits.length ? <div className="result-meta">{bits.join(' · ')}</div> : null;
-            })()}
+          <div className="onepct__body">
+            <p className="t-body-s c-secondary">Ingredients above about 1% are listed from most to least. Below that line, the order says nothing about amount. A guide to the list, not a measurement.</p>
+            {above.length > 0 && (<><p className="t-eyebrow c-positive">Above the line — usually the larger amounts</p>
+              <div className="row wrap">{above.map((x, i) => <span key={i} className="inci-chip">{x}</span>)}</div></>)}
+            <div className="onepct__rule"><span>≈ 1%{marker.ingredient ? ` · ${marker.ingredient}` : ""}</span></div>
+            {below.length > 0 && (<><p className="t-eyebrow c-tertiary">From here on — order does not show the amount</p>
+              <div className="row wrap">{below.map((x, i) => <span key={i} className="inci-chip inci-chip--muted">{x}</span>)}</div></>)}
           </div>
-          <ScoreCircle score={result.main_worth_score} />
         </div>
+      </div>
+    </div>
+  );
+}
 
-        <div className="score-header">
-          <div className="score-meta">
-            <TierBadge tier={result.main_worth_tier} score={result.main_worth_score} />
-            {/* Treatment high intensity badge — inline in score-meta */}
-            {isTreatment && result.is_high_intensity && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700, background: '#fff3cd', color: '#856404', border: '1px solid #C9A96E', borderRadius: '8px', padding: '3px 9px', marginBottom: '4px' }}>
-                <i className="fa-solid fa-bolt"></i> High Intensity Formula
-              </span>
-            )}
-            {result.price_analysis?.value_tier && result.price_analysis.value_tier !== 'fair' && (
-              <div style={{ color: valueChip.color, fontSize: "0.75rem", fontWeight: 600, marginBottom: "4px" }}>
-                {result.price_analysis.value_tier === 'overpriced'
-                  ? `Priced ${result.price_analysis.vs_average} above the category average`
-                  : result.price_analysis.value_tier === 'slightly_overpriced'
-                  ? `Slightly above category average (${result.price_analysis.vs_average})`
-                  : result.price_analysis.value_tier === 'underpriced'
-                  ? `Priced below category average — good value`
-                  : null}
-              </div>
-            )}
-            <p className="score-title-text">{result.score_title}</p>
-            {/* Score confidence badge — replaced for facial oils with lipid-phase note */}
-            {isFacialOil ? (
-              <div style={{ fontSize: '0.68rem', marginTop: '6px', padding: '4px 9px',
-                borderRadius: '8px', background: '#f5f5f0',
-                border: '1px solid #d0c8b0', color: '#7A7168',
-                display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
-                <i className="fa-solid fa-circle-info fa-xs" style={{ flexShrink: 0 }}></i>
-                <span style={{ lineHeight: '1.3' }}>
-                  Concentration estimated via INCI rank & lipid-phase modeling
+export function IngredientsCard({ result, category }) {
+  const { isFacialOil, isSunscreen, isMask, isSerum, isTreatment, isMoisturizer, isToner } = catFlags(category);
+  const actives = result.identified_actives || [];
+  const conflicts = result.ingredient_conflicts;
+  const ph = result.ph_analysis;
+  const showPh = !isFacialOil && !isSunscreen && !isMask && ph?.ph_range;
+  const showOnePct = isSerum || isTreatment || isMoisturizer || isToner;
+  const anyStated = actives.some((a) => a.concentration_known);
+  const count = result.ingredient_count;
+
+  return (
+    <Card eyebrow="Ingredients" title={isFacialOil ? "Botanicals, ranked by evidence" : "Actives, ranked by evidence"}
+          sub={anyStated ? "Green amounts are stated by the brand. Everything else is estimated from the ingredient’s place in the list."
+            : "Amounts are estimated from each ingredient’s place in the list."}
+          aside={count ? <Badge>{count} ingredients</Badge> : null}
+          data-testid="ingredients-card">
+      {actives.length > 0 ? (
+        <div className="itable" role="table" aria-label="Identified actives">
+          <div className="itable__head" role="row">
+            <span role="columnheader">#</span><span role="columnheader">{isFacialOil ? "Contributor" : "Ingredient"}</span>
+            <span role="columnheader">Evidence</span><span role="columnheader">Amount</span>
+          </div>
+          {actives.map((a, i) => {
+            const [tone, label] = evidenceBadge(a.evidence);
+            const what = benefitText(a.primary_benefits || a.functional_category);
+            const stated = a.concentration_known && a.concentration_pct != null;
+            return (
+              <div className="itable__row" role="row" key={`${a.name}-${i}`}>
+                <span className="itable__pos t-mono" role="cell" title="Position in the ingredient list">{a.position != null ? String(a.position).padStart(2, "0") : "—"}</span>
+                <div className="itable__main" role="cell">
+                  <p className="itable__name">
+                    <span>{a.name}</span>
+                    <MechanismTip text={a.mechanism_of_action} />
+                    {a.activity_tier && <span className="tier-tag">{a.activity_tier.split(":")[0]}</span>}
+                  </p>
+                  {what && <p className="t-caption c-secondary">{what}</p>}
+                  {a.targets?.filter((t) => t && t.trim()).length > 0 && (
+                    <div className="row wrap itable__targets">
+                      {a.targets.filter((t) => t && t.trim()).map((t) => <span key={t} className="inci-chip">{t}</span>)}
+                    </div>
+                  )}
+                  {a.mw_depth && <p className="t-caption c-tertiary">{a.mw_depth}</p>}
+                  {a.provenance?.source && (
+                    <p className="t-mono-s c-tertiary">
+                      {[a.provenance.evidence_level, a.provenance.source, a.provenance.reviewed_at && `reviewed ${a.provenance.reviewed_at}`].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+                <span className="itable__ev" role="cell"><Badge tone={tone} title={a.evidence}>{label}</Badge></span>
+                <span className={cx("itable__amt", stated && "itable__amt--stated")} role="cell">
+                  {stated ? <><Check aria-hidden="true" />{a.concentration_pct}% stated</> : (a.concentration || "Estimated")}
                 </span>
               </div>
-            ) : result.score_confidence && (
-              <div style={{ fontSize: '0.68rem', marginTop: '6px', padding: '4px 9px', borderRadius: '8px',
-                background: result.score_confidence_level === 'medium' ? '#f0faf2' : '#faf8f3',
-                border: `1px solid ${result.score_confidence_level === 'medium' ? '#a8dab5' : 'var(--border)'}`,
-                color: result.score_confidence_level === 'medium' ? '#1a5c2a' : '#7A7168',
-                display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
-                <i className={`fa-solid ${result.score_confidence_level === 'medium' ? 'fa-circle-check' : 'fa-circle-info'} fa-xs`}
-                  style={{ flexShrink: 0 }}></i>
-                <span style={{ lineHeight: '1.3' }}>{result.score_confidence}</span>
-              </div>
-            )}
-            {result.worth_multipliers_applied?.length > 0 && (
-              <p className="multipliers">Bonus: {result.worth_multipliers_applied.join(", ")}</p>
-            )}
-          </div>
+            );
+          })}
         </div>
+      ) : (
+        <Callout tone="neutral" title="No recognised actives">
+          <p className="callout__text">Nothing in this list is in our database as an active ingredient. The score above reflects the base formula.</p>
+        </Callout>
+      )}
 
-        {/* Treatment high-intensity banner — full width below score header */}
-        {isTreatment && <TreatmentIntensityBanner result={result} concerns={concerns} />}
-
-        {/* Category-specific headline stats */}
-        {isSunscreen   && <SunscreenHeadlineStats   result={result} />}
-        {isCleanser    && <CleanserHeadlineStats    result={result} />}
-        {isMoisturizer && <MoisturizerHeadlineStats result={result} />}
-        {isFacialOil   && <FacialOilHeadlineStats   result={result} />}
-        {!isSunscreen && !isCleanser && !isMoisturizer && !isFacialOil && (
-          <DefaultHeadlineStats result={result} />
-        )}
-
-        {result.price_analysis?.price_note && (
-          <div className="price-note" data-testid="price-note">
-            <i className="fa-solid fa-info-circle"></i> {result.price_analysis.price_note}
-          </div>
-        )}
-
-        {/* Value and personal advisories sit ABOVE the collapsed breakdown on
-            purpose. Price is shown next to the quality score rather than inside
-            it, and a pregnancy advisory must never be hidden behind a toggle
-            the user has to discover. */}
-        <ValueCard value={result.value_assessment} currency={currency} />
-        <AdvisoryFlags flags={result.advisory_flags} />
-
-        <button className="breakdown-toggle" data-testid="breakdown-toggle" onClick={() => setShowBreakdown(!showBreakdown)} aria-expanded={showBreakdown}>
-          {showBreakdown ? "Hide" : "Show"} Analysis Details {showBreakdown ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
-        </button>
-        <div className={"breakdown" + (showBreakdown ? " open" : "")} data-testid="breakdown-details">
-          {/* Category-aware breakdown. Components and weights come from the
-              backend rubric for this product type, so a cleanser is judged on
-              surfactant mildness and a sunscreen on its filter system, rather
-              than every category being forced through the same five bars.
-              These always sum to the headline score. */}
-          <FormulationBreakdown result={result} />
-          <ConfidenceNote
-            level={result.formulation_confidence}
-            note={result.formulation_confidence_note} />
-          <FormulationFlags flags={result.formulation_flags} />
+      {result.delivery_systems?.length > 0 && (
+        <div className="row wrap delivery">
+          <span className="t-label-s c-secondary">Advanced delivery:</span>
+          {result.delivery_systems.map((d, i) => <Badge key={i} tone="info" title={d.ingredient}>{d.label}</Badge>)}
         </div>
+      )}
 
-        {result.red_flags?.length > 0 && (
-          <div className="red-flags-section" data-testid="red-flags-section">
-            <h4 className="red-flags-title"><i className="fa-solid fa-triangle-exclamation"></i> Worth Red Flags</h4>
-            <ul className="red-flags-list">
-              {(result.red_flags || []).map((rf, i) => <li key={i} data-testid={`red-flag-${i}`}>{rf}</li>)}
-            </ul>
-          </div>
-        )}
-
-        {/* Ingredient Breakdown Table */}
-        {result.identified_actives?.length > 0 && (
-          <div style={{ marginTop: "1rem" }}>
-            <IngredientBreakdownTable actives={result.identified_actives} isFacialOil={isFacialOil} />
-          </div>
-        )}
-
-        {/* Delivery systems badge */}
-        <DeliveryBadge systems={result.delivery_systems} />
-
-        {/* 1% Line Visualiser — hidden for facial oils (pure oil formulas have no water phase) */}
-        {/* INCI 1% line: serum, treatment, moisturizer, toner only */}
-        {(isSerum || isTreatment || isMoisturizer || isToner) && (
-          <OnePercentVisualiser marker={result.one_percent_marker} hideForOil={false} />
-        )}
-
-        {/* Ingredient conflicts */}
-        <ConflictsSection conflicts={result.ingredient_conflicts} />
-
-        {/* pH inference */}
-        {/* pH: always for serum/treatment/toner; optional (data-gated) for moisturizer; hidden for oil/sunscreen/mask */}
-        {!isFacialOil && !isSunscreen && !isMask && (
-          <PhAnalysisSection ph={result.ph_analysis} />
-        )}
+      <div className="stack" style={{ "--stack-gap": "12px", marginTop: 24 }}>
+        {showOnePct && <OnePercentLine marker={result.one_percent_marker} />}
+        <Conflicts conflicts={conflicts} />
+        {showPh && <PhNote ph={ph} />}
       </div>
+    </Card>
+  );
+}
 
-      {/* The invitation sits directly under the score it would sharpen.
-          It used to be the first thing in the results section - four questions
-          in front of the answer the reader came for. */}
-      {personalisePrompt}
-
-      {/* CARD 2: SUITABILITY — paid.
-          Previously two cards, "Skin Concern Fit" and "<Type> Skin
-          Compatibility", which read as the same card because their content
-          largely was: the engine emits four overlapping lists and both drew
-          from them, so one ingredient could be named three times on one
-          screen. SuitabilityCard answers the two questions that are actually
-          different - does it do the job you want, and will it cause you
-          problems - and deduplicates the lists against each other.
-
-          When locked these fields are absent from the response entirely, so
-          this must be an explicit state rather than a render of undefined. */}
-      {isLocked && (
-        <LockedCard
-          title="How this suits you"
-          icon="fa-solid fa-user-check"
-          access={result.access}
-          lines={[
-            ...(result.access?.preview?.concern_names || ["Your selected concerns"])
-              .map((c) => `How well it treats ${c}`),
-            `Whether it suits ${String(skinType || "your").toLowerCase()} skin`,
-            "Irritation and pore-clogging risk",
-          ]}
-          onUnlock={onUnlock}
-        />
-      )}
-      {!isLocked && !hasAnswers && !questionsOpen && (
-        <div className="sc-card result-card suitability-waiting"
-             data-testid="suitability-waiting">
-          <h2 className="card-title">
-            <i className="fa-solid fa-user-check"></i> How this suits you
-          </h2>
-          <p className="suit-waiting-lede">
-            This can go further than the skin type you picked. It needs four
-            answers: skin tone, climate, what you react to, and what you
-            already use.
-          </p>
-          <ul className="suit-waiting-list">
-            <li>Dark-mark risk needs your skin tone</li>
-            <li>Whether the texture will work needs your climate</li>
-            <li>Ingredients to avoid need to know what you react to</li>
-            <li>Clashes and duplication need your current routine</li>
-          </ul>
-          <button className="btn btn-primary suit-waiting-cta"
-                  onClick={onAnswerQuestions} data-testid="suitability-answer">
-            <i className="fa-solid fa-wand-magic-sparkles"></i> Answer them now
-          </button>
-        </div>
-      )}
-      {!isLocked && hasAnswers && <SuitabilityCard result={result} skinType={skinType} />}
-
-      {/* CARD 2B: SUNSCREEN ANALYSIS — shown when Sun Protection selected OR category is sunscreen */}
-      {!isLocked && result.skin_concern_fit?.['Sun Protection']?.sunscreen_analysis && (
-        <SunscreenAnalysisCard data={result.skin_concern_fit['Sun Protection']} />
-      )}
-
-      <div className="export-row no-print">
-        <button
-          className="export-btn"
-          type="button"
-          data-testid="export-btn"
-          onClick={pdfLocked ? onUnlock : onSavePdf}
-        >
-          <i className="fa-solid fa-file-arrow-down"></i> Save as PDF
-        </button>
-        <p className="export-note">The product PDF is included once you buy a credit pack. The 4 sign-in credits do not include it.</p>
-      </div>
-
-      {/* What to use alongside this one. Free: derived from the product's
-          own actives, not from the reader. */}
-      <PairingsCard pairings={result.pairs_well_with} />
-
-      {/* CARD 4A: ALTERNATIVES */}
-      <AlternativesCard result={result} concerns={concerns} alternatives={alternatives} altLoading={altLoading} currency={currency} category={category} />
-
-      {/* CARD 4B: BEST PRICE */}
-      <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
-        bestPriceError={bestPriceError} onRetry={onRetryBestPrice}
-        currency={currency} fetchInput={fetchInput} />
-
+function Conflicts({ conflicts }) {
+  if (!Array.isArray(conflicts)) return null;
+  if (conflicts.length === 0) {
+    return (
+      <Callout tone="positive" title="No clashes found">
+        <p className="callout__text">None of the actives in this formula work against each other. Layering with other products is a separate question.</p>
+      </Callout>
+    );
+  }
+  const tone = { high: "negative", moderate: "caution", low: "info" };
+  return (
+    <>
+      {conflicts.map((c, i) => (
+        <Callout key={i} tone={tone[c.severity] || "info"} title={c.severity === "high" ? "Clash inside this formula" : "Worth knowing"}
+                 aside={c.severity ? `${c.severity} severity` : null}>
+          <p className="callout__text">{c.message}</p>
+        </Callout>
+      ))}
     </>
   );
 }
 
-/**
- * How the scoring works.
- *
- * Exported separately so it can be placed last on the page, after the
- * comparison. It is reference material: useful once someone has read a result
- * and wants to know how much weight to put on it, and in the way before that.
- */
-export function MethodCard() {
+function PhNote({ ph }) {
+  const warn = (ph.warnings || []).length > 0 || /too high|outside the range/.test(ph.headline || "");
   return (
-    <div className="disclaimer" data-testid="disclaimer">
-      <div className="disclaimer-title"><i className="fa-solid fa-circle-info"></i> How scores are calculated</div>
-      <ul className="disclaimer-list">
-        <li><strong>Scores are estimates</strong> based on INCI ingredient position and clinical evidence.</li>
-        <li><strong>Amounts are estimated</strong> from list order. Ingredients above 1% are listed from most to least. A stated percentage is used only when the product page gives one.</li>
-        <li><strong>pH is directional</strong>, inferred from the buffering ingredients in the formula.</li>
-        <li><strong>Ingredient conflicts</strong> are within the single formula only — always patch test new products.</li>
-        <li><strong>Not medical advice.</strong> This tool is for educational use only. Consult a dermatologist for personalised skin concerns.</li>
+    <Callout tone={warn ? "caution" : "info"} icon={TestTube}
+             title={`Estimated pH ${ph.ph_range[0]}–${ph.ph_range[1]}`}
+             aside={ph.confidence === "medium" ? "Medium confidence" : "Estimate"}>
+      {ph.headline && <p className="callout__text">{ph.headline}</p>}
+      {(ph.notes || []).length > 0 && <ul className="callout__list">{ph.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+      {(ph.warnings || []).map((w, i) => <p key={i} className="callout__text" style={{ color: "var(--status-caution)" }}>{w}</p>)}
+      <p className="callout__text t-caption">Inferred from the buffering ingredients — not a lab measurement.</p>
+    </Callout>
+  );
+}
+
+/* ----------------------------------------------------------- Sunscreen */
+
+export function SunscreenCard({ data }) {
+  const [open, setOpen] = useState(false);
+  const sa = data?.sunscreen_analysis;
+  if (!sa) return null;
+  const b = sa.score_breakdown || {};
+  const filters = sa.filters_detected || [];
+  const notes = [...(sa.warnings || []), ...(sa.flags || [])];
+  const reefSafe = sa.reef_safe !== false;
+  const cov = [["UVB", sa.uvb_covered], ["UVA1", sa.uva1_covered], ["UVA2", sa.uva2_covered], ["Broad spectrum", sa.broad_spectrum], ["Reef-safe filters", reefSafe]];
+  return (
+    <Card eyebrow="Sunscreen" title="Filter system" sub="SPF and PA are lab grades of the finished product. This describes the filters; it doesn’t assign either grade."
+          aside={<ScoreRing score={sa.overall_score ?? 0} size="sm" animate={false} label="Filter quality" />}
+          data-testid="card-sunscreen-analysis">
+      <div className="stats" style={{ "--stat-cols": 3, marginBottom: 20 }}>
+        <StatTile label="Filter quality" value={sa.overall_score ?? "—"} note="Out of 100" />
+        <StatTile label="Lab SPF (on pack)" value={sa.spf_estimate || "—"} textValue />
+        <StatTile label="Lab PA (on pack)" value={sa.pa_estimate || "—"} textValue />
+      </div>
+      <div className="row wrap" style={{ marginBottom: 20 }}>
+        {cov.map(([label, ok]) => (
+          <span key={label} className={cx("cov", ok ? "cov--on" : "cov--off")}>{ok ? <Check aria-hidden="true" /> : <X aria-hidden="true" />}{label}</span>
+        ))}
+      </div>
+      <div className="parts">
+        {[["UV coverage", b.uv_coverage, 40], ["Filter strength", b.filter_strength, 30], ["Photostability", b.photostability, 20], ["Formulation", b.formulation, 10]].map(([l, v, m]) => (
+          <Meter key={l} label={l} value={`${v ?? 0} / ${m}`} pct={((v ?? 0) / m) * 100} />
+        ))}
+      </div>
+      {notes.length > 0 && (
+        <div className="stack" style={{ "--stack-gap": "10px", marginTop: 20 }}>
+          {notes.map((w, i) => (
+            <Callout key={i} tone={w.startsWith("🚨") ? "negative" : "caution"}>
+              <p className="callout__text">{w.replace(/^[^\p{L}\p{N}]+/u, "")}</p>
+            </Callout>
+          ))}
+        </div>
+      )}
+      {filters.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <button type="button" className="link" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            UV filters found ({filters.length})<ChevronDown aria-hidden="true" style={{ transform: open ? "rotate(180deg)" : "none" }} />
+          </button>
+          <div className="reveal-panel" data-open={open}>
+            <div><div className="row wrap" style={{ paddingTop: 12 }}>{filters.map((f) => <span key={f} className="inci-chip">{f}</span>)}</div></div>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------- Method */
+
+export function MethodNote() {
+  return (
+    <section className="method-note" data-testid="disclaimer">
+      <p className="t-label-s"><CircleCheck aria-hidden="true" />How scores are calculated</p>
+      <ul>
+        <li><strong>Scores are estimates</strong> from each ingredient’s position and published clinical evidence.</li>
+        <li><strong>Amounts are estimated</strong> from list order unless the product page states a percentage.</li>
+        <li><strong>pH is directional</strong>, inferred from the buffering ingredients.</li>
+        <li><strong>Clashes are checked within this formula only</strong> — always patch test something new.</li>
+        <li><strong>Not medical advice.</strong> For a skin condition, see a dermatologist.</li>
       </ul>
-    </div>
+      <p className="t-caption c-tertiary">Price is shown separately and never changes the formulation score.</p>
+    </section>
   );
 }

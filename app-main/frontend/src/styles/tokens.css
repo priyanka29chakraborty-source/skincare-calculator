@@ -1,0 +1,161 @@
+/*
+ * Urancal design tokens.
+ *
+ * One-to-one with the Figma variables in "Urancal — Design System & Redesign"
+ * (Primitives / Color / Spacing / Radius / Motion). Components reference the
+ * semantic names only; primitives exist so the semantic layer can be re-pointed
+ * (for example to a dark theme) without touching a component.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Primitives --------------------------------------------------- */
+  --white: #ffffff;
+  --porcelain-50: #fbf9f6;
+  --porcelain-100: #f5f1eb;
+  --porcelain-200: #ece6dd;
+  --porcelain-300: #ddd5c9;
+  --stone-400: #b5ac9f;
+  --stone-500: #776f65;
+  --stone-600: #6b645b;
+  --ink-700: #3d3832;
+  --ink-800: #2e2a25;
+  --ink-850: #24201c;
+  --ink-900: #1b1916;
+  --ink-950: #12100e;
+  --rose-50: #faf1ee;
+  --rose-100: #f3e1db;
+  --rose-200: #e7c3b8;
+  --rose-400: #c98b79;
+  --rose-500: #b06a57;
+  --rose-600: #96543f;
+  --rose-700: #7a4232;
+  --sage-50: #eef3ee;
+  --sage-400: #7fa487;
+  --sage-600: #4e7a5a;
+  --sage-700: #3f6b4b;
+  --sage-800: #2f5a3e;
+  --amber-50: #fbf3e2;
+  --amber-400: #d9a84e;
+  --amber-600: #b07a22;
+  --amber-800: #7e5512;
+  --clay-600: #c0653a;
+  --garnet-50: #f8e9e6;
+  --garnet-400: #d9786c;
+  --garnet-600: #b23a2e;
+  --garnet-800: #8c2a21;
+  --slate-50: #ecf0f4;
+  --slate-400: #8ea6bd;
+  --slate-600: #3e5c7a;
+
+  /* ---- Semantic colour ---------------------------------------------- */
+  --bg-canvas: var(--porcelain-50);
+  --bg-subtle: var(--porcelain-100);
+  --bg-muted: var(--porcelain-200);
+  --bg-surface: var(--white);
+  --bg-inverse: var(--ink-950);
+  --bg-inverse-raised: var(--ink-850);
+  --bg-accent-subtle: var(--rose-50);
+  --bg-accent: var(--rose-600);
+  --bg-accent-hover: var(--rose-700);
+
+  --text-primary: var(--ink-900);
+  --text-secondary: var(--stone-600);
+  --text-tertiary: var(--stone-500);
+  --text-inverse: var(--porcelain-50);
+  --text-inverse-secondary: var(--stone-400);
+  --text-inverse-accent: var(--rose-200);
+  --text-accent: var(--rose-600);
+  --text-on-accent: var(--white);
+
+  --border-subtle: var(--porcelain-200);
+  --border-default: var(--porcelain-300);
+  --border-strong: var(--stone-400);
+  --border-focus: var(--ink-900);
+  --border-accent: var(--rose-500);
+  --border-inverse: var(--ink-700);
+
+  --action-primary: var(--ink-900);
+  --action-primary-hover: var(--ink-800);
+  --action-on-primary: var(--porcelain-50);
+
+  --status-positive: var(--sage-700);
+  --status-positive-subtle: var(--sage-50);
+  --status-caution: var(--amber-800);
+  --status-caution-subtle: var(--amber-50);
+  --status-negative: var(--garnet-600);
+  --status-negative-subtle: var(--garnet-50);
+  --status-info: var(--slate-600);
+  --status-info-subtle: var(--slate-50);
+
+  --score-excellent: var(--sage-800);
+  --score-good: var(--sage-600);
+  --score-fair: var(--amber-600);
+  --score-weak: var(--clay-600);
+  --score-poor: var(--garnet-600);
+  --score-track: var(--porcelain-200);
+
+  --ad-slot: var(--porcelain-100);
+  --ad-label: var(--stone-500);
+
+  /* ---- Type --------------------------------------------------------- */
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* ---- Space (4px rhythm) ------------------------------------------- */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+  --space-4xl: 40px;
+  --space-5xl: 48px;
+  --space-6xl: 64px;
+  --space-7xl: 80px;
+  --space-8xl: 96px;
+  --space-9xl: 128px;
+
+  /* ---- Radius ------------------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* ---- Elevation ---------------------------------------------------- */
+  --elevation-1: 0 1px 2px rgba(27, 25, 22, 0.04);
+  --elevation-2: 0 2px 4px rgba(27, 25, 22, 0.04), 0 12px 32px -8px rgba(27, 25, 22, 0.08);
+  --elevation-3: 0 4px 8px rgba(27, 25, 22, 0.06), 0 32px 72px -16px rgba(27, 25, 22, 0.18);
+  --focus-ring: 0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--border-focus);
+  --focus-halo: 0 0 0 4px var(--porcelain-200);
+
+  /* ---- Motion ------------------------------------------------------- */
+  --duration-instant: 80ms;
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 360ms;
+  --duration-reveal: 600ms;
+  --duration-score: 900ms;
+  --stagger-cards: 60ms;
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --easing-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --easing-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---- Layout ------------------------------------------------------- */
+  --page-max: 1280px;
+  --gutter: 80px;
+  --appbar-h: 61px;
+}
+
+@media (max-width: 1100px) {
+  :root { --gutter: 40px; }
+}
+@media (max-width: 640px) {
+  :root { --gutter: 20px; --appbar-h: 57px; }
+}
