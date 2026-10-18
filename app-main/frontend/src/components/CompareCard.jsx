@@ -1,15 +1,19 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  CircleCheck, Copy, FileDown, FlaskConical, GitCompare, Lock, Plus, Tag, TriangleAlert, X,
+} from "lucide-react";
 
-import { money, categoryLabel } from "../constants";
+import { money, categoryLabel, SIZE_UNITS, toMl } from "../constants";
 import { API, api, describeError } from "../api";
 import { track } from "../track";
+import { Badge, Button, Callout, Card, ScoreRing, Select, cx } from "./ds";
 
 const MAX_PRODUCTS = 4;
 
 const EMPTY = {
   product_name: "", brand: "", category: "Serum",
-  price: "", size_ml: "", ingredients: "",
+  price: "", size: "", size_unit: "ml", ingredients: "",
 };
 
 const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
@@ -18,7 +22,8 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
 /**
  * Two to four products side by side.
  *
- * Paid. Two credits cover this pair. Opening the same pair again does not
+ * Paid. One credit per product compared (two for a pair), and it needs an
+ * account. Opening the same set of products again does not
  * spend another. A single product's formulation score stays free.
  *
  * The first version of this was a scoreboard - two numbers and a winner. That
@@ -34,16 +39,18 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
  * plainly as a result, because a stated limit is more useful than a confident
  * guess.
  */
-export default function CompareCard({ seed, currency, skinType, concerns, onUnlock }) {
-  const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState(null);
+export default function CompareCard({ seed, currency, skinType, concerns, onUnlock, onSignIn, autoOpen, signedIn }) {
+  const initialRows = () => [seed ? { ...EMPTY, ...seed } : { ...EMPTY }, { ...EMPTY }];
+  const [open, setOpen] = useState(Boolean(autoOpen));
+  const [rows, setRows] = useState(autoOpen ? initialRows : null);
+  const count = rows ? rows.length : 2;
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   function start() {
     setOpen(true);
-    setRows(rows || [seed ? { ...EMPTY, ...seed } : { ...EMPTY }, { ...EMPTY }]);
+    setRows(rows || initialRows());
   }
 
   function update(i, field, value) {
@@ -56,6 +63,18 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
 
   function removeRow(i) {
     setRows((prev) => (prev.length <= 2 ? prev : prev.filter((_, j) => j !== i)));
+  }
+
+  // Check the form before asking anyone to sign in or spend a credit.
+  function checkAndRun() {
+    const missing = (rows || []).findIndex((r) => !String(r.ingredients || "").trim());
+    if (missing >= 0) {
+      setError(`Add the ingredient list for product ${missing + 1} — every product needs one.`);
+      return;
+    }
+    setError("");
+    if (signedIn) run();
+    else onSignIn?.(() => run());
   }
 
   async function run() {
@@ -72,7 +91,7 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
           brand: r.brand,
           category: r.category,
           price: parseFloat(r.price) || 0,
-          size_ml: parseFloat(r.size_ml) || 0,
+          size_ml: toMl(r.size, r.size_unit),
           ingredients: r.ingredients,
           currency,
         })),
@@ -86,136 +105,123 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
 
   if (!open) {
     return (
-      <div className="card compare-prompt no-print" data-testid="compare-prompt">
-        <div>
-          <div className="card-label">Compare products</div>
-          <p className="compare-lede">
-            Two to four products side by side. Two credits cover this comparison.
-            Opening the same pair again does not spend another two.
-          </p>
-        </div>
-        <button className="btn btn-primary compare-start" onClick={start}
-                data-testid="compare-start">
-          <i className="fa-solid fa-scale-balanced"></i> Compare
-        </button>
-      </div>
+      <Card eyebrow="Compare" title="Compare with another product" className="no-print" data-testid="compare-prompt"
+            sub="Two to four products side by side. Comparing starts at 2 credits — 2 for two products, 3 for three, 4 for four. Opening the same products again is free."
+            aside={<Button variant="secondary" icon={<GitCompare />} onClick={start} data-testid="compare-start">Compare</Button>} />
     );
   }
 
   return (
-    <div className="card compare-card" data-testid="compare-card">
-      <div className="card-label">Compare products</div>
-
-      <div className="compare-inputs no-print">
+    <div className="stack" style={{ "--stack-gap": "24px" }} data-testid="compare-card">
+      <div className="stack no-print" style={{ "--stack-gap": "16px" }}>
         {(rows || []).map((row, i) => (
-          <div className="compare-input-row" key={i}>
-            <div className="compare-input-head">
-              <span className="field-sublabel">Product {i + 1}</span>
+          <section className="card compare-product" key={i} aria-label={`Product ${i + 1}`}>
+            <header className="row-between" style={{ marginBottom: 20 }}>
+              <p className="t-heading-m">Product {i + 1}</p>
               {rows.length > 2 && (
-                <button className="history-forget" onClick={() => removeRow(i)}
-                        aria-label={`Remove product ${i + 1}`}>
-                  <i className="fa-solid fa-xmark"></i>
-                </button>
+                <Button variant="ghost" size="sm" className="btn--icon" icon={<X />} onClick={() => removeRow(i)}
+                        aria-label={`Remove product ${i + 1}`} />
               )}
-            </div>
+            </header>
             <div className="form-grid">
-              <div className="field-group">
-                <label className="field-label">Name</label>
-                <input className="field-input" value={row.product_name}
-                       onChange={(e) => update(i, "product_name", e.target.value)}
-                       placeholder="e.g. Niacinamide 10%" />
+              <div className="field-row">
+                <label className="field"><span className="field__label">Name</span>
+                  <span className="field__control"><input value={row.product_name} onChange={(e) => update(i, "product_name", e.target.value)} placeholder="e.g. Niacinamide 10%" /></span>
+                </label>
+                <label className="field"><span className="field__label">Brand</span>
+                  <span className="field__control"><input value={row.brand} onChange={(e) => update(i, "brand", e.target.value)} placeholder="e.g. Minimalist" data-testid={`compare-brand-${i}`} /></span>
+                </label>
               </div>
-              <div className="field-group">
-                <label className="field-label">Brand</label>
-                <input className="field-input" value={row.brand}
-                       onChange={(e) => update(i, "brand", e.target.value)}
-                       placeholder="e.g. Minimalist"
-                       data-testid={`compare-brand-${i}`} />
+              <div className="field-row field-row--3">
+                <div className="field"><span className="field__label" id={`cmp-${i}-category-label`}>Category</span>
+                  <Select id={`cmp-${i}-category`} labelledBy={`cmp-${i}-category-label`} value={row.category}
+                          onChange={(v) => update(i, "category", v)}
+                          options={CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))} />
+                </div>
+                <label className="field"><span className="field__label">Price</span>
+                  <span className="field__control"><input type="number" min="0" inputMode="decimal" value={row.price} onChange={(e) => update(i, "price", e.target.value)} placeholder="549" /></span>
+                </label>
+                <div className="field"><label className="field__label" htmlFor={`cmp-${i}-size`}>Size</label>
+                  <div className="field-inline">
+                    <span className="field__control">
+                      <input id={`cmp-${i}-size`} type="number" min="0" inputMode="decimal" value={row.size}
+                             onChange={(e) => update(i, "size", e.target.value)} placeholder="30" />
+                    </span>
+                    <Select className="field__unit" value={row.size_unit} onChange={(v) => update(i, "size_unit", v)}
+                            options={SIZE_UNITS} ariaLabel={`Size unit for product ${i + 1}`} />
+                  </div>
+                </div>
               </div>
-              <div className="field-group">
-                <label className="field-label">Category</label>
-                <select className="field-select full-w" value={row.category}
-                        onChange={(e) => update(i, "category", e.target.value)}>
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
-                </select>
-              </div>
-              <div className="field-group">
-                <label className="field-label">Price</label>
-                <input className="field-input" type="number" min="0" value={row.price}
-                       onChange={(e) => update(i, "price", e.target.value)}
-                       placeholder="549" />
-              </div>
-              <div className="field-group">
-                <label className="field-label">Size (ml)</label>
-                <input className="field-input" type="number" min="0" value={row.size_ml}
-                       onChange={(e) => update(i, "size_ml", e.target.value)}
-                       placeholder="30" />
-              </div>
-              <div className="field-group full">
-                <label className="field-label">Ingredients (INCI)</label>
-                <textarea className="field-textarea compare-textarea"
-                          value={row.ingredients}
-                          onChange={(e) => update(i, "ingredients", e.target.value)}
-                          placeholder="Aqua, Niacinamide, Zinc PCA..." />
-              </div>
+              <label className="field"><span className="field__label">Ingredients (INCI list)</span>
+                <span className="field__control field__control--textarea">
+                  <textarea rows={3} value={row.ingredients} onChange={(e) => update(i, "ingredients", e.target.value)} placeholder="Aqua, Niacinamide, Zinc PCA…" spellCheck={false} />
+                </span>
+              </label>
             </div>
-          </div>
+          </section>
         ))}
 
         <div className="compare-actions">
           {rows && rows.length < MAX_PRODUCTS && (
-            <button className="clear-btn-solo" onClick={addRow} data-testid="compare-add">
-              <i className="fa-solid fa-plus"></i> Add another
-            </button>
+            <Button variant="ghost" icon={<Plus />} onClick={addRow} data-testid="compare-add">Add another product</Button>
           )}
-          <button className="analyze-btn compare-run" onClick={run} disabled={busy}
-                  data-testid="compare-run">
-            {busy ? "Comparing..." : "Compare"}
-          </button>
+          <Button variant="primary" size="lg" arrow loading={busy} loadingText="Comparing…" data-testid="compare-run"
+                  onClick={checkAndRun}>
+            {signedIn ? `Compare ${count} products` : "Sign in to compare"}
+          </Button>
         </div>
-        {error && <p className="modal-error" role="alert" data-testid="compare-error">{error}</p>}
+        <p className="t-caption c-tertiary" style={{ textAlign: "center" }}>
+          {signedIn
+            ? `Comparing ${count} products uses ${count} credits. Opening the same products again is free.`
+            : `Comparing ${count} products uses ${count} credits. Your first 4 credits are free when you sign in.`}
+        </p>
+        {error && <Callout tone="negative" role="alert" data-testid="compare-error"><p className="callout__text">{error}</p></Callout>}
       </div>
 
-      {result && <CompareResult result={result} currency={currency} skinType={skinType} onUnlock={onUnlock} />}
+      {result && <CompareResult result={result} currency={currency} skinType={skinType} onUnlock={onUnlock} signedIn={signedIn} productCount={count} />}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------------- */
 
-function Row({ label, children, cols }) {
+function Row({ label, children, cols, className }) {
   return (
-    <div className="compare-row" style={{ "--cols": cols }}>
-      <span className="compare-row-label">{label}</span>
+    <div className={cx("cmp-row", className)} style={{ "--cols": cols }}>
+      <span className="cmp-row__label">{label}</span>
       {children}
     </div>
   );
 }
 
-function CompareResult({ result, currency, skinType, onUnlock }) {
+function toneFor(pct) {
+  if (pct >= 80) return "excellent";
+  if (pct >= 65) return "good";
+  if (pct >= 45) return "fair";
+  if (pct >= 30) return "weak";
+  return "poor";
+}
+
+function CompareResult({ result, currency, skinType, onUnlock, signedIn, productCount = 2 }) {
   // The server omits the table until the comparison is paid for.
-  const locked = result.access?.tier === "free";
-  if (locked) {
+  if (result.access?.tier === "free") {
     return (
-      <section className="compare-block compare-locked" data-testid="compare-locked">
-        <h3 className="compare-block-head">Comparison</h3>
-        <p className="compare-locked-lede">{result.access?.message}</p>
-        <ul className="compare-locked-list">
-          <li><strong>Formulation and price per ml</strong> — side by side</li>
-          <li><strong>What each has that the other does not</strong></li>
-          <li><strong>Which one treats your concerns</strong></li>
-          <li><strong>Irritation for your skin type</strong></li>
-          <li><strong>Whether you could use both</strong></li>
+      <Card eyebrow="Comparison" title="Unlock this comparison"
+            aside={<Badge><Lock aria-hidden="true" style={{ width: 12, height: 12 }} />Locked</Badge>}
+            data-testid="compare-locked">
+        {result.access?.message && <p className="t-body-m c-secondary">{result.access.message}</p>}
+        <ul className="need-list">
+          <li><span>Formulation and price per ml</span>side by side</li>
+          <li><span>What each has</span>that the others don’t</li>
+          <li><span>Your concerns</span>which one treats them better</li>
+          <li><span>Your skin type</span>irritation and congestion risk</li>
+          <li><span>Using both</span>clashes and doubling up</li>
         </ul>
-        <button className="locked-cta" onClick={onUnlock} data-testid="compare-unlock">
-          <span className="locked-cta-main">
-            <i className="fa-solid fa-lock-open"></i> Unlock this comparison
-          </span>
-          <span className="locked-cta-sub">
-            Two credits &middot; covers this pair for good
-          </span>
-        </button>
-      </section>
+        <Button variant="accent" size="lg" block icon={<Lock />} onClick={onUnlock} data-testid="compare-unlock">
+          {signedIn ? `Unlock with ${productCount} credits` : "Sign in — get 4 free credits"}
+        </Button>
+        <p className="t-caption c-tertiary" style={{ textAlign: "center", marginTop: 10 }}>Once unlocked, these products stay covered — opening them again is free.</p>
+      </Card>
     );
   }
   const { products, components, actives, concerns, tolerability, together, verdict } = result;
@@ -223,282 +229,214 @@ function CompareResult({ result, currency, skinType, onUnlock }) {
   const names = products.map((p) => p.product_name);
 
   return (
-    <div className="compare-result" data-testid="compare-result">
-      {/* ---------------------------------------------------------- scores */}
-      <div className="compare-grid">
-        <div className="compare-head-row" style={{ "--cols": cols }}>
-          <span />
-          {products.map((p, i) => (
-            <span className="compare-col-head" key={i}>
-              <span className="compare-col-name">{p.product_name}</span>
-              {p.brand && <span className="compare-col-brand">{p.brand}</span>}
-            </span>
-          ))}
-        </div>
-
-        <Row label="Formulation" cols={cols}>
-          {products.map((p, i) => (
-            <span className="compare-cell" key={i}>
-              <strong className="compare-score">{p.formulation_score ?? "—"}</strong>
-              <span className="compare-tier">{p.formulation_tier}</span>
-            </span>
-          ))}
-        </Row>
-
-        <Row label="Price per ml" cols={cols}>
-          {products.map((p, i) => (
-            <span className="compare-cell" key={i}>
-              {p.price_per_ml ? money(p.currency || currency, p.price_per_ml) : "—"}
-            </span>
-          ))}
-        </Row>
-
-        <Row label="Price per active" cols={cols}>
-          {products.map((p, i) => (
-            <span className="compare-cell" key={i}>
-              {p.price_per_active ? money(p.currency || currency, p.price_per_active) : "—"}
-            </span>
-          ))}
-        </Row>
-
-        {components.map((component) => (
-          <Row key={component.key} label={component.label} cols={cols}>
-            {component.values.map((value, i) => (
-              <span className="compare-cell" key={i}>
-                {value ? (
-                  <>
-                    <span className="compare-component-bar" aria-hidden="true">
-                      <span style={{ width: `${value.pct}%` }} />
-                    </span>
-                    <span className="compare-component-num">
-                      {Math.round(value.score)}/{value.max}
-                    </span>
-                    {(value.notes || []).length > 0 && (
-                      <span className="compare-component-note">{value.notes[0]}</span>
-                    )}
-                  </>
-                ) : "—"}
-              </span>
+    <div className="stack" style={{ "--stack-gap": "24px" }} data-testid="compare-result">
+      <Card eyebrow="Comparison" title="Side by side">
+        <div className="cmp-scroll">
+          <div className="cmp-grid">
+            <div className="cmp-row cmp-row--head" style={{ "--cols": cols }}>
+              <span />
+              {products.map((p, i) => (
+                <span className="cmp-head" key={i}>
+                  {p.formulation_score != null && (
+                    <ScoreRing score={p.formulation_score} size="sm" animate={false} label={`${p.product_name} score`} />
+                  )}
+                  <span className="t-label-s">{p.product_name}</span>
+                  {p.brand && <span className="t-caption c-accent">{p.brand}</span>}
+                  {p.formulation_tier && <span className="t-caption c-tertiary">{p.formulation_tier}</span>}
+                </span>
+              ))}
+            </div>
+            <Row label="Price per ml" cols={cols}>
+              {products.map((p, i) => (
+                <span className="cmp-cell t-mono" key={i}>{p.price_per_ml ? money(p.currency || currency, p.price_per_ml) : "—"}</span>
+              ))}
+            </Row>
+            <Row label="Price per active" cols={cols}>
+              {products.map((p, i) => (
+                <span className="cmp-cell t-mono" key={i}>{p.price_per_active ? money(p.currency || currency, p.price_per_active) : "—"}</span>
+              ))}
+            </Row>
+            {components.map((component) => (
+              <Row key={component.key} label={component.label} cols={cols}>
+                {component.values.map((value, i) => (
+                  <span className="cmp-cell" key={i}>
+                    {value ? (
+                      <>
+                        <span className="meter__track" aria-hidden="true">
+                          <span className="meter__fill" style={{ display: "block", width: `${value.pct}%`, "--meter-color": `var(--score-${toneFor(value.pct)})` }} />
+                        </span>
+                        <span className="t-mono-s c-secondary">{Math.round(value.score)}/{value.max}</span>
+                        {(value.notes || []).length > 0 && <span className="t-caption c-tertiary">{value.notes[0]}</span>}
+                      </>
+                    ) : "—"}
+                  </span>
+                ))}
+              </Row>
             ))}
-          </Row>
-        ))}
-      </div>
+          </div>
+        </div>
+      </Card>
 
-      {/* --------------------------------------------------------- actives */}
       {(actives?.shared?.length > 0 || actives?.unique?.some((u) => u.length > 0)) && (
-        <section className="compare-block" data-testid="compare-actives">
-          <h3 className="compare-block-head">What is actually in them</h3>
-
+        <Card eyebrow="Actives" title="What’s actually in them" data-testid="compare-actives">
           {actives.shared.length > 0 && (
-            <div className="compare-actives-shared">
-              <h4>In all of them</h4>
-              <ul>
+            <div className="cmp-block">
+              <p className="t-heading-s">In all of them</p>
+              <ul className="cmp-list">
                 {actives.shared.map((a) => (
                   <li key={a.name}>
-                    <strong>{a.name}</strong>
-                    {a.evidence && <span className="compare-evidence"> · {a.evidence}</span>}
-                    <span className="compare-levels">
-                      {a.levels.map((lvl, i) => (
-                        <span key={i}>
-                          {names[i]}: {lvl.concentration_pct
-                            ? `${lvl.concentration_pct}%`
-                            : (lvl.position ? `position ${lvl.position}` : "present")}
-                        </span>
-                      ))}
+                    <strong>{a.name}</strong>{a.evidence && <span className="c-tertiary"> · {a.evidence}</span>}
+                    <span className="t-caption c-secondary" style={{ display: "block" }}>
+                      {a.levels.map((lvl, i) => `${names[i]}: ${lvl.concentration_pct ? `${lvl.concentration_pct}%` : (lvl.position ? `position ${lvl.position}` : "present")}`).join(" · ")}
                     </span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
-
-          <div className="compare-actives-unique">
+          <div className="cmp-unique">
             {actives.unique.map((list, i) => (
-              <div key={i}>
-                <h4>Only in {names[i]}</h4>
+              <div key={i} className="cmp-block">
+                <p className="t-heading-s">Only in {names[i]}</p>
                 {list.length > 0 ? (
-                  <ul>
+                  <ul className="cmp-list">
                     {list.map((a) => (
                       <li key={a.name}>
                         <strong>{a.name}</strong>
-                        {a.targets?.length > 0 && (
-                          <span className="compare-evidence"> · for {a.targets.join(", ").toLowerCase()}</span>
-                        )}
+                        {a.targets?.length > 0 && <span className="c-tertiary"> · for {a.targets.join(", ").toLowerCase()}</span>}
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <p className="compare-muted">Nothing the others do not also have.</p>
-                )}
+                ) : <p className="t-body-s c-tertiary">Nothing the others don’t also have.</p>}
               </div>
             ))}
           </div>
-        </section>
+        </Card>
       )}
 
-      {/* -------------------------------------------------------- concerns */}
       {concerns?.length > 0 && (
-        <section className="compare-block" data-testid="compare-concerns">
-          <h3 className="compare-block-head">Against what you are treating</h3>
-          <p className="compare-muted">
-            Each number belongs to the product named above it. This is how well
-            that product treats the concern. It is not the formulation score.
-            A product can be well made and still be the weaker treatment.
-          </p>
-          <div className="compare-grid">
-            {concerns.map((entry) => (
-              <Row key={entry.concern} label={entry.concern} cols={cols}>
-                {entry.scores.map((score, i) => (
-                  <span className={`compare-cell${entry.best_index === i ? " compare-cell-best" : ""}`}
-                        key={i}>
-                    <span className="compare-col-name">{names[i]}</span>
-                    <strong>{score ?? "—"}</strong>
-                    <span className="compare-component-num">/ 100</span>
-                    {entry.best_index === i && (
-                      <span className="compare-component-note">Better for this concern</span>
-                    )}
+        <Card eyebrow="Your concerns" title="Against what you’re treating"
+              sub="How well each product treats the concern — not its formulation score. A product can be well made and still be the weaker treatment."
+              data-testid="compare-concerns">
+          <div className="cmp-scroll">
+            <div className="cmp-grid">
+              {concerns.map((entry) => (
+                <Row key={entry.concern} label={entry.concern} cols={cols}>
+                  {entry.scores.map((score, i) => (
+                    <span className={cx("cmp-cell", entry.best_index === i && "cmp-cell--best")} key={i}>
+                      <span className="t-caption c-tertiary">{names[i]}</span>
+                      <span className="t-heading-s">{score ?? "—"}<span className="t-mono-s c-tertiary"> / 100</span></span>
+                      {entry.best_index === i && <span className="badge badge--positive">Better here</span>}
+                    </span>
+                  ))}
+                </Row>
+              ))}
+            </div>
+          </div>
+          {concerns.some((c) => c.note) && (
+            <p className="t-caption c-tertiary" style={{ marginTop: 12 }}>Where nothing is highlighted, the gap is inside what the method can resolve.</p>
+          )}
+        </Card>
+      )}
+
+      {tolerability?.length > 0 && (
+        <Card eyebrow="Tolerability" title="Irritation and congestion risk" data-testid="compare-tolerability"
+              sub="Formula tolerability is the same for everyone. The second row counts ingredients that often bother your skin type.">
+          <div className="cmp-scroll">
+            <div className="cmp-grid">
+              <Row label="Formula tolerability" cols={cols}>
+                {tolerability.map((t, i) => (
+                  <span className="cmp-cell" key={i}>
+                    <span className="t-caption c-tertiary">{names[i]}</span>
+                    <span className="t-heading-s">{t.formulation_pct != null ? `${Math.round(t.formulation_pct)}/100` : "—"}</span>
+                    {(t.formulation_notes || []).length > 0 && <span className="t-caption c-tertiary">{t.formulation_notes[0]}</span>}
                   </span>
                 ))}
               </Row>
+              <Row label={`For ${String(skinType || "this").toLowerCase()} skin`} cols={cols}>
+                {tolerability.map((t, i) => {
+                  const level = String(t.skin_type_risk || "").split(" ")[0].toLowerCase();
+                  const tone = level === "low" ? "positive" : level === "moderate" ? "caution" : level === "high" ? "negative" : "neutral";
+                  return (
+                    <span className="cmp-cell" key={i}>
+                      <span className="t-caption c-tertiary">{names[i]}</span>
+                      {t.skin_type_risk ? <Badge tone={tone}>{t.skin_type_risk} risk</Badge> : <span>—</span>}
+                      {(t.skin_type_notes || []).length > 0 && (
+                        <span className="t-caption c-tertiary">
+                          {t.skin_type_notes.length === 1 ? t.skin_type_notes[0] : `${t.skin_type_notes.length} ingredients this skin type often reacts to`}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
+              </Row>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {together?.checked && (
+        <Card eyebrow="Routine" title="Could you use both?" data-testid="compare-together">
+          <div className="stack" style={{ "--stack-gap": "10px" }}>
+            {together.clear && (
+              <Callout tone="positive" icon={CircleCheck} title="No layering conflict">
+                <p className="callout__text">Nothing clashes between these, and neither duplicates the other’s job.</p>
+              </Callout>
+            )}
+            {together.conflicts.map((c, i) => (
+              <Callout key={`c${i}`} tone="caution" icon={TriangleAlert} title={c.families.join(" + ")}>
+                <p className="callout__text">{c.message}</p>
+              </Callout>
+            ))}
+            {together.redundant.map((r, i) => (
+              <Callout key={`r${i}`} tone="neutral" icon={Copy} title="Doing the same job">
+                <p className="callout__text">{r.message}</p>
+              </Callout>
             ))}
           </div>
-          {concerns.some((c) => c.note) && (
-            <p className="compare-muted">
-              Where no product is highlighted, the gap is inside what the method
-              can resolve.
-            </p>
-          )}
-        </section>
-      )}
-
-      {/* ---------------------------------------------------- tolerability */}
-      {/* Two measures, deliberately on separate rows. Together in one cell
-          they produced "Tolerability 100% - High Risk", which reads as a
-          contradiction and is not one: the first is formulation-level and the
-          same for everybody, the second is specific to the skin type being
-          analysed for. A product can be free of irritants and still be a poor
-          idea for oily skin. */}
-      {tolerability?.length > 0 && (
-        <section className="compare-block" data-testid="compare-tolerability">
-          <h3 className="compare-block-head">Irritation and congestion risk</h3>
-          <div className="compare-grid">
-            <Row label="Formula tolerability" cols={cols}>
-              {tolerability.map((t, i) => (
-                <span className="compare-cell" key={i}>
-                  <span className="compare-col-name">{names[i]}</span>
-                  <strong>
-                    {t.formulation_pct !== null && t.formulation_pct !== undefined
-                      ? `${Math.round(t.formulation_pct)}/100`
-                      : "—"}
-                  </strong>
-                  {(t.formulation_notes || []).length > 0 && (
-                    <span className="compare-component-note">{t.formulation_notes[0]}</span>
-                  )}
-                </span>
-              ))}
-            </Row>
-            <Row label={`For ${String(skinType || "this").toLowerCase()} skin`} cols={cols}>
-              {tolerability.map((t, i) => (
-                <span className="compare-cell" key={i}>
-                  <span className="compare-col-name">{names[i]}</span>
-                  {t.skin_type_risk ? (
-                    <span className={`compare-risk compare-risk-${String(t.skin_type_risk).split(" ")[0].toLowerCase()}`}>
-                      {t.skin_type_risk} risk
-                    </span>
-                  ) : <span>&mdash;</span>}
-                  {(t.skin_type_notes || []).length > 0 && (
-                    <span className="compare-component-note">
-                      {t.skin_type_notes.length === 1
-                        ? t.skin_type_notes[0]
-                        : `${t.skin_type_notes.length} ingredients this skin type often reacts to`}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </Row>
-          </div>
-          <p className="compare-muted">
-            Formula tolerability is the same for everyone. The row under it
-            counts ingredients that often bother this skin type. Both can say
-            low risk and still list a different number of ingredients.
-          </p>
-        </section>
-      )}
-
-      {/* --------------------------------------------------- using them both */}
-      {together?.checked && (
-        <section className="compare-block" data-testid="compare-together">
-          <h3 className="compare-block-head">Could you use both?</h3>
-          {together.clear && (
-            <p className="compare-together-clear">
-              <i className="fa-solid fa-circle-check"></i> No layering conflict
-              found between these two, and neither duplicates the other's job.
-            </p>
-          )}
-          {together.conflicts.map((c, i) => (
-            <p className="compare-together-warn" key={`c${i}`}>
-              <i className="fa-solid fa-triangle-exclamation"></i>
-              <span><strong>{c.families.join(" + ")}.</strong> {c.message}</span>
-            </p>
-          ))}
-          {together.redundant.map((r, i) => (
-            <p className="compare-together-warn" key={`r${i}`}>
-              <i className="fa-solid fa-copy"></i>
-              <span>{r.message}</span>
-            </p>
-          ))}
-        </section>
+        </Card>
       )}
       {together && together.checked === false && (
-        <p className="compare-muted" data-testid="compare-together-skipped">
-          {together.reason}
-        </p>
+        <p className="t-body-s c-tertiary" data-testid="compare-together-skipped">{together.reason}</p>
       )}
 
-      {/* --------------------------------------------------------- verdict */}
-      <div className="compare-verdict" data-testid="compare-verdict">
-        {verdict.best_formulation && (
-          <p className="compare-verdict-line">
-            <i className="fa-solid fa-flask" aria-hidden="true"></i>
-            <span>Better made: <strong>{verdict.best_formulation}</strong></span>
-          </p>
-        )}
-        {verdict.best_value && (
-          <p className="compare-verdict-line">
-            <i className="fa-solid fa-tag" aria-hidden="true"></i>
-            <span>Better value per ml: <strong>{verdict.best_value}</strong></span>
-          </p>
-        )}
-        {verdict.note && <p className="compare-note">{verdict.note}</p>}
-
+      <Card eyebrow="Verdict" title="So which one?" raised data-testid="compare-verdict">
+        <div className="stack" style={{ "--stack-gap": "10px" }}>
+          {verdict.best_formulation && (
+            <p className="verdict-line"><FlaskConical aria-hidden="true" />Better made: <strong>{verdict.best_formulation}</strong></p>
+          )}
+          {verdict.best_value && (
+            <p className="verdict-line"><Tag aria-hidden="true" />Better value per ml: <strong>{verdict.best_value}</strong></p>
+          )}
+          {verdict.note && <p className="t-body-m c-secondary">{verdict.note}</p>}
+        </div>
         {verdict.choose_if?.length > 0 && (
-          <div className="compare-choose">
+          <div className="cmp-choose">
             {verdict.choose_if.map((c) => (
-              <div className="compare-choose-item" key={c.product_name}>
-                <h4>Choose {c.product_name}</h4>
-                <ul>{c.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+              <div key={c.product_name} className="cmp-block">
+                <p className="t-heading-s c-accent">Choose {c.product_name}</p>
+                <ul className="cmp-list">{c.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
               </div>
             ))}
           </div>
         )}
-
-        <p className="compare-method">{result.method_note}</p>
-      </div>
-      <div className="export-row no-print">
-        <button type="button" className="export-btn" data-testid="compare-pdf"
-                onClick={() => {
-                  document.body.classList.add("print-compare");
-                  const done = () => {
-                    document.body.classList.remove("print-compare");
-                    window.removeEventListener("afterprint", done);
-                  };
-                  window.addEventListener("afterprint", done);
-                  window.requestAnimationFrame(() => window.print());
-                }}>
-          <i className="fa-solid fa-file-arrow-down"></i> Save comparison as PDF
-        </button>
-        <p className="export-note">This PDF is the comparison. It appears only after the comparison has run, and it is separate from the product report.</p>
-      </div>
+        {result.method_note && <p className="t-caption c-tertiary" style={{ marginTop: 16 }}>{result.method_note}</p>}
+        <div className="row wrap no-print" style={{ marginTop: 20 }}>
+          <Button variant="secondary" icon={<FileDown />} data-testid="compare-pdf"
+                  onClick={() => {
+                    document.body.classList.add("print-compare");
+                    const done = () => {
+                      document.body.classList.remove("print-compare");
+                      window.removeEventListener("afterprint", done);
+                    };
+                    window.addEventListener("afterprint", done);
+                    window.requestAnimationFrame(() => window.print());
+                  }}>
+            Save comparison as PDF
+          </Button>
+          <span className="t-caption c-tertiary">Separate from the product report.</span>
+        </div>
+      </Card>
       <ComparePrint result={result} currency={currency} skinType={skinType} />
     </div>
   );

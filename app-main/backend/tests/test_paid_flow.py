@@ -477,12 +477,22 @@ def test_a_signed_in_caller_with_credits_gets_the_whole_comparison(client, funde
     assert data['verdict']['choose_if']
 
 
-def test_a_comparison_costs_one_credit_not_one_per_product(client, funded):
-    """Per-product would make a four-way comparison cost four credits, which
-    nobody would expect from a button labelled "Compare"."""
+def test_a_pair_costs_two_credits(client, funded):
     before = client.get('/api/auth/me').json()['balance']
     client.post('/api/compare', json=compare_body())
     assert client.get('/api/auth/me').json()['balance'] == before - 2
+
+
+def test_a_comparison_costs_one_credit_per_product(client, funded):
+    """Three products cost three credits; the screen says so before running."""
+    body = compare_body()
+    body['products'].append({
+        'product_name': 'C', 'category': 'Serum', 'price': 800, 'size_ml': 30,
+        'ingredients': 'Aqua, Azelaic Acid, Glycerin, Phenoxyethanol'})
+    before = client.get('/api/auth/me').json()['balance']
+    data = client.post('/api/compare', json=body).json()
+    assert data['access']['tier'] == 'full'
+    assert client.get('/api/auth/me').json()['balance'] == before - 3
 
 
 def test_re_running_the_same_comparison_is_free(client, funded):

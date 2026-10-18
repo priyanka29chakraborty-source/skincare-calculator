@@ -57,9 +57,16 @@ CREDIT_PACKS = {
     'bulk':    {'credits': 12, 'amount_paise': 19900, 'label': '12 analyses'},
 }
 
-# One personalised analysis costs one credit. A comparison costs two.
+# One personalised analysis costs one credit. A comparison costs one credit
+# per product compared, with a pair as the minimum: two products cost two,
+# three cost three, four cost four.
 COST_PER_ANALYSIS = 1
 COST_PER_COMPARISON = 2
+
+
+def comparison_cost(product_count):
+    """Credits for comparing this many products: one each, two at the least."""
+    return max(COST_PER_COMPARISON, int(product_count or 0))
 
 # First email sign-in. Four credits covers two analyses, or one analysis
 # and one comparison, or two comparisons.

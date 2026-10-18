@@ -1,23 +1,32 @@
 export const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
 export const CREDIT_EXPIRY_HINT = "Credits expire one year after they are added, including the 4 from your first sign-in.";
+
+// Google AdSense ad unit ids, one per placement. Nothing renders in production
+// until REACT_APP_ADSENSE_CLIENT and the matching slot id are set.
+export const AD_SLOTS = {
+  landingTop: process.env.REACT_APP_ADSENSE_SLOT_LANDING_TOP,
+  landingBottom: process.env.REACT_APP_ADSENSE_SLOT_LANDING_BOTTOM,
+  resultInArticle: process.env.REACT_APP_ADSENSE_SLOT_RESULT_INARTICLE,
+  resultBottom: process.env.REACT_APP_ADSENSE_SLOT_RESULT_BOTTOM,
+};
 // Set REACT_APP_BACKEND_URL in Render environment to your backend URL e.g. https://your-backend.onrender.com
 
 export const CONCERNS_LIST = [
-  { key: "Acne & Oily Skin", desc: "Breakouts, oiliness", icon: "fa-solid fa-droplet" },
-  { key: "Pigmentation", desc: "Dark spots, tone", icon: "fa-solid fa-circle-half-stroke" },
-  { key: "Aging & Fine Lines", desc: "Wrinkles, firmness", icon: "fa-solid fa-hourglass-half" },
-  { key: "Barrier Repair", desc: "Dryness, flakiness", icon: "fa-solid fa-shield-halved" },
-  { key: "Dry Skin", desc: "Tight, rough, flaky", icon: "fa-solid fa-droplet-slash" },
-  { key: "Sensitive Skin", desc: "Redness, reactive", icon: "fa-solid fa-hand-holding-heart" },
-  { key: "Hydration", desc: "Tightness, dull", icon: "fa-solid fa-tint" },
-  { key: "Large Pores", desc: "Visible, texture", icon: "fa-solid fa-magnifying-glass" },
-  { key: "Dullness", desc: "Lack of glow", icon: "fa-solid fa-sun" },
-  { key: "Uneven Texture", desc: "Rough, bumpy", icon: "fa-solid fa-layer-group" },
-  { key: "Dark Circles", desc: "Under-eye", icon: "fa-solid fa-eye" },
-  { key: "Sun Protection", desc: "SPF, UV filters", icon: "fa-solid fa-umbrella-beach" },
-  { key: "UV Damage", desc: "Photoaging repair", icon: "fa-solid fa-bolt" },
-  { key: "Tanning", desc: "Anti-tan, brightening", icon: "fa-solid fa-star" },
-  { key: "Puffiness", desc: "Swelling, de-puff", icon: "fa-solid fa-face-smile" },
+  { key: "Acne & Oily Skin", desc: "Breakouts, oiliness" },
+  { key: "Pigmentation", desc: "Dark spots, tone" },
+  { key: "Aging & Fine Lines", desc: "Wrinkles, firmness" },
+  { key: "Barrier Repair", desc: "Dryness, flakiness" },
+  { key: "Dry Skin", desc: "Tight, rough, flaky" },
+  { key: "Sensitive Skin", desc: "Redness, reactive" },
+  { key: "Hydration", desc: "Tightness, dull" },
+  { key: "Large Pores", desc: "Visible, texture" },
+  { key: "Dullness", desc: "Lack of glow" },
+  { key: "Uneven Texture", desc: "Rough, bumpy" },
+  { key: "Dark Circles", desc: "Under-eye" },
+  { key: "Sun Protection", desc: "SPF, UV filters" },
+  { key: "UV Damage", desc: "Photoaging repair" },
+  { key: "Tanning", desc: "Anti-tan, brightening" },
+  { key: "Puffiness", desc: "Swelling, de-puff" },
 ];
 
 export const SKIN_TYPES = ["Oily", "Dry", "Combination", "Sensitive", "Normal"];
@@ -27,11 +36,19 @@ export const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscre
 export function categoryLabel(value) {
   const raw = String(value || "").trim();
   if (/^moisturi[sz]er$/i.test(raw)) return "Moisturiser";
-  return raw;
+  // Sentence case everywhere: "Eye cream", "Facial oil".
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase() : raw;
 }
 export const COUNTRIES = ["India", "USA", "UK", "UAE", "Singapore", "Australia", "Canada", "South Korea", "Japan", "France", "Germany", "Brazil"];
 export const CURRENCY_MAP = { India:"INR", USA:"USD", UK:"GBP", UAE:"AED", Singapore:"SGD", Australia:"AUD", Canada:"CAD", "South Korea":"KRW", Japan:"JPY", France:"EUR", Germany:"EUR", Brazil:"BRL" };
 export const SIZE_UNITS = ["ml", "g", "oz", "fl oz"];
+
+/** Pack size in ml for the API. Ounces are read as fluid ounces; grams count as ml. */
+export function toMl(size, unit) {
+  const n = parseFloat(size);
+  if (!n) return 0;
+  return unit === "oz" || unit === "fl oz" ? n * 29.5735 : n;
+}
 
 // Display glyphs for the codes in CURRENCY_MAP. CURRENCY_MAP itself must
 // keep returning ISO codes - that value is sent to the API as `currency`,
@@ -48,8 +65,11 @@ export const CURRENCY_SYMBOL = {
  */
 export function money(currency, amount) {
   if (amount === null || amount === undefined || amount === "") return "";
+  // A fractional amount always shows two decimals: "₹20.50", never "₹20.5".
+  const n = Number(amount);
+  const shown = Number.isFinite(n) && !Number.isInteger(n) ? n.toFixed(2) : amount;
   const sym = CURRENCY_SYMBOL[currency];
-  return sym ? `${sym}${amount}` : `${currency} ${amount}`;
+  return sym ? `${sym}${shown}` : `${currency} ${shown}`;
 }
 
 /** Just the affix, for the price field's unit tag. */
@@ -69,24 +89,4 @@ export function pricePlain(value, currency) {
   else if (ratio <= 1.8) compare = "a bit more per ml";
   else if (ratio <= 3.5) compare = "much more per ml";
   return `This costs ${yours}. Most products of this type cost about ${typical}, so this costs ${compare}.`;
-}
-
-export function getScoreColor(s) {
-  if (s >= 75) return "#22c55e";
-  if (s >= 60) return "#eab308";
-  if (s >= 40) return "#f97316";
-  return "#ef4444";
-}
-
-export function getBarColor(p) {
-  // Steps widened for scannability. The previous green (#22c55e) and lime
-  // (#84cc16) were close enough that a component at 74% looked identical to
-  // one at 100%, so the breakdown could not be read at a glance - which is the
-  // whole job of a bar chart. Each step is now visibly distinct, using the
-  // existing palette (--sage, --green, --gold, --orange, --red).
-  if (p >= 85) return "#267C36";   // sage - excellent
-  if (p >= 70) return "#22c55e";   // green - good
-  if (p >= 50) return "#C9A96E";   // gold - middling
-  if (p >= 30) return "#f97316";   // orange - weak
-  return "#ef4444";                // red - poor
 }

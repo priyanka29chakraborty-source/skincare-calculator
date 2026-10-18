@@ -58,7 +58,7 @@ export async function openCheckout({ order, name, description, prefillEmail }) {
       name: name || "Urancal",
       description: description || "Analysis credits",
       prefill: prefillEmail ? { email: prefillEmail } : undefined,
-      theme: { color: "#BF8888" },
+      theme: { color: "#96543F" },
       handler: (response) => resolve(response),
       modal: {
         ondismiss: () => {

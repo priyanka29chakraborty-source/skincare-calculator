@@ -359,7 +359,7 @@ COMPARISON_PAID_SECTIONS = (
 
 
 def _comparison_reference(account_id, products):
-    """Two credits per comparison, keyed on the set of products.
+    """One credit per product compared (two at the least), keyed on the set.
 
     Sorted, so comparing A against B and B against A is the same comparison
     and is not charged twice. Built from the same per-product fingerprint the
@@ -394,7 +394,7 @@ def _resolve_comparison_entitlement(request: Request, products) -> bool:
         return True
     try:
         wallet.spend(
-            account_id, credits=wallet.COST_PER_COMPARISON, reference=reference)
+            account_id, credits=wallet.comparison_cost(len(products)), reference=reference)
         return True
     except wallet.InsufficientCredits:
         return False
@@ -403,7 +403,7 @@ def _resolve_comparison_entitlement(request: Request, products) -> bool:
         return False
 
 
-def _filter_comparison(out, entitled):
+def _filter_comparison(out, entitled, product_count=2):
     """Return the comparison only when it has been paid for.
 
     Removed, not blanked: a key that is absent cannot be read out of the
@@ -418,11 +418,12 @@ def _filter_comparison(out, entitled):
             'tier': 'free',
             'locked_sections': list(COMPARISON_PAID_SECTIONS),
             'message': (
-                "A comparison costs two credits. It covers how each product is "
-                "made, price per ml, what each has that the others do not, "
-                "which treats your concern, irritation for your skin, and "
-                "whether you could use both. Opening the same pair again does "
-                "not spend another two credits."),
+                "This comparison uses %d credits - one for each product. It "
+                "covers how each product is made, price per ml, what each has "
+                "that the others do not, which treats your concern, irritation "
+                "for your skin, and whether you could use them together. "
+                "Opening the same products again is free."
+                % wallet.comparison_cost(product_count)),
         },
     }
 
@@ -489,7 +490,7 @@ async def compare_endpoint(req: CompareRequest, request: Request):
         for row in (out.get('products') or [])
     ])
 
-    return _filter_comparison(out, _resolve_comparison_entitlement(request, cleaned))
+    return _filter_comparison(out, _resolve_comparison_entitlement(request, cleaned), len(cleaned))
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}
