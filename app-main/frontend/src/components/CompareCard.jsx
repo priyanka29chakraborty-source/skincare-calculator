@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   CircleCheck, Copy, FileDown, FlaskConical, GitCompare, Lock, Plus, Tag, TriangleAlert, X,
@@ -9,7 +9,7 @@ import { API, api, describeError } from "../api";
 import { track } from "../track";
 import { Badge, Button, Callout, Card, ScoreRing, Select, cx } from "./ds";
 
-const MAX_PRODUCTS = 4;
+const MAX_PRODUCTS = 6;
 
 const EMPTY = {
   product_name: "", brand: "", category: "Serum",
@@ -20,10 +20,10 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
   "Eye Cream", "Mask", "Treatment", "Facial Oil"];
 
 /**
- * Two to four products side by side.
+ * Two or more products side by side, up to six.
  *
- * Paid. One credit per product compared (two for a pair), and it needs an
- * account. Opening the same set of products again does not
+ * Paid. One credit per product compared (two for a pair), up to six, and it
+ * needs an account. Opening the same set of products again does not
  * spend another. A single product's formulation score stays free.
  *
  * The first version of this was a scoreboard - two numbers and a winner. That
@@ -39,7 +39,7 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
  * plainly as a result, because a stated limit is more useful than a confident
  * guess.
  */
-export default function CompareCard({ seed, currency, skinType, concerns, onUnlock, onSignIn, autoOpen, signedIn }) {
+export default function CompareCard({ seed, preset, currency, skinType, concerns, onUnlock, onSignIn, autoOpen, signedIn }) {
   const initialRows = () => [seed ? { ...EMPTY, ...seed } : { ...EMPTY }, { ...EMPTY }];
   const [open, setOpen] = useState(Boolean(autoOpen));
   const [rows, setRows] = useState(autoOpen ? initialRows : null);
@@ -47,6 +47,23 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!preset?.products?.length) return;
+    setOpen(true);
+    setResult(null);
+    setError("");
+    setRows(preset.products.map((product) => ({
+      product_name: product.product_name || "",
+      brand: product.brand || "",
+      category: product.category || "Serum",
+      price: product.price ? String(product.price) : "",
+      // Saved comparisons store the size already converted to ml.
+      size: product.size_ml ? String(Math.round(product.size_ml * 100) / 100) : "",
+      size_unit: "ml",
+      ingredients: product.ingredients || "",
+    })));
+  }, [preset]);
 
   function start() {
     setOpen(true);
@@ -106,7 +123,7 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
   if (!open) {
     return (
       <Card eyebrow="Compare" title="Compare with another product" className="no-print" data-testid="compare-prompt"
-            sub="Two to four products side by side. Comparing starts at 2 credits — 2 for two products, 3 for three, 4 for four. Opening the same products again is free."
+            sub="Two to six products side by side. Comparing starts at 2 credits — 2 for two products, 3 for three, and so on. Opening the same products again is free."
             aside={<Button variant="secondary" icon={<GitCompare />} onClick={start} data-testid="compare-start">Compare</Button>} />
     );
   }

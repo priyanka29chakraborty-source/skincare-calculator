@@ -72,6 +72,8 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
 
   const [editing, setEditing] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
+  // A saved comparison to load into the compare form ("Compare again").
+  const [comparePreset, setComparePreset] = useState(null);
   const [pendingReopen, setPendingReopen] = useState(false);
   const [pendingFetch, setPendingFetch] = useState(false);
   const [toast, setToast] = useState("");
@@ -384,9 +386,9 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
         <div className="analyse-head">
           <p className="t-eyebrow c-accent">Compare</p>
           <h1 className="t-display-m">Which one is worth it?</h1>
-          <p className="t-body-l c-secondary">Two to four products, scored on the same scale, with what each has that the others don’t.</p>
+          <p className="t-body-l c-secondary">Two to six products, scored on the same scale, with what each has that the others don’t.</p>
         </div>
-        <CompareCard autoOpen signedIn={account.signedIn} currency={currency} skinType={skinType} concerns={concerns}
+        <CompareCard autoOpen preset={comparePreset} signedIn={account.signedIn} currency={currency} skinType={skinType} concerns={concerns}
                      onUnlock={() => openUnlock(account.signedIn ? "credits" : "signin", null, "compare")}
                      onSignIn={(after) => openUnlock("signin", after, "compare")}
                      seed={ingredients ? { product_name: productName, brand, category, price: price || "", size: size || "", size_unit: sizeUnit, ingredients } : null} />
@@ -459,7 +461,11 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
                      skinType={skinType} concerns={concerns} />
       )}
       <SavedSheet open={savedOpen} onClose={() => setSavedOpen(false)} account={account}
-                  onReopen={reopenSaved} onSignIn={() => openUnlock("signin")} />
+                  onReopen={reopenSaved} onSignIn={() => openUnlock("signin")}
+                  onCompareAgain={(products) => {
+                    setComparePreset({ at: Date.now(), products });
+                    navigate(`${ANALYSE_PATH}?view=compare`);
+                  }} />
       {toast && <div className="toast" role="status"><Check aria-hidden="true" />{toast}</div>}
       <SiteFooter compact />
     </div>
@@ -500,8 +506,8 @@ function AnalyseRail({ productName, brand, category, price, size, sizeUnit, curr
       </div>
       {account.signedIn && (
         <button type="button" className="card card--subtle rail-tip" onClick={onOpenSaved}>
-          <p className="t-label-s">Saved analyses</p>
-          <p className="t-body-s c-secondary">Reopen any past product — it re-runs on today’s engine, so you never see two different scores for the same bottle.</p>
+          <p className="t-label-s">Saved products and comparisons</p>
+          <p className="t-body-s c-secondary">Reopen any past product or comparison — it re-runs on today’s engine, so you never see two different scores for the same bottle.</p>
         </button>
       )}
     </aside>

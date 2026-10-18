@@ -52,8 +52,8 @@ def test_one_product_is_not_a_comparison():
         compare([product('A')], fake_engine({'A': 90}))
 
 
-def test_more_than_four_is_refused():
-    names = list('ABCDE')
+def test_more_than_six_is_refused():
+    names = list('ABCDEFG')
     with pytest.raises(CompareError):
         compare([product(n) for n in names],
                 fake_engine({n: 80 for n in names}))

@@ -20,6 +20,7 @@ but it is never logged, never returned for another account, and
 ``forget_all`` exists so an account can be emptied on request.
 """
 
+import hashlib
 import json
 import logging
 import time
@@ -214,11 +215,120 @@ def forget(account_id, entry_id):
 def forget_all(account_id):
     """Empty an account's history. Someone asking to be forgotten gets that."""
     ensure_schema()
+    _ensure_comparisons()
     wallet = _wallet()
     cur = wallet._execute(
         'DELETE FROM analysis_history WHERE account_id = ?',
         (account_id,), commit=True)
+    wallet._execute(
+        'DELETE FROM comparison_history WHERE account_id = ?',
+        (account_id,), commit=True)
     return cur.rowcount
+
+
+COMPARISON_SCHEMA = """
+CREATE TABLE IF NOT EXISTS comparison_history (
+    entry_id        TEXT PRIMARY KEY,
+    account_id      TEXT NOT NULL,
+    comparison_key  TEXT NOT NULL,
+    products        TEXT NOT NULL,
+    created_at      DOUBLE PRECISION NOT NULL
+)
+"""
+
+COMPARISON_INDEXES = [
+    "CREATE UNIQUE INDEX IF NOT EXISTS comparison_history_key_uniq "
+    "ON comparison_history (account_id, comparison_key)",
+]
+
+
+def _ensure_comparisons():
+    wallet = _wallet()
+    sql = COMPARISON_SCHEMA if wallet.storage_is_durable() else COMPARISON_SCHEMA.replace(
+        'DOUBLE PRECISION', 'REAL')
+    wallet._execute(sql, (), commit=True)
+    for statement in COMPARISON_INDEXES:
+        wallet._execute(statement, (), commit=True)
+
+
+def record_comparison(account_id, comparison_key, products):
+    """Save one comparison for this account. Never raises into the request."""
+    if not account_id or not comparison_key or not products:
+        return None
+    try:
+        _ensure_comparisons()
+        wallet = _wallet()
+        entry_id = 'cmp_%s' % hashlib.sha256(
+            ('%s:%s' % (account_id, comparison_key)).encode('utf-8')).hexdigest()[:24]
+        payload = json.dumps(products)[:20000]
+        now = time.time()
+        try:
+            wallet._execute(
+                'INSERT INTO comparison_history '
+                '(entry_id, account_id, comparison_key, products, created_at) '
+                'VALUES (?, ?, ?, ?, ?)',
+                (entry_id, account_id, comparison_key, payload, now),
+                commit=True)
+        except Exception as exc:
+            if not _is_duplicate(exc):
+                raise
+            wallet._execute(
+                'UPDATE comparison_history SET products = ?, created_at = ? '
+                'WHERE account_id = ? AND comparison_key = ?',
+                (payload, now, account_id, comparison_key),
+                commit=True)
+        return entry_id
+    except Exception:
+        logger.exception('could not save comparison history')
+        return None
+
+
+def recent_comparisons(account_id, limit=30):
+    _ensure_comparisons()
+    wallet = _wallet()
+    cur = wallet._execute(
+        'SELECT entry_id, products, created_at FROM comparison_history '
+        'WHERE account_id = ? ORDER BY created_at DESC LIMIT ?',
+        (account_id, int(limit)))
+    out = []
+    for entry_id, payload, created_at in cur.fetchall():
+        products = json.loads(payload or '[]')
+        out.append({
+            'entry_id': entry_id,
+            'created_at': created_at,
+            'products': [
+                {
+                    'product_name': p.get('product_name') or '',
+                    'brand': p.get('brand') or '',
+                    'category': p.get('category') or '',
+                    'score': p.get('score'),
+                }
+                for p in products
+            ],
+        })
+    return out
+
+
+def get_comparison(account_id, entry_id):
+    _ensure_comparisons()
+    wallet = _wallet()
+    cur = wallet._execute(
+        'SELECT products FROM comparison_history '
+        'WHERE account_id = ? AND entry_id = ?',
+        (account_id, entry_id))
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {'products': json.loads(row[0] or '[]')}
+
+
+def forget_comparison(account_id, entry_id):
+    _ensure_comparisons()
+    wallet = _wallet()
+    cur = wallet._execute(
+        'DELETE FROM comparison_history WHERE account_id = ? AND entry_id = ?',
+        (account_id, entry_id), commit=True)
+    return cur.rowcount > 0
 
 
 def _is_duplicate(exc):

@@ -2,6 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 
 import { API, api, describeError } from "../api";
 
+const SIGNED_OUT = {
+  loading: false,
+  signedIn: false,
+  balance: 0,
+  pdfUnlocked: false,
+  owner: false,
+  email: "",
+  creditsExpireAt: null,
+  paymentsEnabled: false,
+};
+
 /**
  * Session and credit balance.
  *
@@ -13,13 +24,7 @@ import { API, api, describeError } from "../api";
  * on a different origin to the frontend.
  */
 export default function useAccount() {
-  const [state, setState] = useState({
-    loading: true,
-    signedIn: false,
-    balance: 0,
-    pdfUnlocked: false,
-    owner: false,
-  });
+  const [state, setState] = useState({ ...SIGNED_OUT, loading: true });
 
   const refresh = useCallback(async () => {
     try {
@@ -30,12 +35,15 @@ export default function useAccount() {
         balance: data.balance || 0,
         pdfUnlocked: !!data.pdf_unlocked,
         owner: !!data.owner,
+        email: data.email || "",
+        creditsExpireAt: data.credits_expire_at || null,
+        paymentsEnabled: !!data.payments_enabled,
       });
       return data;
     } catch {
       // Not signed in is the overwhelmingly common reason this fails, and it
       // is not an error worth showing anyone.
-      setState({ loading: false, signedIn: false, balance: 0, pdfUnlocked: false, owner: false });
+      setState(SIGNED_OUT);
       return null;
     }
   }, []);
@@ -59,6 +67,9 @@ export default function useAccount() {
       balance: data.balance || 0,
       pdfUnlocked: !!data.pdf_unlocked,
       owner: !!data.owner,
+      email: data.email || email,
+      creditsExpireAt: data.credits_expire_at || null,
+      paymentsEnabled: !!data.payments_enabled,
     });
     return data;
   }, []);
@@ -67,7 +78,7 @@ export default function useAccount() {
     try {
       await api.post(`${API}/auth/signout`, {}, { withCredentials: true });
     } finally {
-      setState({ loading: false, signedIn: false, balance: 0, pdfUnlocked: false, owner: false });
+      setState(SIGNED_OUT);
     }
   }, []);
 

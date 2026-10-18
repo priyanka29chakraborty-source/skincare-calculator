@@ -394,7 +394,8 @@ def _resolve_comparison_entitlement(request: Request, products) -> bool:
         return True
     try:
         wallet.spend(
-            account_id, credits=wallet.comparison_cost(len(products)), reference=reference)
+            account_id, credits=wallet.comparison_cost(len(products)),
+            reference=reference)
         return True
     except wallet.InsufficientCredits:
         return False
@@ -403,7 +404,7 @@ def _resolve_comparison_entitlement(request: Request, products) -> bool:
         return False
 
 
-def _filter_comparison(out, entitled, product_count=2):
+def _filter_comparison(out, entitled, cost):
     """Return the comparison only when it has been paid for.
 
     Removed, not blanked: a key that is absent cannot be read out of the
@@ -417,13 +418,13 @@ def _filter_comparison(out, entitled, product_count=2):
         'access': {
             'tier': 'free',
             'locked_sections': list(COMPARISON_PAID_SECTIONS),
+            'cost': cost,
             'message': (
-                "This comparison uses %d credits - one for each product. It "
-                "covers how each product is made, price per ml, what each has "
-                "that the others do not, which treats your concern, irritation "
-                "for your skin, and whether you could use them together. "
-                "Opening the same products again is free."
-                % wallet.comparison_cost(product_count)),
+                "This comparison uses %d credits. It covers how each product "
+                "is made, price per ml, what each has that the others do not, "
+                "which treats your concern, irritation for your skin, and "
+                "whether you could use them together. Opening the same "
+                "products again is free." % cost),
         },
     }
 
@@ -440,7 +441,7 @@ class CompareRequest(BaseModel):
 @api_router.post("/compare")
 @limiter.limit("6/minute")
 async def compare_endpoint(req: CompareRequest, request: Request):
-    """Two to four products side by side. Two credits, same pair is free to reopen."""
+    """Two or more products side by side. One credit each. The same set is free to reopen."""
     products = req.products or []
     if len(products) > MAX_PRODUCTS:
         return JSONResponse(status_code=400, content={
@@ -480,17 +481,34 @@ async def compare_endpoint(req: CompareRequest, request: Request):
     except CompareError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
-    log_comparison([
-        {
+    saved_products = []
+    for row, source in zip(out.get('products') or [], cleaned):
+        saved_products.append({
             'product_name': row.get('product_name') or '',
             'brand': row.get('brand') or '',
             'category': row.get('category') or '',
             'score': row.get('formulation_score'),
+            'price': source.get('price') or 0,
+            'size_ml': source.get('size_ml') or 0,
+            'ingredients': source.get('ingredients') or '',
+        })
+    log_comparison([
+        {
+            'product_name': item['product_name'],
+            'brand': item['brand'],
+            'category': item['category'],
+            'score': item['score'],
         }
-        for row in (out.get('products') or [])
+        for item in saved_products
     ])
+    account_id = current_account(request)
+    if account_id:
+        history.record_comparison(
+            account_id, _comparison_reference(account_id, cleaned), saved_products)
 
-    return _filter_comparison(out, _resolve_comparison_entitlement(request, cleaned), len(cleaned))
+    cost = wallet.comparison_cost(len(cleaned))
+    return _filter_comparison(
+        out, _resolve_comparison_entitlement(request, cleaned), cost)
 
 
 VALID_SKIN_TYPES = {'oily', 'dry', 'combination', 'sensitive', 'normal'}

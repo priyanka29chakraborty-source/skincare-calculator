@@ -144,12 +144,7 @@ async def verify_code(req: VerifyRequest, request: Request):
         return JSONResponse(status_code=400, content={
             'error': 'That code is not right, or it has expired.'})
 
-    response = JSONResponse(content={
-        'signed_in': True,
-        'balance': wallet.get_balance(account_id),
-        'pdf_unlocked': wallet.has_purchased(account_id) or wallet.is_owner(account_id),
-        'owner': wallet.is_owner(account_id),
-    })
+    response = JSONResponse(content=_account_view(account_id))
     response.set_cookie(identity.SESSION_COOKIE,
                         identity.make_session(account_id),
                         **identity.session_cookie_kwargs())
@@ -168,11 +163,18 @@ async def me(request: Request):
     account_id = current_account(request)
     if not account_id:
         return {'signed_in': False, 'balance': 0}
+    return _account_view(account_id)
+
+
+def _account_view(account_id):
+    expires = wallet.credit_expires_at(account_id)
     return {
         'signed_in': True,
+        'email': wallet.account_email(account_id) or '',
         'balance': wallet.get_balance(account_id),
+        'credits_expire_at': expires,
         'cost_per_analysis': wallet.COST_PER_ANALYSIS,
-        'cost_per_comparison': wallet.COST_PER_COMPARISON,
+        'payments_enabled': payments.public_config()['enabled'],
         'pdf_unlocked': wallet.has_purchased(account_id) or wallet.is_owner(account_id),
         'owner': wallet.is_owner(account_id),
     }
@@ -372,6 +374,33 @@ async def saved_analyses(request: Request):
     if not account_id:
         return _unauthenticated()
     return {'entries': history.recent(account_id)}
+
+
+@accounts_router.get('/history/comparisons')
+async def saved_comparisons(request: Request):
+    account_id = _require_account(request)
+    if not account_id:
+        return _unauthenticated()
+    return {'entries': history.recent_comparisons(account_id)}
+
+
+@accounts_router.get('/history/comparisons/{entry_id}')
+async def saved_comparison(entry_id: str, request: Request):
+    account_id = _require_account(request)
+    if not account_id:
+        return _unauthenticated()
+    entry = history.get_comparison(account_id, entry_id)
+    if not entry:
+        return JSONResponse(status_code=404, content={'error': 'Not found.'})
+    return entry
+
+
+@accounts_router.post('/history/comparisons/{entry_id}/forget')
+async def forget_saved_comparison(entry_id: str, request: Request):
+    account_id = _require_account(request)
+    if not account_id:
+        return _unauthenticated()
+    return {'forgotten': history.forget_comparison(account_id, entry_id)}
 
 
 @accounts_router.get('/history/{entry_id}')

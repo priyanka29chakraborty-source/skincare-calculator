@@ -370,6 +370,24 @@
 }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
 .menu__meta { padding: 10px 12px 8px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 6px; }
+/* Account menu: who, credits (balance, expiry, the rule, recent activity), then actions. */
+.menu--account { width: 300px; }
+.avatar--lg { width: 40px; height: 40px; font-size: 16px; cursor: default; flex-shrink: 0; }
+.avatar svg { width: 16px; height: 16px; }
+.menu__account { display: flex; align-items: center; gap: 12px; padding: 10px 10px 12px; }
+.menu__who { min-width: 0; }
+.menu__email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu__credits { display: flex; flex-direction: column; gap: 4px; margin: 0 4px 6px; padding: 14px; border-radius: var(--radius-md); background: var(--bg-subtle); }
+.menu__balance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.menu__balance { display: flex; align-items: baseline; gap: 6px; font-size: 13px; line-height: 18px; color: var(--text-secondary); }
+.menu__balance-num { font-family: var(--font-display); font-size: 28px; line-height: 28px; color: var(--text-primary); }
+.menu__info { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; border: 0; background: var(--bg-surface); color: var(--text-tertiary); cursor: pointer; }
+.menu__info:hover, .menu__info[aria-expanded="true"] { color: var(--text-accent); }
+.menu__info svg { width: 15px; height: 15px; }
+.menu__rule { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--text-secondary); }
+.menu__activity { display: grid; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.menu__activity li { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 16px; color: var(--text-secondary); }
+.menu__activity li span:last-child { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 .menu__item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: var(--radius-md); background: none; border: 0; cursor: pointer; font-size: 13px; line-height: 18px; color: var(--text-primary); text-align: left; }
 .menu__item svg { width: 16px; height: 16px; color: var(--text-tertiary); }
 .menu__item:hover { background: var(--bg-subtle); }

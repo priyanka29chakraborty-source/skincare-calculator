@@ -1,10 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, Coins, History, LogOut, Menu, Plus, User, X } from "lucide-react";
+import { ArrowRight, Coins, History, Info, LogOut, Menu, Plus, User, X } from "lucide-react";
 
 import { Button, Wordmark, cx } from "./ds";
+import { API, api } from "../api";
 import { ANALYSE_PATH, linkTo } from "../lib/router";
-import { CREDIT_EXPIRY_HINT } from "../constants";
+import { CREDIT_EXPIRY_HINT, CREDIT_RULE } from "../constants";
+
+function when(ts) {
+  if (!ts) return "";
+  return new Date(ts * 1000).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Credit activity worth showing: what was added, and when.
+function activityLine(row) {
+  if (row.reason === "grant" && row.delta > 0) return `${row.delta} free credits`;
+  if (row.reason === "purchase" && row.delta > 0) return `${row.delta} credits bought`;
+  return "";
+}
 
 /**
  * The signed-in tool's top bar. The credit balance is always visible: a paid
@@ -13,7 +26,19 @@ import { CREDIT_EXPIRY_HINT } from "../constants";
 export default function AppBar({ account, view, onOpenSaved, onSignIn, onTopUp }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [ruleOpen, setRuleOpen] = useState(false);
+  const [activity, setActivity] = useState([]);
   const menuRef = useRef(null);
+
+  // The menu shows recent credit activity; fetch it when it opens.
+  useEffect(() => {
+    if (!menuOpen || !account.signedIn || account.owner) return undefined;
+    let cancelled = false;
+    api.get(`${API}/credits/history`)
+      .then(({ data }) => { if (!cancelled) setActivity((data.entries || []).filter((row) => activityLine(row))); })
+      .catch(() => { if (!cancelled) setActivity([]); });
+    return () => { cancelled = true; };
+  }, [menuOpen, account.signedIn, account.owner, account.balance]);
 
   useEffect(() => {
     if (!navOpen) return undefined;
@@ -33,6 +58,9 @@ export default function AppBar({ account, view, onOpenSaved, onSignIn, onTopUp }
   }, [menuOpen]);
 
   const signedIn = !account.loading && account.signedIn;
+  // Top up only once payments are switched on; until then there is nothing to buy.
+  const canTopUp = signedIn && !account.owner && account.paymentsEnabled;
+  const letter = (account.email || "").trim().charAt(0).toUpperCase();
 
   return (
     <header className="appbar no-print" data-testid="account-bar">
@@ -60,26 +88,61 @@ export default function AppBar({ account, view, onOpenSaved, onSignIn, onTopUp }
                   <span>{account.balance === 1 ? "credit" : "credits"}</span>
                 </span>
               )}
-              {!account.owner && (
+              {canTopUp && (
                 <button className="link hide-mobile" type="button" onClick={onTopUp} data-testid="top-up">
                   {account.balance === 0 ? "Get credits" : "Top up"}
                 </button>
               )}
               <div className="menu-wrap" ref={menuRef}>
                 <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={menuOpen}
-                        aria-label="Account menu" onClick={() => setMenuOpen((v) => !v)}>
-                  <User aria-hidden="true" />
+                        aria-label="Account menu" onClick={() => setMenuOpen((v) => !v)} data-testid="account-menu">
+                  {letter || <User aria-hidden="true" />}
                 </button>
                 {menuOpen && (
-                  <div className="menu" role="menu">
-                    <div className="menu__meta">
-                      <p className="t-label-s">Your account</p>
-                      <p className="t-caption c-tertiary">{account.owner ? "Owner access" : `${account.balance} ${account.balance === 1 ? "credit" : "credits"} left`}</p>
+                  <div className="menu menu--account" role="menu" data-testid="account-dropdown">
+                    <div className="menu__account">
+                      <span className="avatar avatar--lg" aria-hidden="true">{letter || <User />}</span>
+                      <div className="menu__who">
+                        <p className="t-label-s">{account.owner ? "Owner access" : "Your account"}</p>
+                        {account.email && <p className="t-caption c-tertiary menu__email">{account.email}</p>}
+                      </div>
                     </div>
-                    <button className="menu__item" role="menuitem" type="button" onClick={() => { setMenuOpen(false); onOpenSaved(); }}>
-                      <History /> Saved analyses
-                    </button>
+
                     {!account.owner && (
+                      <div className="menu__credits">
+                        <div className="menu__balance-row">
+                          <p className="menu__balance">
+                            <span className="menu__balance-num">{account.balance}</span>
+                            {account.balance === 1 ? "credit" : "credits"} remaining
+                          </p>
+                          <button type="button" className="menu__info" aria-expanded={ruleOpen}
+                                  aria-label="How credits work" onClick={() => setRuleOpen((v) => !v)} data-testid="credit-info">
+                            <Info aria-hidden="true" />
+                          </button>
+                        </div>
+                        <p className="t-caption c-tertiary" data-testid="credit-expiry">
+                          {account.balance > 0 && account.creditsExpireAt
+                            ? `Valid until ${when(account.creditsExpireAt)}`
+                            : "No credits left"}
+                        </p>
+                        {ruleOpen && <p className="menu__rule" data-testid="credit-rule">{CREDIT_RULE}</p>}
+                        {activity.length > 0 && (
+                          <ul className="menu__activity" aria-label="Recent credit activity">
+                            {activity.slice(0, 3).map((row) => (
+                              <li key={row.entry_id || `${row.reason}-${row.created_at}`}>
+                                <span>{activityLine(row)}</span>
+                                <span>{when(row.created_at)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
+                    <button className="menu__item" role="menuitem" type="button" onClick={() => { setMenuOpen(false); onOpenSaved(); }}>
+                      <History /> Saved products and comparisons
+                    </button>
+                    {canTopUp && (
                       <button className="menu__item" role="menuitem" type="button" onClick={() => { setMenuOpen(false); onTopUp(); }}>
                         <Plus /> Top up credits
                       </button>
@@ -114,7 +177,7 @@ export default function AppBar({ account, view, onOpenSaved, onSignIn, onTopUp }
             <div className="sheet__body">
               <nav className="mobile-links" aria-label="Analyser">
                 <a href={ANALYSE_PATH} onClick={linkTo(ANALYSE_PATH, () => setNavOpen(false))}><span>Analyse a product</span><ArrowRight aria-hidden="true" /></a>
-                <a href="#saved" onClick={(e) => { e.preventDefault(); setNavOpen(false); onOpenSaved(); }}><span>Saved analyses</span><ArrowRight aria-hidden="true" /></a>
+                <a href="#saved" onClick={(e) => { e.preventDefault(); setNavOpen(false); onOpenSaved(); }}><span>Saved products and comparisons</span><ArrowRight aria-hidden="true" /></a>
                 <a href={`${ANALYSE_PATH}?view=compare`} onClick={linkTo(`${ANALYSE_PATH}?view=compare`, () => setNavOpen(false))}><span>Compare products</span><ArrowRight aria-hidden="true" /></a>
                 <a href="/" onClick={linkTo("/", () => setNavOpen(false))}><span>Home</span><ArrowRight aria-hidden="true" /></a>
               </nav>
@@ -122,7 +185,7 @@ export default function AppBar({ account, view, onOpenSaved, onSignIn, onTopUp }
                 {signedIn ? (
                   <>
                     {!account.owner && <p className="t-body-s c-secondary">You have {account.balance} {account.balance === 1 ? "credit" : "credits"}.</p>}
-                    {!account.owner && <Button variant="secondary" size="lg" block icon={<Plus />} onClick={() => { setNavOpen(false); onTopUp(); }}>Top up credits</Button>}
+                    {canTopUp && <Button variant="secondary" size="lg" block icon={<Plus />} onClick={() => { setNavOpen(false); onTopUp(); }}>Top up credits</Button>}
                     <Button variant="ghost" size="lg" block icon={<LogOut />} onClick={() => { setNavOpen(false); account.signOut(); }}>Sign out</Button>
                   </>
                 ) : (

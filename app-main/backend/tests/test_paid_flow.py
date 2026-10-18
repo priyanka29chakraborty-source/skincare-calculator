@@ -477,10 +477,19 @@ def test_a_signed_in_caller_with_credits_gets_the_whole_comparison(client, funde
     assert data['verdict']['choose_if']
 
 
-def test_a_pair_costs_two_credits(client, funded):
+def test_a_pair_costs_two_credits_and_a_trio_three(client, funded):
+    """Two products cost 2. Three products cost 3."""
     before = client.get('/api/auth/me').json()['balance']
     client.post('/api/compare', json=compare_body())
-    assert client.get('/api/auth/me').json()['balance'] == before - 2
+    after_pair = client.get('/api/auth/me').json()['balance']
+    assert after_pair == before - 2
+    body = compare_body()
+    body['products'].append({
+        'product_name': 'C', 'category': 'Serum', 'price': 800, 'size_ml': 30,
+        'ingredients': 'Aqua, Azelaic Acid, Glycerin, Phenoxyethanol',
+    })
+    client.post('/api/compare', json=body)
+    assert client.get('/api/auth/me').json()['balance'] == after_pair - 3
 
 
 def test_a_comparison_costs_one_credit_per_product(client, funded):
@@ -539,10 +548,10 @@ def test_running_out_locks_the_next_comparison(client, signed_in):
     assert 'products' not in third
 
 
-def test_comparison_rejects_more_than_four(client):
+def test_comparison_rejects_more_than_six(client):
     resp = client.post('/api/compare', json={'products': [
         {'product_name': str(i), 'category': 'Serum',
-         'ingredients': 'Aqua, Glycerin'} for i in range(5)]})
+         'ingredients': 'Aqua, Glycerin'} for i in range(7)]})
     assert resp.status_code == 400
 
 
@@ -636,7 +645,7 @@ def test_the_comparison_gate_does_not_mutate_what_it_is_given(client):
                     'choose_if': [{'product_name': 'A'}]},
         'actives': {'shared': []}, 'concerns': [], 'tolerability': [], 'together': {},
     }
-    free = server._filter_comparison(built, False)
+    free = server._filter_comparison(built, False, 2)
 
     assert 'verdict' not in free
     assert all(k not in free for k in (
@@ -647,7 +656,7 @@ def test_the_comparison_gate_does_not_mutate_what_it_is_given(client):
     assert 'actives' in built
     assert 'access' not in built
 
-    paid = server._filter_comparison(built, True)
+    paid = server._filter_comparison(built, True, 2)
     assert 'choose_if' in paid['verdict']
     assert all(k in paid for k in ('actives', 'concerns', 'tolerability', 'together'))
 

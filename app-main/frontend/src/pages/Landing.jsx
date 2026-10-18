@@ -62,7 +62,7 @@ const FAQ = [
   ["Which products can I analyse?",
     "Face products in nine categories — serums, moisturisers, cleansers, toners, sunscreens, eye creams, masks, treatments and facial oils. Paste a product link or barcode, or enter the details yourself."],
   ["What do credits pay for?",
-    "The formulation score is free. A personal analysis — how a product suits your skin — uses 1 credit, and comparing starts at 2 credits — 2 for two products, 3 for three, 4 for four. Opening something you’ve already paid for again costs nothing."],
+    "The formulation score is free. A personal analysis — how a product suits your skin — uses 1 credit, and comparing starts at 2 credits — 2 for two products, 3 for three, and so on up to six. Opening something you’ve already paid for again costs nothing."],
   ["Do credits expire?", CREDIT_EXPIRY_HINT],
 ];
 
@@ -223,7 +223,7 @@ export default function Landing({ account, openUnlock }) {
               </div>
             </Feature>
             <Feature icon={<GitCompare />} title="Compare side by side"
-                     body="Up to four products on the same scale, with what each has that the others don’t.">
+                     body="Up to six products on the same scale, with what each has that the others don’t.">
               <div className="vs">
                 <div className="vs__item"><ScoreRing score={97} size="sm" animate={false} /><span className="t-caption c-secondary">Product A</span></div>
                 <span className="t-display-xs c-tertiary">vs</span>
@@ -278,7 +278,7 @@ export default function Landing({ account, openUnlock }) {
                   cta={<Button as="a" href={ANALYSE_PATH} onClick={linkTo(ANALYSE_PATH)} variant="secondary" block arrow>Analyse a product</Button>} />
             <Plan featured name="Sign in" price="4 credits" unit="free, first sign-in"
                   desc="Match products to your skin — your first 4 credits are on us."
-                  features={[["How it suits you", "1 credit"], ["Compare products", "from 2 credits"], ["Saved analyses"], ["Four extra questions for a sharper fit"]]}
+                  features={[["How it suits you", "1 credit"], ["Compare products", "from 2 credits"], ["Saved products and comparisons"], ["Four extra questions for a sharper fit"]]}
                   cta={<Button variant="primary" block arrow onClick={() => openUnlock("signin")}>Sign in with email</Button>} />
             <Plan name="Credit packs" price="₹99" unit="from · 5 credits"
                   desc="Top up when you need to. Every pack includes the PDF report, and credits last a year."
