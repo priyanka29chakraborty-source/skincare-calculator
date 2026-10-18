@@ -26,6 +26,7 @@ const PAGES = {
     body: [
       "We store the email you sign in with, the products you choose to save, and the credit balance on that account. After you sign in, a saved product shows under Saved, and you can remove it from that list.",
       "If you send feedback and include an email for a reply, that note and address are stored so we can read them. They are not shown on the public site.",
+      "When advertising is enabled, Google and its partners may use cookies and similar technologies to deliver advertisements on this site, including advertisements based on your visits here and on other websites. You can turn off personalised advertising in your Google account settings.",
       NON_REFUNDABLE,
     ],
   },
