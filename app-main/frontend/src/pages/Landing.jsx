@@ -269,7 +269,7 @@ export default function Landing({ account, openUnlock }) {
       {/* --------------------------------------------------------- Pricing */}
       <section className="section" id="pricing">
         <div className="container">
-          <SectionHead eyebrow="Pricing" title="The score is free. Always."
+          <SectionHead eyebrow="Pricing" title="The score is free."
                        lede="Pay only when you want a product matched to your own skin. Credits last a year." />
           <div className="plans">
             <Plan name="Score" price="Free" unit="for every product"
@@ -294,7 +294,7 @@ export default function Landing({ account, openUnlock }) {
         <div className="container faq">
           <div className="faq__head">
             <span className="t-eyebrow c-accent">FAQ</span>
-            <h2 className="t-display-m">Questions, answered plainly.</h2>
+            <h2 className="t-display-m">Questions, answered.</h2>
             <p className="t-body-m c-secondary">
               Something else? <a className="link" href="#feedback">Write to us</a> — a person reads every note.
             </p>
