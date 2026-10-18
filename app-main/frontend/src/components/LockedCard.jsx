@@ -13,12 +13,13 @@ import { Badge, Button, Card, Meter } from "./ds";
 export default function LockedCard({
   title, access, lines, onUnlock, ctaLabel = "Unlock with 1 credit", message,
   note = "Locked means unknown — not bad. One credit covers this product for good.",
+  eyebrow = "Personal fit", testId = "locked-card",
 }) {
   const preview = access?.preview || {};
   return (
-    <Card eyebrow="Personal fit" title={title}
+    <Card eyebrow={eyebrow} title={title}
           aside={<Badge><Lock aria-hidden="true" style={{ width: 12, height: 12 }} />Locked</Badge>}
-          data-testid="locked-card">
+          data-testid={testId}>
       <div className="stack" style={{ "--stack-gap": "16px" }}>
         {(lines || []).map((line) => <Meter key={line} label={line} unknown />)}
       </div>

@@ -62,7 +62,7 @@ const FAQ = [
   ["Which products can I analyse?",
     "Face products in nine categories — serums, moisturisers, cleansers, toners, sunscreens, eye creams, masks, treatments and facial oils. Paste a product link or barcode, or enter the details yourself."],
   ["What do credits pay for?",
-    "The formulation score is free. A personal analysis — how a product suits your skin — uses 1 credit, and comparing starts at 2 credits — 2 for two products, 3 for three, and so on up to six. Opening something you’ve already paid for again costs nothing."],
+    "The formulation score is free. A personal analysis — how a product suits your skin — uses 1 credit, and comparing starts at 2 credits — 2 for two products, 3 for three, 4 for four. Opening something you’ve already paid for again costs nothing."],
   ["Do credits expire?", CREDIT_EXPIRY_HINT],
 ];
 
@@ -223,7 +223,7 @@ export default function Landing({ account, openUnlock }) {
               </div>
             </Feature>
             <Feature icon={<GitCompare />} title="Compare side by side"
-                     body="Up to six products on the same scale, with what each has that the others don’t.">
+                     body="Up to four products on the same scale, with what each has that the others don’t.">
               <div className="vs">
                 <div className="vs__item"><ScoreRing score={97} size="sm" animate={false} /><span className="t-caption c-secondary">Product A</span></div>
                 <span className="t-display-xs c-tertiary">vs</span>

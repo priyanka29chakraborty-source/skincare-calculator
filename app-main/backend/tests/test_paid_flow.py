@@ -295,6 +295,17 @@ def test_a_paid_analysis_returns_the_full_payload(client, funded):
     assert 'skin_concern_fit' in body
 
 
+def test_alternatives_stay_locked_until_the_product_is_paid_for(client, funded):
+    product = analysis_body()
+    alts = {'product_category': 'Serum', 'key_actives': [], 'user_concerns': [],
+            'user_concern_fit': {}, 'ingredients': product['ingredients']}
+    price = {'product_name': 'X', 'ingredients': product['ingredients'], 'category': 'Serum'}
+    assert client.post('/api/find-alternatives', json=alts).json()['access']['tier'] == 'free'
+    assert client.post('/api/best-price', json=price).json()['access']['tier'] == 'free'
+    client.post('/api/analyze', json=product)
+    assert 'access' not in client.post('/api/find-alternatives', json=alts).json()
+
+
 def test_a_paid_analysis_costs_one_credit(client, funded):
     client.post('/api/analyze', json=analysis_body())
     assert client.get('/api/auth/me').json()['balance'] == 11
@@ -548,10 +559,10 @@ def test_running_out_locks_the_next_comparison(client, signed_in):
     assert 'products' not in third
 
 
-def test_comparison_rejects_more_than_six(client):
+def test_comparison_rejects_more_than_four(client):
     resp = client.post('/api/compare', json={'products': [
         {'product_name': str(i), 'category': 'Serum',
-         'ingredients': 'Aqua, Glycerin'} for i in range(7)]})
+         'ingredients': 'Aqua, Glycerin'} for i in range(5)]})
     assert resp.status_code == 400
 
 

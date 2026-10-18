@@ -74,11 +74,14 @@ def test_nothing_is_charged(client):
                 json={'email': 'buyer@example.com', 'code': code})
     account = wallet.get_or_create_account('buyer@example.com')
     wallet.grant(account, 10, reference='manual')
+    # Sign-in already added the 4 trial credits, so the grant leaves 14.
+    # The paywall is off: the three analyses must not spend any of them.
+    after_grant = wallet.get_balance(account)
 
     for _ in range(3):
         assert client.post('/api/analyze', json=body()).json()['access']['tier'] == 'full'
 
-    assert wallet.get_balance(account) == 10
+    assert wallet.get_balance(account) == after_grant
     assert [e for e in wallet.history(account) if e['reason'] == 'spend'] == []
 
 
@@ -96,3 +99,31 @@ def test_the_ledger_still_works_while_the_gate_is_open(client):
     assert wallet.grant(account, 5, reference='pay_1') == 5
     assert wallet.grant(account, 5, reference='pay_1') is None
     assert wallet.get_balance(account) == 5
+
+
+def alternatives_body(**kw):
+    out = {'product_category': 'Serum', 'key_actives': ['Niacinamide'],
+           'user_concerns': [], 'user_concern_fit': {},
+           'ingredients': 'Aqua, Niacinamide', 'category': 'Serum'}
+    out.update(kw)
+    return out
+
+
+def test_alternatives_and_best_price_need_sign_in(client):
+    """They belong to the personal analysis, so a signed-out caller gets the lock."""
+    alts = client.post('/api/find-alternatives', json=alternatives_body()).json()
+    assert alts['access']['tier'] == 'free'
+    assert alts['scored_alternatives'] == [] and alts['basic_alternatives'] == []
+    price = client.post('/api/best-price', json={
+        'product_name': 'Niacinamide 10%', 'ingredients': 'Aqua, Niacinamide',
+        'category': 'Serum'}).json()
+    assert price == {'access': {'tier': 'free', 'message': 'Part of the personal analysis.'}}
+
+
+def test_a_signed_in_caller_gets_the_alternatives_search(client):
+    import identity
+    code = identity.issue_code('buyer@example.com')
+    client.post('/api/auth/verify-code', json={'email': 'buyer@example.com', 'code': code})
+    alts = client.post('/api/find-alternatives', json=alternatives_body()).json()
+    assert 'access' not in alts
+    assert alts['skip_reason'] == 'no_concerns'

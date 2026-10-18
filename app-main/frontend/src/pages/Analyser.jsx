@@ -122,11 +122,12 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
         user_price: parseFloat(price) || 0,
         user_size_ml: parseFloat(size) || 30,
         user_product_name: productName || "",
+        ingredients,
       });
       setAlternatives(data);
     } catch { setAlternatives(null); }
     finally { setAltLoading(false); }
-  }, [category, country, currency, skinType, concerns, price, size, productName]);
+  }, [category, country, currency, skinType, concerns, price, size, productName, ingredients]);
 
   const fetchBestPrice = useCallback(async () => {
     const isUrl = productUrl.startsWith("http");
@@ -142,13 +143,14 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
         country, currency,
         user_price: parseFloat(price) || 0,
         user_url: isUrl ? productUrl : null,
+        ingredients, category,
       });
       setBestPrice(data);
     } catch (e) {
       setBestPrice(null);
       setBestPriceError(`${describeError(e)} Price search did not finish.`);
     } finally { setBestPriceLoading(false); }
-  }, [productName, brand, productUrl, size, country, currency, price]);
+  }, [productName, brand, productUrl, size, country, currency, price, ingredients, category]);
 
   // Re-score with personal context. Only the fit and advisories can change -
   // the formulation score is computed from the product alone.
@@ -199,6 +201,9 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
       track("analysis_completed");
       // A credit may have been spent; never leave the balance stale.
       if (accountRef.current.signedIn) accountRef.current.refresh();
+      // Alternatives and the shop search are paid, like the personal fit.
+      const paid = accountRef.current.signedIn && data.access?.tier !== "free";
+      if (!paid) return;
       const weak = Object.values(data.skin_concern_fit || {})
         .filter((v) => (typeof v === "object" ? v.score : v) < 75);
       if (data.main_worth_score < 75 && weak.length > 0 && concerns.length > 0) fetchAlts(data);
@@ -386,7 +391,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
         <div className="analyse-head">
           <p className="t-eyebrow c-accent">Compare</p>
           <h1 className="t-display-m">Which one is worth it?</h1>
-          <p className="t-body-l c-secondary">Two to six products, scored on the same scale, with what each has that the others don’t.</p>
+          <p className="t-body-l c-secondary">Two to four products, scored on the same scale, with what each has that the others don’t.</p>
         </div>
         <CompareCard autoOpen preset={comparePreset} signedIn={account.signedIn} currency={currency} skinType={skinType} concerns={concerns}
                      onUnlock={() => openUnlock(account.signedIn ? "credits" : "signin", null, "compare")}

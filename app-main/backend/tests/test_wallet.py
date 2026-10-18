@@ -326,11 +326,11 @@ def test_one_accounts_history_never_shows_another(wallet):
 
 def test_the_three_packs_are_priced_as_agreed(wallet):
     assert wallet.CREDIT_PACKS['starter'] == {
-        'credits': 5, 'amount_paise': 9900, 'label': '5 analyses'}
+        'credits': 5, 'amount_paise': 9900, 'label': '5 credits'}
     assert wallet.CREDIT_PACKS['regular'] == {
-        'credits': 8, 'amount_paise': 14900, 'label': '8 analyses'}
+        'credits': 8, 'amount_paise': 14900, 'label': '8 credits'}
     assert wallet.CREDIT_PACKS['bulk'] == {
-        'credits': 12, 'amount_paise': 19900, 'label': '12 analyses'}
+        'credits': 12, 'amount_paise': 19900, 'label': '12 credits'}
 
 
 def test_prices_are_whole_paise(wallet):

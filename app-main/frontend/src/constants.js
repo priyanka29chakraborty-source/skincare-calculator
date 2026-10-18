@@ -2,7 +2,7 @@ export const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
 // Credits: when they lapse (shown beside the balance and in the FAQ), and the
 // whole rule (the account menu's "how credits work").
 export const CREDIT_EXPIRY_HINT = "Credits last one year from the day they are added, including the 4 from your first sign-in. If you buy more while some are still left, those remaining credits last until the new credits expire. Credits that have already expired are not restored.";
-export const CREDIT_RULE = "A personal analysis costs 1 credit. A comparison starts at 2 credits: 2 for two products, 3 for three, and so on up to six. Opening the same product or the same comparison again costs nothing. " + CREDIT_EXPIRY_HINT;
+export const CREDIT_RULE = "A personal analysis costs 1 credit. A comparison starts at 2 credits: 2 for two products, 3 for three, 4 for four. Opening the same product or the same comparison again costs nothing. " + CREDIT_EXPIRY_HINT;
 
 // Google AdSense ad unit ids, one per placement. Nothing renders in production
 // until REACT_APP_ADSENSE_CLIENT and the matching slot id are set.
