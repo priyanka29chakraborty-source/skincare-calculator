@@ -9,7 +9,7 @@ import { API, api, describeError } from "../api";
 import { track } from "../track";
 import { Badge, Button, Callout, Card, ScoreRing, Select, cx } from "./ds";
 
-const MAX_PRODUCTS = 6;
+const MAX_PRODUCTS = 4;
 
 const EMPTY = {
   product_name: "", brand: "", category: "Serum",
@@ -20,9 +20,9 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
   "Eye Cream", "Mask", "Treatment", "Facial Oil"];
 
 /**
- * Two or more products side by side, up to six.
+ * Two to four products side by side.
  *
- * Paid. One credit per product compared (two for a pair), up to six, and it
+ * Paid. One credit per product compared (two for a pair), up to four, and it
  * needs an account. Opening the same set of products again does not
  * spend another. A single product's formulation score stays free.
  *
@@ -123,7 +123,7 @@ export default function CompareCard({ seed, preset, currency, skinType, concerns
   if (!open) {
     return (
       <Card eyebrow="Compare" title="Compare with another product" className="no-print" data-testid="compare-prompt"
-            sub="Two to six products side by side. Comparing starts at 2 credits — 2 for two products, 3 for three, and so on. Opening the same products again is free."
+            sub="Two to four products side by side. Comparing starts at 2 credits — 2 for two products, 3 for three, 4 for four. Opening the same products again is free."
             aside={<Button variant="secondary" icon={<GitCompare />} onClick={start} data-testid="compare-start">Compare</Button>} />
     );
   }

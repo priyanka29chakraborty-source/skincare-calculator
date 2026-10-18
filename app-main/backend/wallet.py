@@ -52,14 +52,14 @@ logger = logging.getLogger(__name__)
 # Prices are in paise, the smallest unit, because that is what Razorpay's API
 # takes and because float rupees would eventually produce a 98.99999 charge.
 CREDIT_PACKS = {
-    'starter': {'credits': 5,  'amount_paise': 9900,  'label': '5 analyses'},
-    'regular': {'credits': 8,  'amount_paise': 14900, 'label': '8 analyses'},
-    'bulk':    {'credits': 12, 'amount_paise': 19900, 'label': '12 analyses'},
+    'starter': {'credits': 5,  'amount_paise': 9900,  'label': '5 credits'},
+    'regular': {'credits': 8,  'amount_paise': 14900, 'label': '8 credits'},
+    'bulk':    {'credits': 12, 'amount_paise': 19900, 'label': '12 credits'},
 }
 
 # One personalised analysis costs one credit. A comparison costs one credit
 # per product compared, with a pair as the minimum: two products cost two,
-# three cost three, and so on up to six.
+# three cost three, and four cost four.
 COST_PER_ANALYSIS = 1
 COST_PER_COMPARISON = 2
 

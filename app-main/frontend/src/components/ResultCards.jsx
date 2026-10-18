@@ -272,17 +272,21 @@ function evidenceBadge(raw) {
   return ["neutral", "Minimal"];
 }
 
-function MechanismTip({ text }) {
+/** "Tier 1" on screen; what the tier means on hover, focus or tap. */
+function TierTag({ tier }) {
   const [show, setShow] = useState(false);
-  if (!text) return null;
+  if (!tier) return null;
+  const [label, ...rest] = String(tier).split(":");
+  const meaning = rest.join(":").trim();
+  if (!meaning) return <span className="tier-tag">{label}</span>;
   return (
     <span className="tip">
-      <button type="button" className="tip__btn" aria-label="How it works" aria-expanded={show}
+      <button type="button" className="tier-tag" aria-label={`${label}: ${meaning}`} aria-expanded={show}
               onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
               onFocus={() => setShow(true)} onBlur={() => setShow(false)} onClick={() => setShow((s) => !s)}>
-        <Info aria-hidden="true" />
+        {label}
       </button>
-      {show && <span className="tip__bubble" role="tooltip"><strong>How it works</strong>{text}</span>}
+      {show && <span className="tip__bubble" role="tooltip"><strong>{label}</strong>{meaning}</span>}
     </span>
   );
 }
@@ -347,8 +351,7 @@ export function IngredientsCard({ result, category }) {
                 <div className="itable__main" role="cell">
                   <p className="itable__name">
                     <span>{a.name}</span>
-                    <MechanismTip text={a.mechanism_of_action} />
-                    {a.activity_tier && <span className="tier-tag">{a.activity_tier.split(":")[0]}</span>}
+                    <TierTag tier={a.activity_tier} />
                   </p>
                   {what && <p className="t-caption c-secondary">{what}</p>}
                   {a.targets?.filter((t) => t && t.trim()).length > 0 && (

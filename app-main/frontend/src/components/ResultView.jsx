@@ -43,15 +43,16 @@ export default function ResultView(props) {
   const personalLocked = result?.access?.tier === "free" || !signedIn;
   const hasAnswers = (result?.personalisation?.level || "none") !== "none";
   const sunscreen = result.skin_concern_fit?.["Sun Protection"]?.sunscreen_analysis;
-  const showAlternatives = !personalLocked;
+  const lockedNote = signedIn ? "Locked means unknown — not bad. One credit covers this product for good."
+    : "Your first 4 credits are free when you sign in.";
 
   const sections = useMemo(() => [
     ["overview", "Overview"],
     ["ingredients", "Ingredients"],
     ["fit", "Your fit"],
     ["value", "Value"],
-    ...(showAlternatives ? [["alternatives", "Alternatives"]] : []),
-  ], [showAlternatives]);
+    ["alternatives", "Alternatives"],
+  ], []);
 
   const active = useScrollSpy(sections.map(([id]) => id));
   const unlockLabel = signedIn ? "Unlock with 1 credit" : "Sign in — get 4 free credits";
@@ -102,8 +103,7 @@ export default function ResultView(props) {
                   title="How this suits you" access={result.access} onUnlock={onUnlock} ctaLabel={unlockLabel}
                   message={result.access?.message || (signedIn ? null
                     : "Sign in to see how well this product treats your concerns, whether it suits your skin type, and what to watch out for.")}
-                  note={signedIn ? "Locked means unknown — not bad. One credit covers this product for good."
-                    : "Your first 4 credits are free when you sign in."}
+                  note={lockedNote}
                   lines={[
                     ...lockedConcerns.map((c) => `How well it treats ${c}`),
                     `Whether it suits ${String(skinType || "your").toLowerCase()} skin`,
@@ -136,17 +136,37 @@ export default function ResultView(props) {
             <section id="value" className="result-section" aria-label="Value">
               <ValueCard value={result.value_assessment} priceAnalysis={result.price_analysis}
                          currency={currency} category={category} />
-              <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
-                             bestPriceError={bestPriceError} onRetry={onRetryBestPrice}
-                             currency={currency} productUrl={productUrl} />
+              {personalLocked ? (
+                <LockedCard
+                  eyebrow="Where to buy" title="Best price we could find" testId="locked-best-price"
+                  onUnlock={onUnlock} ctaLabel={unlockLabel} note={lockedNote}
+                  message={signedIn
+                    ? "The shop search is part of the personal analysis for this product."
+                    : "Sign in to search other shops for this exact product, same brand and same size."}
+                  lines={["Other shops selling this exact product", "The cheapest price we could find"]}
+                />
+              ) : (
+                <BestPriceCard bestPrice={bestPrice} bestPriceLoading={bestPriceLoading}
+                               bestPriceError={bestPriceError} onRetry={onRetryBestPrice}
+                               currency={currency} productUrl={productUrl} />
+              )}
             </section>
 
-            {showAlternatives && (
-              <section id="alternatives" className="result-section" aria-label="Alternatives">
+            <section id="alternatives" className="result-section" aria-label="Alternatives">
+              {personalLocked ? (
+                <LockedCard
+                  eyebrow="Alternatives" title="Products that may suit you better" testId="locked-alternatives"
+                  onUnlock={onUnlock} ctaLabel={unlockLabel} note={lockedNote}
+                  message={signedIn
+                    ? "Alternatives are part of the personal analysis for this product."
+                    : "Sign in to see products that may cover your concerns better."}
+                  lines={["Products scored on the same scale", "What each covers that this one doesn’t"]}
+                />
+              ) : (
                 <AlternativesCard result={result} concerns={concerns} alternatives={alternatives}
                                   altLoading={altLoading} currency={currency} category={category} />
-              </section>
-            )}
+              )}
+            </section>
 
             <MethodNote />
 

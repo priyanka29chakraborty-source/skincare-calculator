@@ -65,6 +65,9 @@ export default function PrintReport({
   // The server already withheld the personal sections; this is what the
   // document says about that. `access.tier` is the server's answer.
   const isFree = result.access?.tier === "free";
+  // Same rule as the result screen: the personal fit is shown only after the
+  // personal questions are answered, so the report includes it only then.
+  const showPersonal = !isFree && (result.personalisation?.level || "none") !== "none";
 
   const unit = sizeUnit === "g" ? "g" : "ml";
   const perUnit = (price && size) ? Number(price) / Number(size) : null;
@@ -200,7 +203,7 @@ export default function PrintReport({
       )}
 
       {/* ------------------------------------------------------- suitability */}
-      {Object.keys(concernFit).length > 0 && (
+      {showPersonal && Object.keys(concernFit).length > 0 && (
         <section className="pr-section">
           <h2>Against the concerns selected</h2>
           <table className="pr-table">
@@ -220,7 +223,7 @@ export default function PrintReport({
         </section>
       )}
 
-      {typeof compat === "number" && (
+      {showPersonal && typeof compat === "number" && (
         <section className="pr-section">
           <h2>Suitability for {String(skinType || "this").toLowerCase()} skin</h2>
           <p><strong>{compat}%</strong> compatible.</p>
@@ -266,22 +269,6 @@ export default function PrintReport({
               <p>{f.message}</p>
             </div>
           ))}
-        </section>
-      )}
-
-      {isFree && (
-        <section className="pr-section pr-upgrade">
-          <h2>Not covered in this report</h2>
-          <p>
-            Everything above is about the product itself and is the same for
-            every reader. It does not cover how this suits <em>you</em>: how
-            well it treats the concerns you selected, whether it suits your
-            skin type, what in it is likely to give you trouble, and how it
-            fits alongside what you already use.
-          </p>
-          <p className="pr-muted">
-            That part is in the full report, at urancal.com.
-          </p>
         </section>
       )}
 

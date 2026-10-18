@@ -189,6 +189,9 @@ class FindAlternativesRequest(BaseModel):
     user_price: Optional[float] = 0
     user_size_ml: Optional[float] = 30
     user_product_name: Optional[str] = None
+    # The product these are alternatives to, so the server can check it was paid for.
+    ingredients: Optional[str] = None
+    category: Optional[str] = None
 
 
 @api_router.get("/")
@@ -329,11 +332,23 @@ def _product_fingerprint(product_data):
     the category decides which rubric scores it, so the same INCI sold as a
     serum and as a toner is genuinely two analyses.
     """
-    ingredients = re.sub(r'[\s,]+', ',',
-                         (product_data.get('ingredients') or '').strip().lower())
-    category = (product_data.get('category') or '').strip().lower()
-    return hashlib.sha256(
-        ('%s|%s' % (category, ingredients)).encode('utf-8')).hexdigest()[:32]
+    return history.fingerprint(product_data.get('ingredients'),
+                               product_data.get('category'))
+
+
+def _save_history(request, product_data, result, entitled, brand):
+    """Saved for signed-in accounts so a product can be re-opened later.
+
+    Keyed on the product, not the cache key: the same product run with another
+    skin type, concern or price is still one row. product_data omits brand
+    because it does not change the score, so it is added back here.
+    """
+    account_id = current_account(request)
+    if not account_id:
+        return
+    history.record(account_id, history.product_key(product_data), result, dict(
+        product_data, brand=brand, skin_concerns=product_data['concerns'],
+    ), entitled)
 
 
 def _spend_reference(account_id, product_data):
@@ -583,6 +598,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
             # cached object directly would hand a free caller the paid data
             # whenever anyone had analysed the same product before them, which
             # is precisely how a paywall leaks without anyone noticing.
+            _save_history(request, product_data, cached, entitled,
+                          _sanitize(req.brand or ''))
             _out = filter_for_entitlement(cached, entitled)
             if not entitled:
                 audit_no_paid_leakage(_out)
@@ -642,21 +659,10 @@ async def analyze(req: AnalyzeRequest, request: Request):
         # editable field. Until accounts and credits exist this resolves to
         # False, so the free payload is what ships and the gate is exercised in
         # production from day one rather than bolted on later.
-        # Saved for signed-in accounts so a product can be re-opened later.
         # record() swallows its own failures: history is a convenience, and a
         # storage hiccup must not turn a successful analysis into an error.
-        _account = current_account(request)
-        if _account:
-            # product_data is the cache key's input, so it deliberately omits
-            # fields that do not change the score - brand is one. History needs
-            # them for display, so they are added here rather than widened into
-            # the cache key, where brand would split the cache for two
-            # identically formulated products.
-            history.record(_account, cache_key, result, dict(
-                product_data,
-                brand=_sanitize(req.brand or ''),
-                skin_concerns=product_data['concerns'],
-            ), entitled)
+        _save_history(request, product_data, result, entitled,
+                      _sanitize(req.brand or ''))
 
         result = filter_for_entitlement(result, entitled)
         if not entitled:
@@ -865,10 +871,38 @@ def _serp_shopping_search(query, country, serp_key, num=10):
     return []
 
 
+def _product_paid_for(request: Request, ingredients, category) -> bool:
+    """Whether this caller may see the paid extras for one product.
+
+    Alternatives and the best-price search belong to the personal analysis,
+    so they need an account, and with the paywall on, the credit for this
+    product must already have been spent. Nothing is charged here.
+    """
+    account_id = current_account(request)
+    if not account_id:
+        return False
+    if not _PAYWALL_ENABLED or _DEV_UNLOCK or wallet.is_owner(account_id):
+        return True
+    category_raw = (_sanitize(category or '') or 'serum').lower()
+    if category_raw not in VALID_CATEGORIES:
+        category_raw = 'serum'
+    reference = _spend_reference(account_id, {
+        'ingredients': _sanitize(ingredients or ''),
+        'category': category_raw.title(),
+    })
+    return bool(reference) and wallet.already_spent(reference)
+
+
+_LOCKED_EXTRA = {'tier': 'free', 'message': 'Part of the personal analysis.'}
+
+
 @api_router.post("/find-alternatives")
 @limiter.limit("10/minute")
 async def find_alternatives(req: FindAlternativesRequest, request: Request):
     """See best_price: tagging happens after the alternatives are chosen."""
+    if not _product_paid_for(request, req.ingredients, req.product_category):
+        return {"scored_alternatives": [], "basic_alternatives": [],
+                "user_score": req.user_score, "access": dict(_LOCKED_EXTRA)}
     return disclosure_for(await _find_alternatives_impl(req, request))
 
 
@@ -1251,6 +1285,8 @@ class BestPriceRequest(BaseModel):
     currency: str = "INR"
     user_price: Optional[float] = 0
     user_url: Optional[str] = None
+    ingredients: Optional[str] = None
+    category: Optional[str] = None
 
 
 def _normalize_product_key(name, brand=None, size=None):
@@ -1315,6 +1351,8 @@ async def best_price(req: BestPriceRequest, request: Request):
     price and product match, then tagged. It also guarantees a tagged link
     never ships without its required disclosure.
     """
+    if not _product_paid_for(request, req.ingredients, req.category):
+        return {"access": dict(_LOCKED_EXTRA)}
     return disclosure_for(await _best_price_impl(req, request))
 
 
@@ -1490,7 +1528,6 @@ app.add_middleware(
     allow_origins=[
         "https://urancal.com",
         "https://www.urancal.com",
-        "https://tool.urancal.com",
         "https://skincare-calculator.pages.dev",
         "http://localhost:3000",
         "http://localhost:5001",

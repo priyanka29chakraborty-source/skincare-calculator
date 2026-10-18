@@ -6,10 +6,8 @@ import { categoryLabel } from "../constants";
 /**
  * Shown while the analysis runs.
  *
- * Only the first line is ticked, because it is the only step the browser has
- * actually finished - it counted the ingredients itself. The rest describe the
- * work the engine is doing, in the order it does it; the current one is
- * highlighted but never marked done before the result exists.
+ * The steps describe the work the engine does, in the order it does it. Each
+ * one is ticked once the next is highlighted.
  */
 export default function AnalysingState({ ingredientCount, category, productName }) {
   const [current, setCurrent] = useState(1);
@@ -35,7 +33,7 @@ export default function AnalysingState({ ingredientCount, category, productName 
         <h1 className="t-display-s">Reading the <em>formula</em>…</h1>
         <ol className="analysing__steps">
           {steps.map((s, i) => {
-            const state = i === 0 ? "done" : i === current ? "active" : i < current ? "passed" : "todo";
+            const state = i < current ? "done" : i === current ? "active" : "todo";
             return (
               <li key={s} className={`analysing__step analysing__step--${state}`}>
                 <span className="analysing__dot" aria-hidden="true">{state === "done" && <Check />}</span>

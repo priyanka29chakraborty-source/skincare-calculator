@@ -47,7 +47,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MAX_PRODUCTS = 6
+MAX_PRODUCTS = 4
 MIN_PRODUCTS = 2
 
 # Below this gap the two formulations are treated as equivalent. Chosen to
