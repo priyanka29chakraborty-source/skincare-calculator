@@ -854,9 +854,13 @@ body::before {
 /* ========== ACCOUNT ========== */
 /* Above the header. Sign in is always available. */
 .account-bar {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: calc(12px + (100% - 100vw) / 2);
+  z-index: 30;
   display: flex; align-items: center; justify-content: flex-end;
   gap: 12px; flex-wrap: wrap;
-  width: 100%; margin: 0 0 8px;
+  width: auto; margin: 0;
   padding: 0;
   background: none; border: none;
   font-family: 'DM Sans', sans-serif; font-size: 0.78rem; color: var(--text-sub);
@@ -882,6 +886,76 @@ body::before {
 }
 .account-link:hover { color: var(--charcoal); }
 .account-link:focus-visible { outline: none; box-shadow: var(--focus-ring-strong); border-radius: 4px; }
+
+.account-menu-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 12px 4px 4px; cursor: pointer;
+  font-family: inherit; color: var(--charcoal);
+}
+.account-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--dusty-rose); color: #fff;
+  font-weight: 700; font-size: 0.9rem;
+}
+.account-menu-credits { font-size: 0.84rem; font-weight: 700; }
+.account-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
+  width: min(360px, calc(100vw - 24px));
+  max-height: 70vh; overflow: auto;
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(30,41,59,0.16);
+  padding: 14px 14px 8px;
+  text-align: left;
+}
+.account-menu-email {
+  margin: 0 0 10px; font-size: 0.78rem; color: var(--text-sub); word-break: break-all;
+}
+.account-menu-balance {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0; font-weight: 700; color: var(--charcoal);
+}
+.account-info {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--border); background: #fff;
+  font-family: inherit; font-size: 0.75rem; font-weight: 700;
+  color: var(--dusty-rose-dark); cursor: pointer;
+}
+.account-rule, .account-expiry, .account-empty {
+  margin: 8px 0 0; font-size: 0.75rem; line-height: 1.5; color: var(--text-sub);
+}
+.account-topup, .account-signout, .account-history-actions button {
+  font-family: inherit; cursor: pointer;
+}
+.account-topup {
+  margin-top: 10px; background: var(--charcoal); color: #fff;
+  border: none; border-radius: 999px; padding: 7px 14px; font-weight: 700;
+}
+.account-activity, .account-history ul {
+  list-style: none; margin: 10px 0 0; padding: 0;
+}
+.account-activity li, .account-history li {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 8px 0; border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+.account-history-head {
+  margin: 14px 0 0; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--charcoal);
+}
+.account-history li { align-items: flex-start; flex-direction: column; }
+.account-history li strong { display: block; font-size: 0.8rem; }
+.account-history li span { color: var(--text-sub); }
+.account-history-actions { display: flex; gap: 10px; }
+.account-history-actions button, .account-signout {
+  background: none; border: none; padding: 0;
+  color: var(--dusty-rose-dark); font-weight: 700; font-size: 0.75rem;
+}
+.account-signout {
+  display: block; width: 100%; text-align: left;
+  margin-top: 12px; padding: 12px 0 6px; border-top: 1px solid var(--border);
+}
 
 /* ========== UNLOCK MODAL ========== */
 .modal-backdrop {
@@ -929,7 +1003,9 @@ body::before {
   --signin-ok: #3f7a5c;
   --signin-on: #ffffff;
   position: fixed; inset: 0; z-index: 1000;
-  display: grid; place-items: center; padding: 16px; overflow-y: auto;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px 28px;
+  overflow-y: auto;
   background: rgba(44, 53, 80, 0.4);
   backdrop-filter: blur(5px);
 }
@@ -943,7 +1019,8 @@ body::before {
   }
 }
 .signin-modal {
-  position: relative; width: min(420px, 100%); margin-top: 70px;
+  position: relative; width: min(420px, 100%); flex: 0 0 auto;
+  margin: 140px 0 16px;
   background: var(--signin-card); color: var(--signin-ink);
   border-radius: 28px; box-shadow: 0 30px 70px -25px rgba(44, 53, 80, 0.5);
   padding: 0 28px 26px; text-align: center;
@@ -1026,7 +1103,7 @@ body::before {
   color: var(--signin-deep); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
 }
 @media (max-width: 420px) {
-  .signin-modal { padding: 0 18px 22px; }
+  .signin-modal { padding: 0 18px 22px; margin-top: 140px; }
   .signin-modal h2 { font-size: 1.5rem; }
 }
 .modal-lede { font-size: 0.86rem; line-height: 1.65; color: var(--charcoal); margin-bottom: 20px; }

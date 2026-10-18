@@ -1,5 +1,5 @@
 export const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
-export const CREDIT_EXPIRY_HINT = "Credits expire one year after they are added, including the 4 from your first sign-in.";
+export const CREDIT_EXPIRY_HINT = "A personal analysis costs 1 credit. A comparison always includes at least two products, so it starts at 2 credits. Three products cost 3, four cost 4, five cost 5, and six cost 6. Opening the same product or the same comparison again costs nothing. Credits last one year from the day they are added. If you buy more while some are still left, those remaining credits last until the new credits expire. Credits that have already expired are not restored.";
 // Set REACT_APP_BACKEND_URL in Render environment to your backend URL e.g. https://your-backend.onrender.com
 
 export const CONCERNS_LIST = [

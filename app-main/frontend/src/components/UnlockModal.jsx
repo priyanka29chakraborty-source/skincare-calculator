@@ -48,13 +48,14 @@ export default function UnlockModal({ open, onClose, account, onPurchased, onSig
     return () => { cancelled = true; };
   }, [open, packs]);
 
-  // Escape closes, and focus does not escape to the page behind.
+  // The sign-in card stays up until its close mark is used. Escape still
+  // closes the credit packs card.
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || step !== "packs") return undefined;
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, step]);
 
   if (!open) return null;
 
@@ -134,8 +135,7 @@ export default function UnlockModal({ open, onClose, account, onPurchased, onSig
 
   if (step !== "packs") {
     return (
-      <div className="signin-overlay" role="presentation" data-testid="unlock-modal"
-           onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="signin-overlay" role="presentation" data-testid="unlock-modal">
         <div className="signin-modal" role="dialog" aria-modal="true" aria-labelledby="signin-title">
           <button className="signin-close" onClick={onClose} aria-label="Close" type="button">&times;</button>
           <Bottle />

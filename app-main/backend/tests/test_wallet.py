@@ -285,6 +285,21 @@ def test_a_later_purchase_survives_an_older_pack_expiring(wallet, account, monke
     monkeypatch.setattr(wallet, '_now', lambda: later)
     wallet.grant(account, 2, reference='pay_new')
     monkeypatch.setattr(wallet, '_now', lambda: bought + wallet.CREDIT_LIFETIME_SECONDS + 5)
+    # The first pack was still valid when the second was bought, so those
+    # remaining credits take the new expiry. Both packs are still live here.
+    assert wallet.get_balance(account) == 7
+    monkeypatch.setattr(wallet, '_now', lambda: later + wallet.CREDIT_LIFETIME_SECONDS + 5)
+    assert wallet.get_balance(account) == 0
+
+
+def test_a_purchase_does_not_restore_credits_that_already_expired(wallet, account, monkeypatch):
+    bought = 1_700_000_000.0
+    monkeypatch.setattr(wallet, '_now', lambda: bought)
+    wallet.grant(account, 5, reference='pay_old')
+    later = bought + wallet.CREDIT_LIFETIME_SECONDS + 5
+    monkeypatch.setattr(wallet, '_now', lambda: later)
+    assert wallet.get_balance(account) == 0
+    wallet.grant(account, 2, reference='pay_new')
     assert wallet.get_balance(account) == 2
 
 

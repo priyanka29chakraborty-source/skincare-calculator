@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { money, categoryLabel } from "../constants";
 import { API, api, describeError } from "../api";
 import { track } from "../track";
 
-const MAX_PRODUCTS = 4;
+const MAX_PRODUCTS = 6;
 
 const EMPTY = {
   product_name: "", brand: "", category: "Serum",
@@ -16,9 +16,9 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
   "Eye Cream", "Mask", "Treatment", "Facial Oil"];
 
 /**
- * Two to four products side by side.
+ * Two or more products side by side, up to six.
  *
- * Paid. Two credits cover this pair. Opening the same pair again does not
+ * Paid. One credit for each product. Opening the same set again does not
  * spend another. A single product's formulation score stays free.
  *
  * The first version of this was a scoreboard - two numbers and a winner. That
@@ -34,12 +34,27 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
  * plainly as a result, because a stated limit is more useful than a confident
  * guess.
  */
-export default function CompareCard({ seed, currency, skinType, concerns, onUnlock }) {
+export default function CompareCard({ seed, preset, currency, skinType, concerns, onUnlock }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!preset?.products?.length) return;
+    setOpen(true);
+    setResult(null);
+    setError("");
+    setRows(preset.products.map((product) => ({
+      product_name: product.product_name || "",
+      brand: product.brand || "",
+      category: product.category || "Serum",
+      price: product.price ? String(product.price) : "",
+      size_ml: product.size_ml ? String(product.size_ml) : "",
+      ingredients: product.ingredients || "",
+    })));
+  }, [preset]);
 
   function start() {
     setOpen(true);
@@ -124,6 +139,13 @@ export default function CompareCard({ seed, currency, skinType, concerns, onUnlo
                 <input className="field-input" value={row.product_name}
                        onChange={(e) => update(i, "product_name", e.target.value)}
                        placeholder="e.g. Niacinamide 10%" />
+              </div>
+              <div className="field-group">
+                <label className="field-label">Brand</label>
+                <input className="field-input" value={row.brand}
+                       onChange={(e) => update(i, "brand", e.target.value)}
+                       placeholder="e.g. Minimalist"
+                       data-testid={`compare-brand-${i}`} />
               </div>
               <div className="field-group">
                 <label className="field-label">Category</label>

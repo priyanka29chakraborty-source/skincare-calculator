@@ -1,4 +1,4 @@
-"""Comparing two to four products side by side.
+"""Comparing two or more products side by side.
 
 The rule the whole app is built on applies here most visibly: **how well a
 product is made and how much it costs are different questions.** So a
@@ -47,7 +47,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MAX_PRODUCTS = 4
+MAX_PRODUCTS = 6
 MIN_PRODUCTS = 2
 
 # Below this gap the two formulations are treated as equivalent. Chosen to

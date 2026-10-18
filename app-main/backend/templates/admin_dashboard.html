@@ -26,7 +26,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tab-badge{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.65rem;font-weight:700;line-height:1.6;display:none}
 .tab-badge.visible{display:inline-block}
 .content{background:var(--card);margin:0 24px 24px;border-radius:0 12px 12px 12px;border:1px solid var(--border);padding:24px;min-height:400px}
-.section{display:none}.section.active{display:block}
+.content > .section{display:none}.content > .section.active{display:block}
+.fetch-block{margin-bottom:28px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.fetch-block h3{font-size:0.95rem;margin:0 0 12px}
 .section-title{font-family:'Playfair Display',serif;font-size:1.15rem;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .section-title i{color:var(--accent)}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -109,21 +111,67 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
 <div id="warnings-container"></div>
 
 <div class="tabs">
-  <div class="tab active" data-tab="health"><i class="fa-solid fa-heart-pulse"></i> Health</div>
-  <div class="tab" data-tab="logs"><i class="fa-solid fa-list"></i> Fetch Logs</div>
-  <div class="tab" data-tab="credits"><i class="fa-solid fa-coins"></i> Credits</div>
-  <div class="tab" data-tab="analytics"><i class="fa-solid fa-chart-line"></i> Analytics</div>
+  <div class="tab active" data-tab="today"><i class="fa-solid fa-sun"></i> Today</div>
+  <div class="tab" data-tab="people"><i class="fa-solid fa-user"></i> People</div>
+  <div class="tab" data-tab="products"><i class="fa-solid fa-flask"></i> Products</div>
+  <div class="tab" data-tab="comparisons"><i class="fa-solid fa-scale-balanced"></i> Comparisons</div>
   <div class="tab" data-tab="feedback"><i class="fa-solid fa-comment"></i> Feedback</div>
-  <div class="tab" data-tab="sites"><i class="fa-solid fa-globe"></i> Sites</div>
-  <div class="tab" data-tab="scrapers"><i class="fa-solid fa-robot"></i> Scrapers</div>
-  <div class="tab" data-tab="flagged"><i class="fa-solid fa-flag"></i> Flagged <span class="tab-badge" id="flag-badge">0</span></div>
-  <div class="tab" data-tab="config"><i class="fa-solid fa-gear"></i> Config</div>
+  <div class="tab" data-tab="fetching"><i class="fa-solid fa-wrench"></i> Fetching <span class="tab-badge" id="flag-badge">0</span></div>
 </div>
 
 <div class="content">
 
+  <div class="section active" id="sec-today">
+    <div class="section-title"><i class="fa-solid fa-sun"></i> Today
+      <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">Since midnight, India time</span>
+    </div>
+    <div class="grid-3" id="today-stats"></div>
+  </div>
+
+  <div class="section" id="sec-people">
+    <div class="section-title"><i class="fa-solid fa-user"></i> People who signed in</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Signed in</th><th>Email</th><th>Credits left</th></tr></thead>
+        <tbody id="people-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="sec-products">
+    <div class="section-title"><i class="fa-solid fa-flask"></i> Products analysed</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Time</th><th>Product</th><th>Brand</th><th>Category</th><th>Skin type</th><th>Ingredients</th><th>Score</th><th>How it was entered</th><th>Shop country</th></tr></thead>
+        <tbody id="recent-analyses-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="sec-comparisons">
+    <div class="section-title"><i class="fa-solid fa-scale-balanced"></i> Comparisons</div>
+    <p style="font-size:0.8rem;color:var(--text-sub);margin:-8px 0 14px">Each row is one comparison. The score is the formulation score.</p>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Time</th><th>Products and scores</th></tr></thead>
+        <tbody id="comparisons-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="sec-feedback">
+    <div class="section-title"><i class="fa-solid fa-comment"></i> Feedback</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Time</th><th>Email</th><th>Note</th></tr></thead>
+        <tbody id="feedback-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="sec-fetching">
   <!-- Health -->
-  <div class="section active" id="sec-health">
+  <div class="fetch-block" id="sec-health">
     <div class="section-title"><i class="fa-solid fa-heart-pulse"></i> Live Health Monitor
       <span id="health-time" style="font-size:0.7rem;color:var(--text-sub);font-family:'DM Sans';font-weight:400;margin-left:auto"></span>
     </div>
@@ -131,7 +179,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
   </div>
 
   <!-- Fetch Logs -->
-  <div class="section" id="sec-logs">
+  <div class="fetch-block" id="sec-logs">
     <div class="section-title"><i class="fa-solid fa-list"></i> Fetch Attempt Logs</div>
     <div class="grid-4 mb-16" id="log-stats"></div>
     <div class="filter-bar">
@@ -149,57 +197,15 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
     </div>
   </div>
 
-  <!-- Credits -->
-  <div class="section" id="sec-credits">
-    <div class="section-title"><i class="fa-solid fa-coins"></i> API Credit Tracker</div>
+  <div class="fetch-block" id="sec-credits">
+    <div class="section-title"><i class="fa-solid fa-plug"></i> Outside services
+      <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">How often this app called them. Not customer credits.</span>
+    </div>
     <div id="credit-bars"></div>
   </div>
 
-  <!-- Analytics -->
-  <div class="section" id="sec-analytics">
-    <div class="section-title"><i class="fa-solid fa-chart-line"></i> Tool Usage Analytics</div>
-    <div class="grid-4 mb-16" id="analytics-stats"></div>
-    <div class="grid-2">
-      <div class="chart-container"><div class="chart-title">Product Categories</div><div class="chart-wrap"><canvas id="chart-categories"></canvas></div></div>
-      <div class="chart-container"><div class="chart-title">Top Skin Concerns</div><div class="chart-wrap"><canvas id="chart-concerns"></canvas></div></div>
-      <div class="chart-container"><div class="chart-title">Entry Method</div><div class="chart-wrap"><canvas id="chart-entry"></canvas></div></div>
-      <div class="chart-container"><div class="chart-title">Busiest Hours (UTC)</div><div class="chart-wrap"><canvas id="chart-hourly"></canvas></div></div>
-    </div>
-    <div class="chart-container mt-16">
-      <div class="chart-title"><i class="fa-solid fa-flask" style="color:var(--accent)"></i> Top Ingredients This Week</div>
-      <ul class="trend-list" id="ingredient-trends"><li style="color:var(--text-sub);font-size:0.8rem;padding:8px 0">Loading…</li></ul>
-    </div>
-    <div class="mt-16">
-      <div class="chart-title">Top Countries</div>
-      <table><thead><tr><th>Country</th><th>Analyses</th></tr></thead><tbody id="country-table"></tbody></table>
-    </div>
-    <div class="mt-16">
-      <div class="chart-title" style="margin-bottom:10px">
-        <i class="fa-solid fa-clock-rotate-left" style="color:var(--accent)"></i> Recent Analyses
-        <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">URL fetches, barcode scans, and manual inputs</span>
-      </div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr><th>Time</th><th>Product</th><th>Brand</th><th>Category</th><th>Skin Type</th><th>Ingredients</th><th>Score</th><th>Method</th><th>Country</th></tr></thead>
-          <tbody id="recent-analyses-body"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- Feedback -->
-  <div class="section" id="sec-feedback">
-    <div class="section-title"><i class="fa-solid fa-comment"></i> Feedback</div>
-    <div style="overflow-x:auto">
-      <table>
-        <thead><tr><th>Time</th><th>Email</th><th>Note</th></tr></thead>
-        <tbody id="feedback-body"></tbody>
-      </table>
-    </div>
-  </div>
-
   <!-- Sites -->
-  <div class="section" id="sec-sites">
+  <div class="fetch-block" id="sec-sites">
     <div class="section-title"><i class="fa-solid fa-globe"></i> Site Fetch Success Rate
       <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">Auto-detected from fetch logs only</span>
       <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="testAllSites()"><i class="fa-solid fa-play"></i> Test Known Sites</button>
@@ -214,7 +220,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
   </div>
 
   <!-- Scrapers -->
-  <div class="section" id="sec-scrapers">
+  <div class="fetch-block" id="sec-scrapers">
     <div class="section-title"><i class="fa-solid fa-robot"></i> Scraper Layer Monitoring (7 days)</div>
     <div class="grid-3 mb-16" id="scraper-summary"></div>
     <div class="chart-container">
@@ -228,7 +234,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
   </div>
 
   <!-- Flagged -->
-  <div class="section" id="sec-flagged">
+  <div class="fetch-block" id="sec-flagged">
     <div class="section-title"><i class="fa-solid fa-flag"></i> Flagged Analyses — Quality Review
       <span style="font-size:0.7rem;font-weight:400;color:var(--text-sub);margin-left:8px">Auto-flagged when score looks wrong for the input data</span>
       <label style="margin-left:auto;font-size:0.75rem;font-weight:500;display:flex;align-items:center;gap:6px;cursor:pointer">
@@ -265,7 +271,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
   </div>
 
   <!-- Config -->
-  <div class="section" id="sec-config">
+  <div class="fetch-block" id="sec-config">
     <div class="section-title"><i class="fa-solid fa-gear"></i> Database & Config</div>
     <div class="grid-3 mb-16" id="db-stats"></div>
     <h3 style="font-size:0.9rem;margin:16px 0 10px">API Keys Status</h3>
@@ -276,6 +282,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
     </div>
     <div id="config-msg" class="mt-16" style="font-size:0.8rem"></div>
   </div>
+  </div><!-- fetching -->
 
 </div><!-- .content -->
 
@@ -354,9 +361,9 @@ function destroyChart(id) {
 async function loadHealth() {
   const d = await api('/health-check');
   if (!d) return;
-  const names = {backend:'Backend Server',csv_database:'CSV Database',firecrawl:'Firecrawl API',
-    scrapdo:'ScrapeDo API',scraperapi:'ScraperAPI',huggingface:'HuggingFace API',
-    exchangerate:'ExchangeRate API',openbeautyfacts:'Open Beauty Facts',duckduckgo:'DuckDuckGo Search'};
+  const names = {backend:'Backend Server',csv_database:'Ingredient list',firecrawl:'Firecrawl',
+    scrapdo:'Scrape.do',scraperapi:'ScraperAPI',
+    exchangerate:'Exchange rates',openbeautyfacts:'Open Beauty Facts',duckduckgo:'Shop search'};
   document.getElementById('health-grid').innerHTML = Object.entries(d).map(([k,v]) =>
     `<div class="health-item"><div class="dot ${v.status}"></div><div class="health-info">
       <div class="health-name">${names[k]||k}</div>
@@ -422,87 +429,85 @@ async function loadCredits() {
 }
 
 // ── Analytics ────────────────────────────────────────────────────────────
-async function loadAnalytics() {
-  const d = await api('/analytics');
+function indiaTime(value) {
+  if (!value) return '';
+  const ms = typeof value === 'number' ? value * 1000 : Date.parse(value);
+  if (!ms) return '';
+  return new Date(ms).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false }).replace(',', '');
+}
+
+async function loadToday() {
+  const d = await api('/today');
   if (!d) return;
-  document.getElementById('analytics-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value">${d.total_today}</div></div>
-    <div class="stat-card"><div class="stat-label">This Week</div><div class="stat-value">${d.total_week}</div></div>
-    <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value">${d.total_month}</div></div>
-    <div class="stat-card"><div class="stat-label">All Time</div><div class="stat-value">${d.total_all}</div></div>`;
+  const cards = [
+    ['Analyses', d.analyses],
+    ['New sign-ins', d.signins],
+    ['Comparisons', d.comparisons],
+  ];
+  document.getElementById('today-stats').innerHTML = cards.map(([label, n]) =>
+    `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${n}</div></div>`).join('');
+}
 
-  destroyChart('chart-categories');
-  if (d.categories.length) chartInstances['chart-categories'] = new Chart(
-    document.getElementById('chart-categories').getContext('2d'),
-    {type:'doughnut',data:{labels:d.categories.map(c=>c.name),datasets:[{data:d.categories.map(c=>c.count),backgroundColor:COLORS}]},
-     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11}}}}}});
-
-  destroyChart('chart-concerns');
-  if (d.concerns.length) chartInstances['chart-concerns'] = new Chart(
-    document.getElementById('chart-concerns').getContext('2d'),
-    {type:'bar',data:{labels:d.concerns.slice(0,8).map(c=>c.name),datasets:[{data:d.concerns.slice(0,8).map(c=>c.count),backgroundColor:'#BF8888'}]},
-     options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{display:false}}}}});
-
-  destroyChart('chart-entry');
-  const ftc = d.fetch_type_counts||{};
-  chartInstances['chart-entry'] = new Chart(
-    document.getElementById('chart-entry').getContext('2d'),
-    {type:'doughnut',data:{labels:['URL Fetch','Barcode Scan','Manual Entry'],
-      datasets:[{data:[ftc['url']||0,ftc['barcode']||0,ftc['manual']||0],backgroundColor:['#BF8888','#9B8EC4','#C9A87C']}]},
-     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'}}}});
-
-  destroyChart('chart-hourly');
-  const hours = Array.from({length:24},(_,i)=>i);
-  const hourMap = {}; d.hourly.forEach(h=>hourMap[h.hour]=h.count);
-  chartInstances['chart-hourly'] = new Chart(
-    document.getElementById('chart-hourly').getContext('2d'),
-    {type:'bar',data:{labels:hours.map(h=>h+':00'),datasets:[{data:hours.map(h=>hourMap[h]||0),backgroundColor:'#8BA89C'}]},
-     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
-
-  document.getElementById('country-table').innerHTML =
-    d.countries.map(c=>`<tr><td>${c.name}</td><td>${c.count}</td></tr>`).join('');
-
-  // Ingredient trends
-  const td = await api('/ingredient-trends');
-  const tel = document.getElementById('ingredient-trends');
-  if (!td||!td.trends||!td.trends.length) {
-    tel.innerHTML = '<li style="color:var(--text-sub);font-size:0.8rem;padding:8px 0">No trend data yet — will populate as analyses run.</li>';
-  } else {
-    const max = td.trends[0].count||1;
-    tel.innerHTML = td.trends.map(t=>`<li class="trend-item">
-      <span style="min-width:140px;font-weight:500">${esc(t.name)}</span>
-      <div class="trend-bar-bg"><div class="trend-bar-fill" style="width:${Math.round(t.count/max*100)}%"></div></div>
-      <span class="trend-count">${t.count}</span></li>`).join('');
+async function loadPeople() {
+  const d = await api('/accounts');
+  const body = document.getElementById('people-body');
+  if (!d || !d.accounts || !d.accounts.length) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-state">No one has signed in yet.</td></tr>';
+    return;
   }
+  body.innerHTML = d.accounts.map(a => `<tr>
+    <td style="white-space:nowrap;font-size:0.72rem">${indiaTime(a.created_at)}</td>
+    <td>${esc(a.email)}</td>
+    <td>${a.balance}</td>
+  </tr>`).join('');
+}
 
-  // Recent analyses
-  const ftBadge = {url:'<span class="badge badge-blue">URL</span>',barcode:'<span class="badge badge-purple">Barcode</span>',manual:'<span class="badge badge-gray">Manual</span>'};
+async function loadComparisons() {
+  const d = await api('/comparisons');
+  const body = document.getElementById('comparisons-body');
+  if (!d || !d.comparisons || !d.comparisons.length) {
+    body.innerHTML = '<tr><td colspan="2" class="empty-state">No comparisons yet. Ones run after this update will appear here.</td></tr>';
+    return;
+  }
+  body.innerHTML = d.comparisons.map(row => {
+    const items = (row.products || []).map(p => {
+      const score = p.score == null ? '—' : Math.round(p.score);
+      const brand = p.brand ? esc(p.brand) + ' · ' : '';
+      return `${brand}${esc(p.product_name || 'Unnamed')} <strong>${score}</strong>`;
+    }).join(' &nbsp;vs&nbsp; ');
+    return `<tr><td style="white-space:nowrap;font-size:0.72rem">${indiaTime(row.timestamp)}</td><td>${items}</td></tr>`;
+  }).join('');
+}
+
+function loadFetching() {
+  loadHealth(); loadLogs(); loadCredits(); loadSites(); loadScrapers(); loadFlagged(); loadConfig();
+}
+
+async function loadProducts() {
+  const ftBadge = {url:'<span class="badge badge-blue">Link</span>',barcode:'<span class="badge badge-purple">Barcode</span>',manual:'<span class="badge badge-gray">Typed</span>'};
   const ra = await api('/recent-analyses');
   const raBody = document.getElementById('recent-analyses-body');
   if (!ra||!ra.analyses||!ra.analyses.length) {
-    raBody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fa-solid fa-clock-rotate-left"></i>No analyses logged yet.</td></tr>';
-  } else {
-    raBody.innerHTML = ra.analyses.map(a => {
-      const ts = a.timestamp?a.timestamp.substring(0,16).replace('T',' '):'';
-      const score = a.main_worth_score!=null?Math.round(a.main_worth_score):'-';
-      const scoreColor = score>=75?'var(--green)':score>=50?'var(--yellow)':'var(--red)';
-      const ft = a.fetch_type||'manual';
-      const badge = ftBadge[ft]||`<span class="badge badge-gray">${esc(ft)}</span>`;
-      const flagIcon = a.is_flagged?'<i class="fa-solid fa-flag" style="color:var(--red);margin-left:4px" title="Flagged"></i>':'';
-      return `<tr class="${a.is_flagged?'row-red':''}">
-        <td style="white-space:nowrap;font-size:0.72rem">${ts}</td>
-        <td style="font-weight:500">${a.product_name?esc(a.product_name):'<em style="color:var(--text-sub)">—</em>'}${flagIcon}</td>
-        <td>${esc(a.brand||'—')}</td>
-        <td>${esc(a.product_category||'—')}</td>
-        <td>${esc(a.skin_type||'—')}</td>
-        <td>${a.ingredient_count||0}</td>
-        <td style="font-weight:700;color:${scoreColor}">${score}</td>
-        <td>${badge}</td>
-        <td>${esc(a.country||'—')}</td>
-      </tr>`;
-    }).join('');
+    raBody.innerHTML = '<tr><td colspan="9" class="empty-state">No products analysed yet.</td></tr>';
+    return;
   }
-
+  raBody.innerHTML = ra.analyses.map(a => {
+    const score = a.main_worth_score!=null?Math.round(a.main_worth_score):'-';
+    const scoreColor = score>=75?'var(--green)':score>=50?'var(--yellow)':'var(--red)';
+    const ft = a.fetch_type||'manual';
+    const badge = ftBadge[ft]||`<span class="badge badge-gray">${esc(ft)}</span>`;
+    return `<tr>
+      <td style="white-space:nowrap;font-size:0.72rem">${indiaTime(a.timestamp)}</td>
+      <td style="font-weight:500">${a.product_name?esc(a.product_name):'<em style="color:var(--text-sub)">—</em>'}</td>
+      <td>${esc(a.brand||'—')}</td>
+      <td>${esc(a.product_category||'—')}</td>
+      <td>${esc(a.skin_type||'—')}</td>
+      <td>${a.ingredient_count||0}</td>
+      <td style="font-weight:700;color:${scoreColor}">${score}</td>
+      <td>${badge}</td>
+      <td>${esc(a.country||'—')}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function loadFeedback() {
@@ -513,7 +518,7 @@ async function loadFeedback() {
     fbBody.innerHTML = '<tr><td colspan="3" class="empty-state">No feedback yet.</td></tr>';
   } else {
     fbBody.innerHTML = fb.notes.map(n => {
-      const when = n.created_at ? new Date(n.created_at * 1000).toISOString().substring(0, 16).replace('T', ' ') : '';
+      const when = indiaTime(n.created_at);
       return `<tr>
         <td style="white-space:nowrap;font-size:0.72rem">${when}</td>
         <td>${n.email ? esc(n.email) : '<em style="color:var(--text-sub)">—</em>'}</td>
@@ -691,7 +696,7 @@ async function loadConfig() {
   const d = await api('/db-info');
   if (!d) return;
   document.getElementById('db-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Ingredients</div><div class="stat-value">${d.ingredient_count}</div><div class="stat-sub">ingredient_database_fixed2.csv</div></div>
+    <div class="stat-card"><div class="stat-label">Ingredients</div><div class="stat-value">${d.ingredient_count}</div><div class="stat-sub">ingredient database</div></div>
     <div class="stat-card"><div class="stat-label">Synergy Combos</div><div class="stat-value">${d.synergy_count}</div></div>
     <div class="stat-card"><div class="stat-label">UV / Sun DB</div><div class="stat-value">${d.uv_count}</div></div>`;
   document.getElementById('keys-grid').innerHTML = Object.entries(d.keys_status).map(([key,set])=>
@@ -715,14 +720,13 @@ async function clearOldLogs() {
 
 // ── Loader map ───────────────────────────────────────────────────────────
 const _loaders = {
-  health:loadHealth, logs:loadLogs, credits:loadCredits, analytics:loadAnalytics,
-  feedback:loadFeedback,
-  sites:loadSites, scrapers:loadScrapers, flagged:loadFlagged, config:loadConfig,
+  today:loadToday, people:loadPeople, products:loadProducts,
+  comparisons:loadComparisons, feedback:loadFeedback, fetching:loadFetching,
 };
 
 // Boot: load immediately-visible panels + flagged count for badge
-loadHealth(); loadLogs(); loadCredits();
-_loaded['health']=true; _loaded['logs']=true; _loaded['credits']=true;
+loadToday();
+_loaded['today']=true;
 
 // Load flag badge count on startup without loading full table
 (async()=>{
@@ -734,9 +738,10 @@ _loaded['health']=true; _loaded['logs']=true; _loaded['credits']=true;
   }
 })();
 
-setInterval(loadHealth, 60000);
-setInterval(loadLogs, 30000);
-setInterval(loadCredits, 60000);
+setInterval(() => {
+  if (document.getElementById('sec-today').classList.contains('active')) loadToday();
+  if (document.getElementById('sec-fetching').classList.contains('active')) loadFetching();
+}, 60000);
 // Refresh flagged count every 5 minutes
 setInterval(async()=>{
   const d = await api('/flagged-count');
