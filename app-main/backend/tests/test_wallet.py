@@ -71,6 +71,40 @@ def test_balance_of_an_unknown_account_is_zero(wallet):
     assert wallet.get_balance('acct_does_not_exist') == 0
 
 
+def test_failed_statement_rolls_back_postgres_connection(wallet, monkeypatch):
+    """A rejected statement must not poison later work on the same PG thread."""
+    class FailingCursor:
+        def execute(self, _sql, _params):
+            raise RuntimeError('duplicate key')
+
+    class FakeConnection:
+        def __init__(self):
+            self.rollbacks = 0
+
+        def cursor(self):
+            return FailingCursor()
+
+        def rollback(self):
+            self.rollbacks += 1
+
+    conn = FakeConnection()
+    monkeypatch.setattr(wallet, '_USE_PG', True)
+    monkeypatch.setattr(wallet, 'init_storage', lambda: None)
+    monkeypatch.setattr(wallet, '_connect', lambda: conn)
+
+    with pytest.raises(RuntimeError, match='duplicate key'):
+        wallet._execute('INSERT INTO example VALUES (?)', ('value',), commit=True)
+    assert conn.rollbacks == 1
+
+
+def test_account_list_shows_the_balance_after_a_spend(wallet, account):
+    wallet.grant(account, 4, reference='trial_list')
+    wallet.spend(account, reference='analysis_1')
+    listed = wallet.list_accounts()
+    assert listed[0]['email'] == 'buyer@example.com'
+    assert listed[0]['balance'] == 3
+
+
 # ---------------------------------------------------------------------------
 # Granting - idempotency is the whole point
 # ---------------------------------------------------------------------------

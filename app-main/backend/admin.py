@@ -278,7 +278,7 @@ async def health_check(request: Request):
     t0 = time.time()
     try:
         from duckduckgo_search import DDGS
-        DDGS._impersonates = ("chrome_120", "chrome_127", "chrome_131", "safari_18", "edge_127")
+        DDGS._impersonates = ("chrome_120", "chrome_127")
         loop = asyncio.get_running_loop()
         def _ddg_test():
             with DDGS() as ddgs:

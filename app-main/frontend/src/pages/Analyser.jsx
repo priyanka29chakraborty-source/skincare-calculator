@@ -203,6 +203,11 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
       if (accountRef.current.signedIn) accountRef.current.refresh();
       // Alternatives and the shop search are paid, like the personal fit.
       const paid = accountRef.current.signedIn && data.access?.tier !== "free";
+      // Signed in, but this product was not covered: the free score stays,
+      // and the packs open so the personal result can be bought.
+      if (accountRef.current.signedIn && data.access?.tier === "free") {
+        openUnlock("credits", () => handleAnalyze(), "fit");
+      }
       if (!paid) return;
       const weak = Object.values(data.skin_concern_fit || {})
         .filter((v) => (typeof v === "object" ? v.score : v) < 75);
@@ -211,7 +216,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
     } catch (e) { setError(describeError(e)); }
     finally { setLoading(false); }
   }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput,
-      productUrl, productName, brand, activeConcentrations, userProfile, fetchAlts, fetchBestPrice]);
+      productUrl, productName, brand, activeConcentrations, userProfile, fetchAlts, fetchBestPrice, openUnlock]);
 
   // After a purchase, re-run so the person sees what they paid for.
   useEffect(() => {
@@ -396,6 +401,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
         <CompareCard autoOpen preset={comparePreset} signedIn={account.signedIn} currency={currency} skinType={skinType} concerns={concerns}
                      onUnlock={() => openUnlock(account.signedIn ? "credits" : "signin", null, "compare")}
                      onSignIn={(after) => openUnlock("signin", after, "compare")}
+                     onFinished={() => { if (account.signedIn) account.refresh(); }}
                      seed={ingredients ? { product_name: productName, brand, category, price: price || "", size: size || "", size_unit: sizeUnit, ingredients } : null} />
       </main>
     );

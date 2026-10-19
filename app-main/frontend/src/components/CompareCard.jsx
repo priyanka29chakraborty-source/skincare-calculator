@@ -39,7 +39,7 @@ const CATEGORIES = ["Serum", "Moisturizer", "Cleanser", "Toner", "Sunscreen",
  * plainly as a result, because a stated limit is more useful than a confident
  * guess.
  */
-export default function CompareCard({ seed, preset, currency, skinType, concerns, onUnlock, onSignIn, autoOpen, signedIn }) {
+export default function CompareCard({ seed, preset, currency, skinType, concerns, onUnlock, onSignIn, onFinished, autoOpen, signedIn }) {
   const initialRows = () => [seed ? { ...EMPTY, ...seed } : { ...EMPTY }, { ...EMPTY }];
   const [open, setOpen] = useState(Boolean(autoOpen));
   const [rows, setRows] = useState(autoOpen ? initialRows : null);
@@ -115,6 +115,8 @@ export default function CompareCard({ seed, preset, currency, skinType, concerns
       });
       setResult(data);
       track("comparison_completed");
+      onFinished?.();
+      if (signedIn && data.access?.tier === "free") onUnlock?.();
     } catch (e) {
       setError(describeError(e));
     } finally { setBusy(false); }
