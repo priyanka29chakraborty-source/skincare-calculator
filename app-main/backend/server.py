@@ -809,10 +809,10 @@ SITE_MAP = {
 }
 
 
-# The search client picks a browser name at random. Several of those names
-# are rejected on the server ("Invalid impersonate"), and every price and
-# product search then comes back empty. These names open.
-_DDG_BROWSERS = ("chrome_120", "chrome_127", "chrome_131", "safari_18", "edge_127")
+# The search client picks a browser name at random. primp rejects
+# chrome_131, safari_18 and edge_127 ("Invalid impersonate"), and that
+# failed pick makes the whole price search come back empty.
+_DDG_BROWSERS = ("chrome_120", "chrome_127")
 
 
 def _ddg_search(query, max_results=8):
