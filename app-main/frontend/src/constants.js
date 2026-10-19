@@ -1,4 +1,10 @@
-export const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+// Production calls the same-origin Pages Function, which proxies to Render.
+// Keeping the browser on urancal.com makes the HttpOnly session a first-party
+// cookie. Local development still talks directly to the configured backend.
+const API_ORIGIN = process.env.NODE_ENV === "production"
+  ? ""
+  : (process.env.REACT_APP_BACKEND_URL || "");
+export const API = `${API_ORIGIN}/api`;
 // Credits: when they lapse (shown beside the balance and in the FAQ), and the
 // whole rule (the account menu's "how credits work").
 export const CREDIT_EXPIRY_HINT = "Credits last one year from the day they are added, including the 4 from your first sign-in. If you buy more while some are still left, those remaining credits last until the new credits expire. Credits that have already expired are not restored.";

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { GitCompare, History, X } from "lucide-react";
 
 import { money, categoryLabel } from "../constants";
-import { API, api } from "../api";
+import { API, api, describeError } from "../api";
 import { track } from "../track";
 import { Button, ScoreRing } from "./ds";
 
@@ -28,8 +28,10 @@ export default function SavedSheet({ open, onClose, account, onReopen, onCompare
   const [entries, setEntries] = useState(null);
   const [comparisons, setComparisons] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    setError("");
     if (!account.signedIn) { setEntries(null); setComparisons(null); return; }
     const [products, compared] = await Promise.allSettled([
       api.get(`${API}/history`),
@@ -63,10 +65,16 @@ export default function SavedSheet({ open, onClose, account, onReopen, onCompare
   }
 
   async function forget(entry) {
-    setBusy(true);
+    setBusy(true); setError("");
     try {
-      await api.post(`${API}/history/${entry.entry_id}/forget`, {});
+      const { data } = await api.post(`${API}/history/${entry.entry_id}/forget`, {});
+      if (!data.forgotten) {
+        setError("That saved product could not be removed. Please refresh and try again.");
+        return;
+      }
       setEntries((rows) => (rows || []).filter((r) => r.entry_id !== entry.entry_id));
+    } catch (e) {
+      setError(describeError(e));
     } finally { setBusy(false); }
   }
 
@@ -82,10 +90,16 @@ export default function SavedSheet({ open, onClose, account, onReopen, onCompare
   }
 
   async function forgetComparison(entry) {
-    setBusy(true);
+    setBusy(true); setError("");
     try {
-      await api.post(`${API}/history/comparisons/${entry.entry_id}/forget`, {});
+      const { data } = await api.post(`${API}/history/comparisons/${entry.entry_id}/forget`, {});
+      if (!data.forgotten) {
+        setError("That saved comparison could not be removed. Please refresh and try again.");
+        return;
+      }
       setComparisons((rows) => (rows || []).filter((r) => r.entry_id !== entry.entry_id));
+    } catch (e) {
+      setError(describeError(e));
     } finally { setBusy(false); }
   }
 
@@ -118,6 +132,7 @@ export default function SavedSheet({ open, onClose, account, onReopen, onCompare
         )}
 
         <div className="sheet__body">
+          {error && <p className="t-body-s c-negative" role="alert">{error}</p>}
           {!account.signedIn ? (
             <div className="empty">
               <span className="empty__icon"><History aria-hidden="true" /></span>
