@@ -77,7 +77,7 @@ _CACHE_TTL = 3600  # 1 hour
 def _make_cache_key(data: dict) -> str:
     """Create a stable cache key from request fields."""
     key_str = "|".join([
-        str(data.get('ingredients', ''))[:200],
+        str(data.get('ingredients', '')),
         str(data.get('product_name', '')),
         str(data.get('price', '')),
         str(data.get('size_ml', '')),

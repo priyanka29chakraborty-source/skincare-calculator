@@ -304,9 +304,38 @@ def estimate_concentration(ingredient_list, known_concentrations=None):
             # Smooth decay: ~15% at pos 0, ~0.6% at pos 20
             # Formula: 15 * e^(-0.20 * position), clamped to [0.5, 15.0]
             est = max(0.5, min(15.0, 15.0 * math.exp(-0.20 * position)))
-        concentrations[ing] = est
+        concentrations[ing] = _cap_positional_estimate(ing, est)
 
     return concentrations
+
+
+def _cap_positional_estimate(ing, est):
+    """An unlabeled place in the list is not a measured dose.
+
+    The positional guess tops out at 15%. For niacinamide that is above the
+    published ceiling, so an undeclared ingredient outscored a truthful 5–10%.
+    Cap the guess at the usual maximum when the database has one. Declared
+    percentages are not passed through here.
+    """
+    data = data_loader.get_ingredient_data(ing) or {}
+    cap = None
+    for field in ('Typical_Use_Max_Pct', 'Max_Safe_%'):
+        raw = data.get(field)
+        if raw is None:
+            continue
+        text = str(raw).strip().replace('%', '')
+        if text.lower() in ('', 'nan', 'none'):
+            continue
+        try:
+            cap = float(text)
+        except (TypeError, ValueError):
+            continue
+        if cap > 0:
+            break
+        cap = None
+    if cap is None:
+        return est
+    return min(est, cap)
 
 
 def _parse_concentrations_from_name(product_name):
@@ -439,7 +468,7 @@ def is_support_ingredient(data):
                      "surfactant", "preservative"}:
         return True
     if any(k in func for k in ["humectant", "emollient", "occlusive",
-                                "barrier", "texture", "solvent"]):
+                                "texture", "solvent"]):
         return True
     return False
 
@@ -473,8 +502,10 @@ def get_concentration_factor(estimated_pct, data):
         return 0.7
     elif estimated_pct <= max_safe:
         return 1.0
-    else:
-        return 0.9
+    # A declared dose above the published ceiling is not evidence that the
+    # active works less well than the dose at that ceiling. Irritation from
+    # going over the ceiling is a tolerability signal, not a weaker active.
+    return 1.0
 
 
 def get_evidence_factor(data):
@@ -1210,6 +1241,23 @@ def detect_red_flags(ingredient_list, concentrations, category):
     return flags, penalty
 
 
+_FRAGRANCE_INCI = {
+    'fragrance', 'parfum', 'perfume', 'aroma', 'parfume',
+}
+
+
+def _is_fragrance_label(name, data=None):
+    """Parfum is an allergen. It is not a comedogenic oil."""
+    n = re.sub(r'\([^)]*\)', '', str(name or '')).strip().lower()
+    if n in _FRAGRANCE_INCI:
+        return True
+    if data:
+        inci = str(data.get('INCI_Name') or '').strip().lower()
+        if inci in _FRAGRANCE_INCI:
+            return True
+    return False
+
+
 def detect_formulation_notes(ingredient_list):
     """Generate formulation sensitivity notes — population-specific, non-alarmist."""
     notes = []
@@ -1218,7 +1266,7 @@ def detect_formulation_notes(ingredient_list):
         data = data_loader.get_ingredient_data(ing)
 
         # Comedogenic warnings — contextual, not absolute
-        if data:
+        if data and not _is_fragrance_label(ing, data):
             try:
                 c_rating = float(data.get('Comedogenicity_0_5', 0) or 0)
                 if c_rating >= 4:
@@ -1274,13 +1322,21 @@ def detect_formulation_notes(ingredient_list):
     return list(dict.fromkeys(notes))[:8]
 
 
-def _get_evidence_weight(evidence_strength):
-    """Map Evidence_Strength string to numeric weight per spec."""
-    ev = str(evidence_strength).strip().lower() if evidence_strength else ''
-    if 'strong' in ev:    return 8
-    if 'moderate' in ev:  return 6
-    if 'limited' in ev:   return 3
-    return 3  # default
+def _get_evidence_weight(evidence):
+    """Map the same evidence source the badge uses to a numeric weight.
+
+    Passing a row dict uses Evidence_Level_Normalized / Evidence_Factor.
+    A bare string is treated as Evidence_Strength for older callers.
+    """
+    if isinstance(evidence, dict):
+        factor = get_evidence_factor(evidence)
+    else:
+        factor = get_evidence_factor({'Evidence_Strength': evidence})
+    if factor >= 0.9:
+        return 8
+    if factor >= 0.7:
+        return 6
+    return 3
 
 def _get_role_weight(ingredient_data):
     """Get role weight from DB row, falling back to role_weight_table, then defaults."""
@@ -1339,7 +1395,7 @@ def _calc_impact_score(ingredient_name, position, ingredient_list, known_concent
     # Activity_Tier_Weight from new DB column (0.1–1.0)
     tier_weight = data_loader.get_activity_tier_weight(data)
 
-    ev_weight   = _get_evidence_weight(data.get('Evidence_Strength', ''))
+    ev_weight   = _get_evidence_weight(data)
     role_weight = _get_role_weight(data)
 
     # Synergy multiplier from synergy_partners_map
@@ -1886,7 +1942,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             and data_loader.get_activity_tier_weight(d) >= 0.8  # Tier 1 or Tier 2 only
         ]
         below_evidence = sum(
-            _get_evidence_weight(d.get('Evidence_Strength','')) * 0.6
+            _get_evidence_weight(d) * 0.6
             for _, pos, s, d in _tier12_below
         )
         active_potency = min(40, above_impact / 40 + below_evidence)
@@ -1896,7 +1952,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 f"Trace floor credit applied: {len(_tier12_below)} Tier 1/2 active(s) below 1% threshold"
             )
 
-        ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength','')) for _, _, _, d in all_impact
+        ev_sum = sum(_get_evidence_weight(d) for _, _, _, d in all_impact
                      if str(d.get('Ingredient_Class','')).lower() == 'active')
         active_count_for_ev = max(1, sum(1 for _, _, _, d in all_impact
                                          if str(d.get('Ingredient_Class','')).lower() == 'active'))
@@ -2162,11 +2218,11 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             and data_loader.get_activity_tier_weight(d) >= 0.8
         ]
         below_evidence = sum(
-            _get_evidence_weight(d.get('Evidence_Strength', '')) * 0.6
+            _get_evidence_weight(d) * 0.6
             for _, pos, s, d in _tier12_below_ec
         )
         active_potency = min(40, above_impact / 40 + below_evidence)
-        ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength', ''))
+        ev_sum = sum(_get_evidence_weight(d)
                      for _, _, _, d in all_impact
                      if str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES)
         active_count_ev = max(1, sum(1 for _, _, _, d in all_impact
@@ -2239,6 +2295,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
     safety_details = []
     _bypass_irritation = is_high_intensity_treatment  # skip irr penalty for treatment actives
     _high_intensity_set = {ing.lower() for ing in high_intensity_actives_found}
+    from formulation import is_pregnancy_caution
 
     for i, ing in enumerate(ingredient_list):
         il = ing.strip().lower()
@@ -2274,8 +2331,10 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                         safety_details.append(f"{ing} — high irritation risk; patch test recommended")
             elif irr in ('medium','moderate'):
                 safety_score -= 0.5
-            preg = str(data.get('Pregnancy_Safety','')).lower()
-            if ('avoid' in preg or 'restrict' in preg) and _preg_ded < 4:
+            preg = str(data.get('Pregnancy_Safety','') or '')
+            if (is_pregnancy_caution(preg)
+                    and ('avoid' in preg.lower() or 'restrict' in preg.lower())
+                    and _preg_ded < 4):
                 _preg_ded += 1
                 safety_details.append(f"{ing} — caution if pregnant (check with your doctor)")
     safety_score = round(max(0, min(10, safety_score)), 1)
@@ -2711,10 +2770,10 @@ def apply_category_normalisation(absolute_score, concern, category):
 
 
 # ─── INCI ALIAS RESOLUTION ────────────────────────────────────────────────────
-# Bemotrizinol = Bisoctrizole = Methylene Bis-Benzotriazolyl Tetramethylbutylphenol (Tinosorb M)
-# These are resolved BEFORE any lookup so we never double-count or miss entries.
+# Bemotrizinol is Tinosorb S. Bisoctrizole is Tinosorb M. They are not the
+# same filter. Resolved before lookup so a trade name and its INCI agree.
 INCI_ALIASES = {
-    'Bemotrizinol': 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+    'Bemotrizinol': 'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine',
     'Bisoctrizole':  'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
     'Avobenzone':    'Butyl Methoxydibenzoylmethane',
     'Octinoxate':    'Ethylhexyl Methoxycinnamate',
@@ -2722,6 +2781,14 @@ INCI_ALIASES = {
     'Ensulizole':    'Phenylbenzimidazole Sulfonic Acid',
     'Ecamsule':      'Terephthalylidene Dicamphor Sulfonic Acid',
 }
+
+_INCI_ALIAS_BY_LOWER = {k.lower(): v for k, v in INCI_ALIASES.items()}
+
+
+def _resolve_inci_alias(name):
+    """Case-insensitive INN/trade-name resolution. Unknown names stay as written."""
+    text = str(name or '').strip()
+    return _INCI_ALIAS_BY_LOWER.get(text.lower(), name)
 
 # ─── UV BAND MEMBERSHIP LISTS ─────────────────────────────────────────────────
 _UVB_FILTER_LIST = {
@@ -2859,7 +2926,7 @@ _BANNED_FILTERS = {
     'Aminobenzoic Acid':           'Banned EU; high sensitization risk',
     'Oxybenzone':                  'Banned Hawaii; endocrine/reef concerns',
     '3-Benzylidene Camphor':       'Endocrine concerns; avoided in modern formulas',
-    '4-Methylbenzylidene Camphor': 'Endocrine review; restricted use',
+    '4-Methylbenzylidene Camphor': 'Prohibited in the EU (Reg. (EU) 2024/858)',
 }
 
 
@@ -2895,7 +2962,7 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
     """
 
     # ── Step 0: Alias resolution ─────────────────────────────────────────────
-    resolved_list = [INCI_ALIASES.get(ing, ing) for ing in ingredient_list]
+    resolved_list = [_resolve_inci_alias(ing) for ing in ingredient_list]
     resolved_lower = {ing.lower() for ing in resolved_list}
 
     # ── Step 1: Detect UV filters from DB (Ingredient_Category contains 'UV Filter') ──
@@ -2903,7 +2970,7 @@ def _score_uv_concern(concern, ingredient_list, concentrations, product_inci_map
     detected_filters = []
     seen_filter_keys = set()
     for ing in resolved_list:
-        canonical = INCI_ALIASES.get(ing, ing)
+        canonical = _resolve_inci_alias(ing)
         # Trade names in the list are title case. A pasted INCI is often
         # ALL CAPS, and Tinosorb M arrives as "... (NANO)". The lookup is
         # case-insensitive, but the name stored here used to be the raw
@@ -3568,12 +3635,19 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         results = _facial_oil_concern_fit(ingredient_list, concerns, ing_str)
         return {'concerns': results, 'am_pm': 'Suitable for: PM (locks in moisture)'}
 
-    # Pre-lookup all product ingredients once
+    # Pre-lookup all product ingredients once. Two names for one record
+    # (niacinamide and nicotinamide) must not be scored as two actives.
     product_inci_map = {}
+    seen_resolved = set()
     for ing in ingredient_list:
         data = data_loader.get_ingredient_data(ing)
         if data:
             inci = str(data.get('INCI_Name', '')).strip()
+            resolved = inci.lower()
+            if resolved and resolved in seen_resolved:
+                continue
+            if resolved:
+                seen_resolved.add(resolved)
             product_inci_map[ing] = {'inci': inci, 'data': data, 'raw': ing}
 
     product_inci_set = {v['inci'] for v in product_inci_map.values()}
@@ -3678,6 +3752,13 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
         # Find present actives and their data
         present_actives_data = []
         for ing, info in product_inci_map.items():
+            inci_lower = info['inci'].lower()
+            # Matrixyl 3000 is the trade name of these two peptides. It is
+            # not a third active when they are already on the label.
+            if inci_lower == 'matrixyl 3000' and (
+                    'palmitoyl tripeptide-1' in product_inci_lower
+                    or 'palmitoyl tetrapeptide-7' in product_inci_lower):
+                continue
             if _is_concern_active(info['inci'], info.get('data')):
                 present_actives_data.append(info)
 
@@ -4096,7 +4177,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
         ing_lower = ing.lower()
         data = data_loader.get_ingredient_data(ing)
 
-        if data:
+        if data and not _is_fragrance_label(ing, data):
             try:
                 c_rating = float(data.get('Comedogenicity_0_5', 0) or 0)
                 if c_rating >= 3:
@@ -4147,7 +4228,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
                         helpful_ingredients.append(enriched)
 
         if skin_type == 'oily':
-            if data:
+            if data and not _is_fragrance_label(ing, data):
                 # DB-driven comedogenicity (always from database)
                 try:
                     comedogenicity = float(data.get('Comedogenicity_0_5', 0) or 0)

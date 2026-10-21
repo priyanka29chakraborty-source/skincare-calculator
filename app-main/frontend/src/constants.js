@@ -99,3 +99,12 @@ export function pricePlain(value, currency) {
   else if (ratio <= 3.5) compare = "much more per ml";
   return `This costs ${yours}. Most products of this type cost about ${typical}, so this costs ${compare}.`;
 }
+
+/** Header chip. Same tier words as the price card (excellent, good, premium, luxury). */
+const HEADER_VALUE_TIERS = ["excellent", "good", "premium", "luxury"];
+
+export function headerValueLine(value) {
+  const tier = value && value.tier;
+  if (!HEADER_VALUE_TIERS.includes(tier)) return null;
+  return value.headline || null;
+}

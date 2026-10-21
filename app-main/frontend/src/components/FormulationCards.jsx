@@ -56,7 +56,16 @@ export function AdvisoryFlags({ flags }) {
           <p className="callout__text">{f.message}</p>
           {f.items?.length > 0 && (
             <ul className="callout__list">
-              {f.items.map((it, j) => <li key={j}><strong>{it.ingredient}</strong> — {it.guidance}</li>)}
+              {f.items.map((it, j) => (
+                <li key={j}>
+                  <strong>{it.ingredient}</strong> — {it.guidance}
+                  {it.signed === false && (
+                    <span className="t-caption c-tertiary" style={{ display: "block" }}>
+                      Unsigned database note
+                    </span>
+                  )}
+                </li>
+              ))}
             </ul>
           )}
         </Callout>

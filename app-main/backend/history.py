@@ -180,11 +180,13 @@ def record(account_id, analysis_key, result, request_data, was_paid):
                 'product_name = CASE WHEN ? <> \'\' THEN ? ELSE product_name END, '
                 'brand = CASE WHEN ? <> \'\' THEN ? ELSE brand END, '
                 'score = ?, tier = ?, price = ?, size_ml = ?, currency = ?, '
-                'skin_type = ?, concerns = ?, was_paid = ?, created_at = ? '
+                'skin_type = ?, concerns = ?, ingredients = ?, was_paid = ?, '
+                'created_at = ? '
                 'WHERE account_id = ? AND analysis_key = ?',
                 (row[3], row[3], row[4], row[4],
                  row[6], row[7], row[8], row[9], row[10], row[11], row[12],
-                 1 if was_paid else 0, row[15], account_id, analysis_key),
+                 row[13], 1 if was_paid else 0, row[15],
+                 account_id, analysis_key),
                 commit=True)
 
         _trim(account_id)
