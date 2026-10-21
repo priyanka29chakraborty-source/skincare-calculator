@@ -31,6 +31,7 @@ Design rules (deliberate; each is evidence-driven):
     not inferable. Every score carries a confidence level that says so.
 """
 
+import math
 import re
 
 from data_loader import data_loader
@@ -78,7 +79,7 @@ _CHOLESTEROL_MARKERS = ('cholesterol',)
 _FATTY_ACID_MARKERS = (
     'stearic acid', 'palmitic acid', 'linoleic acid', 'oleic acid', 'lauric acid',
     'myristic acid', 'behenic acid', 'phytosphingosine', 'sphingosine',
-    'caprylic/capric triglyceride', 'sodium lauroyl lactylate', 'isostearic acid',
+    'sodium lauroyl lactylate', 'isostearic acid',
 )
 
 _OCCLUSIVES = (
@@ -182,10 +183,29 @@ def _any(ingredient_list, markers):
     return bool(_find(ingredient_list, markers))
 
 
+_WATER_TOKENS = {'aqua', 'water', 'eau'}
+
+
+def _has_water(name):
+    """A water token counts after a slash split.
+
+    'Water/Aqua/Eau' and 'Purified Water' are water. A short list such as
+    niacinamide and zinc PCA has neither token.
+    """
+    n = _norm(name)
+    if n in _WATER:
+        return True
+    for chunk in re.split(r'[/]+', n):
+        tokens = re.findall(r'[a-z]+', chunk)
+        if any(tok in _WATER_TOKENS for tok in tokens):
+            return True
+    return False
+
+
 def is_anhydrous(ingredient_list):
     """Water-free products (oils, balms, silicone systems) do not require
     preservation. Penalising them for lacking a preservative would be wrong."""
-    return not any(_norm(i) in _WATER for i in ingredient_list)
+    return not any(_has_water(i) for i in ingredient_list)
 
 
 def one_percent_line(ingredient_list):
@@ -209,7 +229,7 @@ _EXTRA_PRESERVATIVES = (
     'chlorhexidine', 'iodopropynyl butylcarbamate', 'methylisothiazolinone',
     'methylchloroisothiazolinone', 'benzalkonium chloride', 'benzethonium chloride',
     'sodium hydroxymethylglycinate', 'diazolidinyl urea', 'imidazolidinyl urea',
-    'dmdm hydantoin', 'quaternium-15', 'sorbic acid', 'salicylic acid',
+    'dmdm hydantoin', 'quaternium-15', 'sorbic acid',
     'zinc pyrithione', 'climbazole', 'piroctone olamine', 'undecylenic acid',
 )
 
@@ -347,6 +367,26 @@ def dose_band_label(name, estimate, known=False):
     return "Estimated from its place in the list."
 
 
+_MATRIXYL_3000 = "matrixyl 3000"
+_MATRIXYL_3000_PEPTIDES = (
+    "palmitoyl tripeptide-1",
+    "palmitoyl tetrapeptide-7",
+)
+
+
+def _matrixyl_trade_name_already_listed(ing, ingredient_list):
+    """Matrixyl 3000 is a trade name, not a third peptide.
+
+    A formula that only says Matrixyl 3000 is not rewritten into the two
+    palmitoyl peptides. When those peptides are already on the label, the
+    trade-name row is not scored again on top of them.
+    """
+    if _norm(ing) != _MATRIXYL_3000:
+        return False
+    listed = {_norm(name) for name in ingredient_list}
+    return any(peptide in listed for peptide in _MATRIXYL_3000_PEPTIDES)
+
+
 def _score_actives(ingredient_list, concentrations, max_pts, category,
                    known_concentrations=None):
     """Active efficacy: are actives present at concentrations with evidence?
@@ -362,6 +402,7 @@ def _score_actives(ingredient_list, concentrations, max_pts, category,
     scored = []
     explanations = []
     flags = []
+    seen_resolved = set()
 
     for pos, ing in enumerate(ingredient_list):
         n = _norm(ing)
@@ -370,6 +411,13 @@ def _score_actives(ingredient_list, concentrations, max_pts, category,
         data = data_loader.get_ingredient_data(ing)
         if not data:
             continue
+        resolved = str(data.get('INCI_Name') or n).strip().lower()
+        if resolved == _MATRIXYL_3000 and _matrixyl_trade_name_already_listed(
+                resolved, ingredient_list):
+            continue
+        if resolved in seen_resolved:
+            continue
+        seen_resolved.add(resolved)
         klass = str(data.get('Ingredient_Class', '')).lower()
         if klass not in ('active', 'peptide', 'retinoid', 'brightening active'):
             continue
@@ -472,6 +520,10 @@ def _score_evidence(ingredient_list, max_pts):
         data = data_loader.get_ingredient_data(ing)
         if not data:
             continue
+        resolved = str(data.get('INCI_Name') or _norm(ing)).strip().lower()
+        if resolved == _MATRIXYL_3000 and _matrixyl_trade_name_already_listed(
+                resolved, ingredient_list):
+            continue
         if str(data.get('Ingredient_Class', '')).lower() not in (
                 'active', 'peptide', 'retinoid', 'brightening active'):
             continue
@@ -552,6 +604,17 @@ def _score_integrity(ingredient_list, max_pts, category):
     has_chelator = _any(ingredient_list, _CHELATORS)
     has_antiox = _any(ingredient_list, _ANTIOXIDANT_STABILISERS)
     prone = _find(ingredient_list, _OXIDATION_PRONE)
+    if not prone:
+        # 'Vitamin C' and 'HPR' are the ascorbic acid and hydroxypinacolone
+        # records. The stability check has to see that record, not only the
+        # shorthand written on the label.
+        resolved = []
+        for ing in ingredient_list:
+            data = data_loader.get_ingredient_data(ing) or {}
+            inci = str(data.get('INCI_Name') or '').strip()
+            if inci:
+                resolved.append(inci)
+        prone = _find(resolved, _OXIDATION_PRONE)
 
     if prone:
         # A stabiliser is genuinely load-bearing here.
@@ -596,8 +659,44 @@ def _score_integrity(ingredient_list, max_pts, category):
     return round(min(max_pts, total), 1), explanations, flags
 
 
+def _published_ceiling(data):
+    """Lowest positive published maximum on the row, if one is recorded."""
+    ceilings = []
+    for field in ("Typical_Use_Max_Pct", "Max_Safe_%"):
+        raw = data.get(field)
+        if raw is None or str(raw).strip() in ("", "nan", "None"):
+            continue
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if math.isnan(value) or value <= 0:
+            continue
+        ceilings.append(value)
+    return min(ceilings) if ceilings else None
+
+
+def _declared_above_ceiling(ingredient_list, known_concentrations):
+    """Declared doses that sit above the row's own published ceiling."""
+    known = {_norm(k): v for k, v in (known_concentrations or {}).items()}
+    hits = []
+    for ing in ingredient_list:
+        n = _norm(ing)
+        if n not in known:
+            continue
+        try:
+            declared = float(known[n])
+        except (TypeError, ValueError):
+            continue
+        data = data_loader.get_ingredient_data(ing) or {}
+        ceiling = _published_ceiling(data)
+        if ceiling is not None and declared > ceiling:
+            hits.append((ing, declared, ceiling))
+    return hits
+
+
 def _score_tolerability(ingredient_list, max_pts, occlusive_context=False,
-                        periocular=False):
+                        periocular=False, known_concentrations=None):
     """Irritant load, calibrated to the actual evidence.
 
     Fragrance is a personal risk factor (0.7-2.6% general-population allergy),
@@ -668,6 +767,25 @@ def _score_tolerability(ingredient_list, max_pts, occlusive_context=False,
                        "there is little evidence this damages the barrier at "
                        "cosmetic levels, but it does help other ingredients "
                        "penetrate, which can amplify their irritancy.",
+        })
+
+    over = _declared_above_ceiling(ingredient_list, known_concentrations)
+    if over:
+        # One modest deduction. The active still scores as the ceiling dose;
+        # going further is an irritation concern, not a weaker active.
+        pts -= max_pts * 0.12
+        named = ", ".join(
+            "{} at {:g}% (published ceiling about {:g}%)".format(ing, dose, ceiling)
+            for ing, dose, ceiling in over[:3]
+        )
+        explanations.append(
+            "Stated above the published ceiling: {}.".format(named))
+        flags.append({
+            'type': 'above_published_ceiling',
+            'severity': 'info',
+            'message': "Stated above the published ceiling: {}. "
+                       "That can increase irritation. It is not scored as a "
+                       "weaker active than the dose at the ceiling.".format(named),
         })
 
     if periocular and (frag or eos):
@@ -1419,7 +1537,8 @@ def score_formulation(ingredient_list, concentrations, category,
         elif key == 'tolerability':
             pts, notes, flags = _score_tolerability(
                 ingredient_list, weight,
-                occlusive_context=occlusive, periocular=periocular)
+                occlusive_context=occlusive, periocular=periocular,
+                known_concentrations=known_concentrations)
         elif key == 'hydration':
             pts, notes = _score_hydration(ingredient_list, weight)
         elif key == 'barrier':
@@ -1635,6 +1754,35 @@ _PREGNANCY_CAUTION = (
 _PREGNANCY_CLEAR = ('safe',)
 
 
+def is_pregnancy_caution(raw):
+    """True when the database note is about pregnancy, not a different avoid.
+
+    'Avoid sun exposure', 'avoid on acne-prone skin' and 'avoid on
+    barrier-damaged skin' are use notes. Retinoids and hydroquinone stay
+    warnings because they name a teratogen, ACOG, or pregnancy itself.
+    """
+    low = str(raw or '').strip().lower()
+    if not low:
+        return False
+    scoped = any(w in low for w in (
+        'pregnan', 'breast', 'nurs', 'foetal', 'fetal', 'teratogen',
+        'acog', 'embryopath',
+    ))
+    if 'sensitive' in low and not scoped:
+        return False
+    if any(w in low for w in ('region', 'not permitted', 'prohibited')) and not scoped:
+        return False
+    if any(p in low for p in (
+            'sun exposure', 'sunlight', 'acne-prone', 'acne prone',
+            'barrier-damaged', 'barrier damaged')) and not scoped:
+        return False
+    if not any(c in low for c in _PREGNANCY_CAUTION):
+        return False
+    if low.startswith('safe') and 'caution' not in low and 'avoid' not in low:
+        return False
+    return True
+
+
 def build_advisory_flags(ingredient_list):
     """Contextual advisories that depend on the PERSON, not the product.
 
@@ -1652,30 +1800,16 @@ def build_advisory_flags(ingredient_list):
         if not data:
             continue
         raw = str(data.get('Pregnancy_Safety', '') or '').strip()
-        if not raw:
+        if not is_pregnancy_caution(raw):
             continue
         low = raw.lower()
-        # A note about sensitive skin is not a pregnancy note. It belongs in
-        # the personal result, once a skin type is known.
-        if 'sensitive' in low and not any(
-                w in low for w in ('pregnan', 'breast', 'nurs', 'foetal', 'fetal')):
-            continue
-        # "Restricted in some regions" is a dye rule, not a pregnancy rule.
-        # It was being filed under pregnancy because the word restrict is in it.
-        if any(w in low for w in ('region', 'not permitted', 'prohibited')) and not any(
-                w in low for w in ('pregnan', 'breast', 'nurs', 'foetal', 'fetal', 'teratogen')):
-            continue
-        # "Safe" with no qualifier needs no advisory.
-        if any(c in low for c in _PREGNANCY_CAUTION):
-            if low.startswith('safe') and 'caution' not in low and 'avoid' not in low:
-                continue
-            severity = 'high' if ('avoid' in low or 'contraindicated' in low) \
-                else 'info'
-            pregnancy.append({
-                'ingredient': ing,
-                'severity': severity,
-                'guidance': raw,
-            })
+        severity = 'high' if ('avoid' in low or 'contraindicated' in low) \
+            else 'info'
+        pregnancy.append({
+            'ingredient': ing,
+            'severity': severity,
+            'guidance': raw,
+        })
 
     flags = []
     if pregnancy:
@@ -1740,8 +1874,10 @@ def formulation_summary(score, category, components, confidence):
                     key=lambda c: (c['score'] / c['max']) if c['max'] else 0)
     weakest, strongest = ranked[0], ranked[-1]
 
-    if score >= 78:
+    if score >= 82:
         stem = "This is a well-made {}".format(cat)
+    elif score >= 70:
+        stem = "This is a solidly formulated {}".format(cat)
     elif score >= 65:
         stem = "This is a reasonable {}".format(cat)
     elif score >= 50:

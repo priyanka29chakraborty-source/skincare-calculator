@@ -140,7 +140,7 @@ _INGREDIENT_ALIASES = {
     "vitamin k": "phytonadione", "vitamin k1": "phytonadione",
     "dl-alpha-tocopherol": "tocopherol", "alpha-tocopherol": "tocopherol",
     "l-ascorbic acid": "ascorbic acid",
-    "ha": "sodium hyaluronate", "aha": "glycolic acid",
+    "ha": "sodium hyaluronate",
     "bha": "salicylic acid", "pha": "gluconolactone",
     "hyaluronic acid": "sodium hyaluronate",
     "retin-a": "tretinoin", "retinaldehyde": "retinal",
@@ -178,6 +178,47 @@ def _protected_tokens(text):
         'vesicle', 'vesicles', 'exosome', 'exosomes', 'extracellular',
         'sponge', 'reedle', 'milt',
     }
+
+
+_CANONICAL_LOOKUP = {
+    # Shorthand rows exist beside the real INCI. Resolve these before the
+    # exact key, and do not delete the rows. BHA is not in this map.
+    'hpr': 'hydroxypinacolone retinoate',
+    'vitamin c': 'ascorbic acid',
+    'l-ascorbic acid': 'ascorbic acid',
+    'hyaluronic acid': 'sodium hyaluronate',
+    'ha': 'sodium hyaluronate',
+}
+
+
+def _significant_extra_tokens(query, matched):
+    """Tokens the matched record adds that the query never said.
+
+    Ethyl linoleate shares linoleate with retinyl linoleate. The extra
+    retinyl is a different molecule. A longer query may still match the
+    shorter record (centella leaf extract → centella extract).
+    """
+    query_tokens = set(re.findall(r'[a-z0-9]+', query or ''))
+    match_tokens = set(re.findall(r'[a-z0-9]+', matched or ''))
+    return {
+        token for token in (match_tokens - query_tokens)
+        if len(token) > 2 and not token.isdigit()
+    }
+
+
+def _trailing_number_conflict(query, matched):
+    """True when the only material difference is a trailing number (3 vs 9)."""
+    def parts(text):
+        tokens = re.findall(r'[a-z0-9]+', (text or '').lower())
+        if len(tokens) >= 2 and tokens[-1].isdigit():
+            return tokens[:-1], tokens[-1]
+        return tokens, None
+
+    query_base, query_num = parts(query)
+    match_base, match_num = parts(matched)
+    return bool(
+        query_num and match_num and query_num != match_num and query_base == match_base
+    )
 
 
 _INGREDIENT_FAMILY_MAP = {
@@ -436,15 +477,47 @@ class DataLoader:
             self.concern_supporters[concern] = list(set(supporters + extra_actives))
             logger.info(f"  {concern}: {len(self.concern_actives[concern])} ideal actives")
 
+    @staticmethod
+    def _uv_filter_common_aliases(common):
+        """Exact trade-name pieces from a UV Common_Name.
+
+        A slash or semicolon separates two names. A trailing parenthetical
+        that is not a nano marker is also stored without that note, so
+        'Tinosorb A2B (BASF)' resolves as Tinosorb A2B. '(nano)' is never
+        removed: the nano filter and the non-nano filter stay different keys.
+        """
+        text = str(common or "").strip()
+        if not text or text.lower() == "nan":
+            return []
+        names = []
+        for part in re.split(r"\s*[/;]\s*", text):
+            part = part.strip()
+            if not part:
+                continue
+            names.append(part)
+            match = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", part)
+            if not match or "nano" in match.group(2).lower():
+                continue
+            base = match.group(1).strip()
+            if base:
+                names.append(base)
+        return names
+
     def _load_uv_sun_tanning_db(self):
         INCI_ALIASES = {
-            'bemotrizinol': 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+            'bemotrizinol': 'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine',
             'bisoctrizole': 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
             'avobenzone': 'Butyl Methoxydibenzoylmethane',
             'octinoxate': 'Ethylhexyl Methoxycinnamate',
             'octisalate': 'Ethylhexyl Salicylate',
             'ensulizole': 'Phenylbenzimidazole Sulfonic Acid',
             'ecamsule': 'Terephthalylidene Dicamphor Sulfonic Acid',
+            'benzophenone-3': 'Oxybenzone',
+            'benzophenone-4': 'Sulisobenzone',
+            'tinosorb s': 'Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine',
+            'tinosorb m': 'Methylene Bis-Benzotriazolyl Tetramethylbutylphenol',
+            'uvinul a plus': 'Diethylamino Hydroxybenzoyl Hexyl Benzoate',
+            'uvinul t 150': 'Ethylhexyl Triazone',
         }
         try:
             uv_path = os.path.join(self.database_path, 'uv_sunscreen_tanning_database.csv')
@@ -454,6 +527,7 @@ class DataLoader:
             df = pd.read_csv(uv_path)
             df.columns = df.columns.str.strip()
             count = 0
+            common_name_claims = []
             for _, row in df.iterrows():
                 inci = str(row.get('INCI_Name', '')).strip()
                 if not inci or inci == 'nan':
@@ -464,10 +538,30 @@ class DataLoader:
                         entry[k] = ''
                 self.uv_sun_db[inci.lower()] = entry
                 count += 1
+                category = str(entry.get('Ingredient_Category') or '').lower()
+                # Shadowed rows (bemotrizinol, bisoctrizole) are not sources
+                # for trade names. Their Common_Name text mislabels the filter.
+                if 'uv filter' not in category or inci.lower() in INCI_ALIASES:
+                    continue
+                for name in self._uv_filter_common_aliases(entry.get('Common_Name')):
+                    common_name_claims.append((name.lower(), inci.lower()))
             for alias_lower, canonical_inci in INCI_ALIASES.items():
                 canonical_key = canonical_inci.lower()
-                if canonical_key in self.uv_sun_db and alias_lower not in self.uv_sun_db:
+                if canonical_key in self.uv_sun_db:
+                    # Override a same-named row. Bemotrizinol is stored as its
+                    # own filter and must point at Tinosorb S, not that row.
                     self.uv_sun_db[alias_lower] = self.uv_sun_db[canonical_key]
+            owners = {}
+            for alias_lower, inci_lower in common_name_claims:
+                owners.setdefault(alias_lower, set()).add(inci_lower)
+            for alias_lower, incis in owners.items():
+                # Exact only. An existing key wins, so Benzophenone-3 stays
+                # Oxybenzone and a shared name is not guessed.
+                if len(incis) != 1 or alias_lower in self.uv_sun_db:
+                    continue
+                target = self.uv_sun_db.get(next(iter(incis)))
+                if target:
+                    self.uv_sun_db[alias_lower] = target
             logger.info(f"Loaded {count} UV/sunscreen ingredients")
         except Exception as e:
             logger.error(f"Error loading UV sunscreen DB: {e}")
@@ -596,9 +690,17 @@ class DataLoader:
         normalized = self._normalize_ingredient(ingredient_name)
         if normalized in self.uv_sun_db:
             return self.uv_sun_db[normalized]
-        match = process.extractOne(normalized, list(self.uv_sun_db.keys()), scorer=fuzz.token_set_ratio, score_cutoff=85)
-        if match:
-            return self.uv_sun_db[match[0]]
+        matches = process.extract(
+            normalized,
+            list(self.uv_sun_db.keys()),
+            scorer=fuzz.token_set_ratio,
+            score_cutoff=85,
+            limit=5,
+        ) or []
+        for matched, _score, _idx in matches:
+            if _trailing_number_conflict(normalized, matched):
+                continue
+            return self.uv_sun_db[matched]
         return None
 
     def get_ingredient_data(self, ingredient_name):
@@ -608,6 +710,12 @@ class DataLoader:
         key = re.sub(r'\([^)]*\)', '', key)
         key = re.sub(r'\d+\.?\d*\s*%', '', key)
         key = re.sub(r'\s+', ' ', key).strip()
+
+        # A few shorthand rows sit beside the real INCI. Those names resolve
+        # to the canonical record before the exact key can win.
+        canon = _CANONICAL_LOOKUP.get(key)
+        if canon and canon in self.ingredient_lookup:
+            return self.ingredient_lookup[canon]
 
         # O(1) JSON dict lookup
         if key in self.ingredient_lookup:
@@ -638,16 +746,19 @@ class DataLoader:
             return self.ingredient_lookup[tech]
         # Fuzzy fallback (same threshold as before). A longer name that adds
         # vesicle, sponge, or milt is not the shorter ingredient it contains.
-        match = process.extractOne(
+        matches = process.extract(
             normalized,
             list(self.ingredient_lookup.keys()),
             scorer=fuzz.token_set_ratio,
-            score_cutoff=85
-        )
-        if match:
-            if _protected_tokens(normalized) - _protected_tokens(match[0]):
-                return None
-            return self.ingredient_lookup[match[0]]
+            score_cutoff=85,
+            limit=8,
+        ) or []
+        for matched, _score, _idx in matches:
+            if _protected_tokens(normalized) - _protected_tokens(matched):
+                continue
+            if _significant_extra_tokens(normalized, matched):
+                continue
+            return self.ingredient_lookup[matched]
         return None
 
     def _load_surfactant_db(self):

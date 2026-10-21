@@ -125,10 +125,14 @@ def record(account_id, analysis_key, result, request_data, was_paid):
             # top of the list rather than adding a second row.
             wallet._execute(
                 'UPDATE analysis_history SET score = ?, tier = ?, price = ?, '
-                'size_ml = ?, was_paid = ?, created_at = ? '
+                'size_ml = ?, was_paid = ?, created_at = ?, ingredients = ?, '
+                'product_name = CASE WHEN ? = \'\' THEN product_name ELSE ? END, '
+                'brand = CASE WHEN ? = \'\' THEN brand ELSE ? END '
                 'WHERE account_id = ? AND analysis_key = ?',
                 (row[6], row[7], row[8], row[9],
-                 1 if was_paid else 0, row[14], account_id, analysis_key),
+                 1 if was_paid else 0, row[15], row[13],
+                 row[3], row[3], row[4], row[4],
+                 account_id, analysis_key),
                 commit=True)
 
         _trim(account_id)

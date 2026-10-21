@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { getBarColor, money, categoryLabel } from "../constants";
+import { getBarColor, money, categoryLabel, headerValueLine } from "../constants";
 import { ScoreCircle, TierBadge, ProgressBar, ConcernCard, SkinTypeDetails } from "./ScoreComponents";
 import { FormulationBreakdown, ConfidenceNote, ValueCard, FormulationFlags, AdvisoryFlags } from "./FormulationCards";
 import LockedCard from "./LockedCard";
@@ -30,16 +30,6 @@ function benefitText(raw) {
     ? `${bits[0]} and ${bits[1]}`
     : `${bits.slice(0, -1).join(", ")}, and ${bits[bits.length - 1]}`;
   return `Used for ${body}.`;
-}
-
-function getValueChip(valueTier, ratio) {
-  switch (valueTier) {
-    case 'underpriced':      return { label: 'Good Value',         subtitle: 'Priced below category average for the formula quality.',          color: '#267C36' };
-    case 'fair':             return { label: 'Average Value',      subtitle: `Priced around category average (~${(ratio || 1).toFixed(1)}×).`,  color: '#2D7FD3' };
-    case 'slightly_overpriced': return { label: 'Below Average Value', subtitle: "Priced somewhat above category average for what's inside.",   color: '#E6A817' };
-    case 'overpriced':       return { label: 'Poor Value',         subtitle: 'Significantly overpriced relative to active ingredient content.',  color: '#D06030' };
-    default:                 return { label: 'Analysed',           subtitle: '',                                                                 color: '#7A7168' };
-  }
 }
 
 // ── MoA Tooltip ─────────────────────────────────────────────────────────────
@@ -641,7 +631,7 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
   const isMask        = cat === 'mask';
   const isEyeCream    = cat === 'eye cream';
 
-  const valueChip = getValueChip(result.price_analysis?.value_tier, result.price_analysis?.ratio);
+  const valueLine = headerValueLine(result.value_assessment);
 
   return (
     <>
@@ -715,15 +705,9 @@ export default function ResultCards({ result, concerns, skinType, currency, alte
                 <i className="fa-solid fa-bolt"></i> High Intensity Formula
               </span>
             )}
-            {result.price_analysis?.value_tier && result.price_analysis.value_tier !== 'fair' && (
-              <div style={{ color: valueChip.color, fontSize: "0.75rem", fontWeight: 600, marginBottom: "4px" }}>
-                {result.price_analysis.value_tier === 'overpriced'
-                  ? `Priced ${result.price_analysis.vs_average} above the category average`
-                  : result.price_analysis.value_tier === 'slightly_overpriced'
-                  ? `Slightly above category average (${result.price_analysis.vs_average})`
-                  : result.price_analysis.value_tier === 'underpriced'
-                  ? `Priced below category average — good value`
-                  : null}
+            {valueLine && (
+              <div style={{ color: "#7A7168", fontSize: "0.75rem", fontWeight: 600, marginBottom: "4px" }} data-testid="header-value-line">
+                {valueLine}
               </div>
             )}
             <p className="score-title-text">{result.score_title}</p>
