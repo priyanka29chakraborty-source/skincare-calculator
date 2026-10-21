@@ -1,210 +1,113 @@
+import React from "react";
+import { ArrowUpRight, CircleCheck, LoaderCircle, PiggyBank, RotateCcw, Store } from "lucide-react";
+
 import { money, currencyAffix } from "../constants";
 import AffiliateNotice from "./AffiliateNotice";
-export default function BestPriceCard({ bestPrice, bestPriceLoading, bestPriceError, onRetry, currency, fetchInput }) {
-  const userUrl = bestPrice?.user_url || (fetchInput?.trim().startsWith('http') ? fetchInput.trim() : null);
+import { Button, Callout, Card, cx } from "./ds";
 
-  function displaySource(source) {
-    if (!source) return "Unknown";
-    return source
-      .replace(/^www\./, "")
-      .replace(/\.(com\.au|co\.uk|co\.kr|co\.jp|com\.br|com\.sg|ae|sg|fr|de|ca|in|com)$/, "")
-      .split(".")[0]
-      .replace(/^\w/, c => c.toUpperCase());
-  }
+function displaySource(source) {
+  if (!source) return "Unknown";
+  return source
+    .replace(/^www\./, "")
+    .replace(/\.(com\.au|co\.uk|co\.kr|co\.jp|com\.br|com\.sg|ae|sg|fr|de|ca|in|com)$/, "")
+    .split(".")[0]
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
 
-  const allPrices = bestPrice?.all_prices || [];
-  const cheapestPrice = allPrices.length > 0 ? parseFloat(allPrices[0].price) : null;
+/** Where to buy this exact product - same brand, same size - for less. */
+export default function BestPriceCard({ bestPrice, bestPriceLoading, bestPriceError, onRetry, currency, productUrl }) {
+  const userUrl = bestPrice?.user_url || (productUrl?.startsWith("http") ? productUrl : null);
+  const all = bestPrice?.all_prices || [];
+  const cheapest = all.length > 0 ? parseFloat(all[0].price) : null;
+  const retry = onRetry && (
+    <Button variant="ghost" size="sm" icon={<RotateCcw />} onClick={onRetry} data-testid="best-price-retry">Search again</Button>
+  );
 
   return (
-    <div className="sc-card result-card card-best-price" data-testid="card-best-price" style={{ "--anim-delay": "0.6s" }}>
-      <h2 className="card-title">
-        <i className="fa-solid fa-tags"></i> Best Price Available
-      </h2>
+    <Card eyebrow="Where to buy" title="Best price we could find"
+          sub="Same product, same brand, same size only." data-testid="card-best-price">
+      {bestPriceLoading && <p className="loading-line"><LoaderCircle className="spin" aria-hidden="true" />Searching shops for this exact product…</p>}
 
-      {bestPriceLoading && (
-        <div className="alt-loading">
-          <i className="fa-solid fa-spinner fa-spin"></i> Searching for the best price...
-        </div>
-      )}
-
-      {/* ── Case 1: User already has cheapest ── */}
       {!bestPriceLoading && bestPrice?.is_user_cheapest && (
-        <div style={{ marginBottom: allPrices.length > 0 ? "1rem" : 0 }}>
-          <div className="best-price-badge user-cheapest" data-testid="user-cheapest-badge">
-            <i className="fa-solid fa-circle-check" style={{ color: "#267C36", fontSize: "1.1rem" }}></i>
-            <div>
-              <strong style={{ color: "#267C36" }}>✅ Best price available</strong>
-              <p style={{ fontSize: "0.8rem", color: "var(--text-sub)", margin: "2px 0 8px" }}>
-                No cheaper listing found for this exact product.
-              </p>
-              {userUrl && (
-                <a href={userUrl} target="_blank" rel="noopener noreferrer" className="buy-here-link" data-testid="buy-here-link">
-                  <i className="fa-solid fa-store" style={{ marginRight: "5px" }}></i>
-                  Buy Here <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
+        <Callout tone="positive" icon={CircleCheck} title="You’ve found the best price" data-testid="user-cheapest-badge">
+          <p className="callout__text">No cheaper listing turned up for this exact product.</p>
+          {userUrl && (
+            <a href={userUrl} target="_blank" rel="noopener noreferrer" className="link" data-testid="buy-here-link" style={{ marginTop: 8 }}>
+              Open your listing<ArrowUpRight aria-hidden="true" />
+            </a>
+          )}
+        </Callout>
       )}
 
-      {/* ── Case 2: Cheaper found — saving banner ── */}
       {!bestPriceLoading && !bestPrice?.is_user_cheapest && bestPrice?.best_price && (
-        <div className="best-price-badge better-found" style={{ marginBottom: "1rem" }} data-testid="better-price-badge">
-          <i className="fa-solid fa-piggy-bank" style={{ color: "#267C36", fontSize: "1.1rem" }}></i>
-          <div>
-            <strong>Better price found on {displaySource(bestPrice.best_price.source)}!</strong>
-            {" "}{money(currency, bestPrice.best_price.price)}
-            {bestPrice.savings > 0 && (
-              <span className="savings-tag"> — Save {money(currency, bestPrice.savings)}</span>
-            )}
-            {bestPrice.best_price.link && (
-              <div style={{ marginTop: "8px" }}>
-                <a href={bestPrice.best_price.link} target="_blank" rel="noopener noreferrer" className="buy-here-link">
-                  <i className="fa-solid fa-store" style={{ marginRight: "5px" }}></i>
-                  View &amp; Buy on {displaySource(bestPrice.best_price.source)}{" "}
-                  <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
+        <Callout tone="positive" icon={PiggyBank} data-testid="better-price-badge"
+                 title={`Cheaper on ${displaySource(bestPrice.best_price.source)}: ${money(currency, bestPrice.best_price.price)}`}
+                 aside={bestPrice.savings > 0 ? `Save ${money(currency, bestPrice.savings)}` : null}>
+          {bestPrice.best_price.link && (
+            <a href={bestPrice.best_price.link} target="_blank" rel="noopener noreferrer sponsored" className="link" style={{ marginTop: 6 }}>
+              View on {displaySource(bestPrice.best_price.source)}<ArrowUpRight aria-hidden="true" />
+            </a>
+          )}
+        </Callout>
       )}
 
       {!bestPriceLoading && bestPrice?.search_unavailable && (
-        <p className="alt-empty" role="alert" data-testid="best-price-unavailable">
-          {bestPrice.message}
-        </p>
+        <Callout tone="neutral" data-testid="best-price-unavailable"><p className="callout__text">{bestPrice.message}</p></Callout>
       )}
 
       {!bestPriceLoading && bestPriceError && (
-        <p className="alt-empty" role="alert" data-testid="best-price-error">
-          {bestPriceError}{" "}
-          {onRetry && (
-            <button type="button" className="clear-btn-solo" onClick={onRetry}>
-              Search again
-            </button>
-          )}
-        </p>
+        <div className="stack" style={{ "--stack-gap": "10px" }}>
+          <Callout tone="caution" data-testid="best-price-error"><p className="callout__text">{bestPriceError}</p></Callout>
+          {retry}
+        </div>
       )}
 
       {!bestPriceLoading && !bestPriceError && !bestPrice?.search_unavailable && bestPrice?.not_found && (
-        <div style={{ marginBottom: "0.5rem" }}>
-          {userUrl ? (
-            <div className="best-price-badge user-cheapest" data-testid="not-found-message">
-              <i className="fa-solid fa-store" style={{ color: "#267C36", fontSize: "1.1rem" }}></i>
-              <div>
-                <strong>Your listing</strong>
-                {bestPrice.user_price > 0 && (
-                  <p style={{ fontSize: "0.8rem", color: "var(--text-sub)", margin: "2px 0 8px" }}>
-                    {money(currency, bestPrice.user_price)}. A wider search did not return another price for this exact product and size.
-                  </p>
-                )}
-                <a href={userUrl} target="_blank" rel="noopener noreferrer" className="buy-here-link" data-testid="buy-here-link">
-                  <i className="fa-solid fa-store" style={{ marginRight: "5px" }}></i>
-                  View &amp; Buy <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                </a>
-              </div>
-            </div>
-          ) : (
-            <p className="alt-empty" data-testid="not-found-message">
-              No other listings found for this product.
+        <div className="stack" style={{ "--stack-gap": "10px" }}>
+          <Callout tone="neutral" icon={Store} title={userUrl ? "Your listing" : "No other listings found"} data-testid="not-found-message">
+            <p className="callout__text">
+              {userUrl
+                ? `${bestPrice.user_price > 0 ? `${money(currency, bestPrice.user_price)}. ` : ""}A wider search didn’t return another price for this exact product and size.`
+                : "We couldn’t find another shop selling this exact product."}
             </p>
-          )}
-          {onRetry && (
-            <button type="button" className="clear-btn-solo" onClick={onRetry} data-testid="best-price-retry">
-              Search again
-            </button>
-          )}
+            {userUrl && <a href={userUrl} target="_blank" rel="noopener noreferrer" className="link" data-testid="buy-here-link" style={{ marginTop: 6 }}>Open your listing<ArrowUpRight aria-hidden="true" /></a>}
+          </Callout>
+          {retry}
         </div>
       )}
 
-      {/* ── Fallback: no data at all ── */}
       {!bestPriceLoading && !bestPrice && !bestPriceError && (
-        <p className="alt-empty">No other listings found for this product.</p>
+        <Callout tone="neutral"><p className="callout__text">Add the product name to search other shops for it.</p></Callout>
       )}
 
-      {/* ── Price Table: Platform | Price | Action (up to 3 rows) ── */}
-      {!bestPriceLoading && allPrices.length > 0 && (
-        <div style={{ marginTop: "0.5rem", overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-            <thead>
-              <tr style={{ background: "var(--bg-deep)", borderBottom: "2px solid var(--border)" }}>
-                <th style={{ padding: "7px 10px", textAlign: "left", fontWeight: 700, color: "var(--text-sub)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  Platform
-                </th>
-                <th style={{ padding: "7px 10px", textAlign: "right", fontWeight: 700, color: "var(--text-sub)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  Price ({currencyAffix(currency)})
-                </th>
-                <th style={{ padding: "7px 10px", textAlign: "center", fontWeight: 700, color: "var(--text-sub)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {allPrices.map((item, idx) => {
-                const isCheapest = cheapestPrice !== null && parseFloat(item.price) === cheapestPrice;
-                const saving = item.savings > 0 ? item.savings : null;
-                return (
-                  <tr
-                    key={idx}
-                    style={{
-                      background: isCheapest ? "rgba(38, 124, 54, 0.07)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    <td style={{ padding: "8px 10px" }}>
-                      <span style={{ fontWeight: isCheapest ? 700 : 500, color: isCheapest ? "#267C36" : "var(--charcoal)" }}>
-                        {isCheapest && (
-                          <i className="fa-solid fa-star" style={{ fontSize: "0.65rem", marginRight: "5px", color: "#267C36" }}></i>
-                        )}
-                        {displaySource(item.source)}
-                      </span>
-                      {saving && (
-                        <span style={{ fontSize: "0.7rem", color: "#267C36", marginLeft: "6px", fontWeight: 600 }}>
-                          Save {money(currency, saving)}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: isCheapest ? "#267C36" : "var(--charcoal)" }}>
-                      {item.price}
-                    </td>
-                    <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                      {item.link ? (
-                        <a
-                          href={item.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: "inline-block",
-                            padding: "4px 14px",
-                            borderRadius: "6px",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            textDecoration: "none",
-                            background: isCheapest
-                              ? "linear-gradient(135deg, #267C36, #1a5c28)"
-                              : "var(--bg-deep)",
-                            color: isCheapest ? "#fff" : "var(--charcoal)",
-                            border: isCheapest ? "none" : "1px solid var(--border)",
-                            transition: "opacity 0.15s",
-                          }}
-                        >
-                          Buy <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: "0.65rem" }}></i>
-                        </a>
-                      ) : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p style={{ fontSize: "0.7rem", color: "var(--text-sub)", marginTop: "6px", fontStyle: "italic" }}>
-            ⭐ Cheapest verified listing highlighted in green. Same product, same brand, same size only.
-          </p>
-        </div>
+      {!bestPriceLoading && all.length > 0 && (
+        <table className="dtable price-table">
+          <thead><tr><th>Shop</th><th style={{ textAlign: "right" }}>Price ({currencyAffix(currency)})</th><th /></tr></thead>
+          <tbody>
+            {all.map((item, idx) => {
+              const best = cheapest !== null && parseFloat(item.price) === cheapest;
+              return (
+                <tr key={idx} className={cx(best && "price-table__best")}>
+                  <td>
+                    <span className="t-label-s">{displaySource(item.source)}</span>
+                    {best && <span className="badge badge--positive" style={{ marginLeft: 8 }}>Cheapest</span>}
+                    {item.savings > 0 && <span className="t-caption c-positive" style={{ display: "block" }}>Save {money(currency, item.savings)}</span>}
+                  </td>
+                  <td className="num" style={{ textAlign: "right" }}>{item.price}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {item.link ? (
+                      <a href={item.link} target="_blank" rel="noopener noreferrer sponsored" className={cx("btn btn--sm", best ? "btn--primary" : "btn--secondary")}>
+                        <span>View</span><ArrowUpRight aria-hidden="true" />
+                      </a>
+                    ) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
       <AffiliateNotice disclosure={bestPrice?.affiliate_disclosure} />
-    </div>
+    </Card>
   );
 }

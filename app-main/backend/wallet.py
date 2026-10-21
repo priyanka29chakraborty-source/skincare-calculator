@@ -52,15 +52,21 @@ logger = logging.getLogger(__name__)
 # Prices are in paise, the smallest unit, because that is what Razorpay's API
 # takes and because float rupees would eventually produce a 98.99999 charge.
 CREDIT_PACKS = {
-    'starter': {'credits': 5,  'amount_paise': 9900,  'label': '5 analyses'},
-    'regular': {'credits': 8,  'amount_paise': 14900, 'label': '8 analyses'},
-    'bulk':    {'credits': 12, 'amount_paise': 19900, 'label': '12 analyses'},
+    'starter': {'credits': 5,  'amount_paise': 9900,  'label': '5 credits'},
+    'regular': {'credits': 8,  'amount_paise': 14900, 'label': '8 credits'},
+    'bulk':    {'credits': 12, 'amount_paise': 19900, 'label': '12 credits'},
 }
 
 # One personalised analysis costs one credit. A comparison costs one credit
-# for each product in it.
+# per product compared, with a pair as the minimum: two products cost two,
+# three cost three, and four cost four.
 COST_PER_ANALYSIS = 1
 COST_PER_COMPARISON = 2
+
+
+def comparison_cost(product_count):
+    """Credits for comparing this many products: one each, two at the least."""
+    return max(COST_PER_COMPARISON, int(product_count or 0))
 
 # First email sign-in. Four credits covers two analyses, or one analysis
 # and one comparison, or two comparisons.
@@ -208,9 +214,16 @@ def _execute(sql, params=(), commit=False):
     init_storage()
     conn = _connect()
     cur = conn.cursor()
-    cur.execute(_q(sql), params)
-    if commit:
-        _commit(conn)
+    try:
+        cur.execute(_q(sql), params)
+        if commit:
+            _commit(conn)
+    except BaseException:
+        # PostgreSQL keeps a connection in an aborted transaction after any
+        # failed statement.  Roll it back before returning it to this thread,
+        # otherwise every later query fails with InFailedSqlTransaction.
+        _rollback(conn)
+        raise
     return cur
 
 
@@ -299,11 +312,6 @@ def get_or_create_account(email):
         if row:
             return row[0]
         raise
-
-
-def comparison_cost(product_count):
-    """One credit for each product in the comparison."""
-    return max(COST_PER_COMPARISON, int(product_count or 0))
 
 
 def _remaining_lots(rows, now):
@@ -412,13 +420,19 @@ def has_purchased(account_id):
 def list_accounts(limit=100):
     """Recent sign-ins: email, credits left, and when the account was created."""
     cur = _execute(
-        'SELECT email, balance, created_at FROM wallet_account '
+        'SELECT account_id, email, created_at FROM wallet_account '
         'ORDER BY created_at DESC LIMIT ?',
         (int(limit),))
-    return [
-        {'email': row[0], 'balance': row[1], 'created_at': row[2]}
-        for row in cur.fetchall()
-    ]
+    accounts = []
+    for account_id, email, created_at in cur.fetchall():
+        # get_balance applies any expiry that became due since the cached
+        # wallet_account balance was last touched.
+        accounts.append({
+            'email': email,
+            'balance': get_balance(account_id),
+            'created_at': created_at,
+        })
+    return accounts
 
 
 def count_accounts_since(since_ts):

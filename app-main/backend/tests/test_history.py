@@ -80,6 +80,39 @@ def test_different_products_are_separate_rows(hist, account):
     assert len(hist.recent(account)) == 2
 
 
+def test_one_product_is_one_row_whatever_it_was_run_with(hist, account):
+    """Another skin type, price or a blank name must not add an 'Unnamed' row."""
+    named = request_data('Moisture Restore')
+    hist.record(account, hist.product_key(named), result(79), named, was_paid=False)
+    blank = dict(request_data(''), brand='', skin_type='dry', price=999)
+    hist.record(account, hist.product_key(blank), result(80), blank, was_paid=False)
+    rows = hist.recent(account)
+    assert len(rows) == 1
+    assert rows[0]['product_name'] == 'Moisture Restore'
+    assert rows[0]['brand'] == 'Minimalist'
+    assert rows[0]['score'] == 80
+
+
+def test_older_rows_of_the_same_product_are_folded_in(hist, account):
+    """Rows saved under the old cache key merge into the product's row."""
+    hist.record(account, 'old-cache-key-1', result(), request_data('Moisture Restore'),
+                was_paid=False)
+    hist.record(account, 'old-cache-key-2', result(), request_data(''), was_paid=False)
+    hist.record(account, 'other', result(), dict(request_data('Other'), ingredients='Aqua, Retinol'),
+                was_paid=False)
+    again = request_data('')
+    hist.record(account, hist.product_key(again), result(), again, was_paid=False)
+    names = sorted(r['product_name'] for r in hist.recent(account))
+    assert names == ['Moisture Restore', 'Other']
+
+
+def test_re_analysing_moves_the_product_to_the_top(hist, account):
+    hist.record(account, 'key1', result(), request_data('First'), was_paid=False)
+    hist.record(account, 'key2', result(), request_data('Second'), was_paid=False)
+    hist.record(account, 'key1', result(), request_data('First'), was_paid=False)
+    assert hist.recent(account)[0]['product_name'] == 'First'
+
+
 def test_newest_first(hist, account):
     hist.record(account, 'key1', result(), request_data('Older'), was_paid=False)
     hist.record(account, 'key2', result(), request_data('Newer'), was_paid=False)

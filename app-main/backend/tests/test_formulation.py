@@ -398,11 +398,17 @@ def test_unknown_category_falls_back_without_crashing():
 
 
 def test_confidence_is_reported_honestly():
-    """Below the 1% line, EU 1223/2009 Art. 19 permits any order, so dose is not
-    inferable and the product must say so."""
-    declared = score(ORDINARY_NIACINAMIDE, "serum",
-                     known={"Niacinamide": 10.0})
-    assert declared["confidence"] == "high"
+    """High means every ingredient on the list has a declared amount. Declaring
+    only some of them is partial, so the score says moderate rather than high.
+    Below the 1% line, EU 1223/2009 Art. 19 permits any order, so an undeclared
+    list must say the doses are inferred."""
+    partial = score(ORDINARY_NIACINAMIDE, "serum",
+                    known={"Niacinamide": 10.0})
+    assert partial["confidence"] == "moderate"
+    names = [part.strip().lower() for part in ORDINARY_NIACINAMIDE.split(",") if part.strip()]
+    complete = score(ORDINARY_NIACINAMIDE, "serum",
+                     known={name: 1.0 for name in names})
+    assert complete["confidence"] == "high"
     inferred = score(ORDINARY_NIACINAMIDE, "serum")
     assert inferred["confidence"] in ("moderate", "low")
     assert "1%" in inferred["confidence_note"] or "inferred" in inferred["confidence_note"]

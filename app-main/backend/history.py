@@ -23,6 +23,7 @@ but it is never logged, never returned for another account, and
 import hashlib
 import json
 import logging
+import re
 import time
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,49 @@ def ensure_schema():
         wallet._execute(statement, (), commit=True)
 
 
+PRODUCT_KEY_PREFIX = 'product:'
+
+
+def fingerprint(ingredients, category):
+    """The same product, whatever name, price or skin type it was run with."""
+    ingredients = re.sub(r'[\s,]+', ',', (ingredients or '').strip().lower())
+    category = (category or '').strip().lower()
+    return hashlib.sha256(
+        ('%s|%s' % (category, ingredients)).encode('utf-8')).hexdigest()[:32]
+
+
+def product_key(request_data):
+    return PRODUCT_KEY_PREFIX + fingerprint(
+        request_data.get('ingredients'), request_data.get('category'))
+
+
+def _absorb_legacy_rows(wallet, account_id, analysis_key):
+    """Drop older rows of this product saved under the full cache key.
+
+    Those keys changed with the name, skin type, concerns and price, so one
+    product could fill the list several times, some rows without a name.
+    Returns the name and brand worth keeping from them.
+    """
+    cur = wallet._execute(
+        'SELECT entry_id, analysis_key, product_name, brand, category, ingredients '
+        'FROM analysis_history WHERE account_id = ? ORDER BY created_at DESC',
+        (account_id,))
+    name, brand, stale = '', '', []
+    for entry_id, key, row_name, row_brand, category, ingredients in cur.fetchall():
+        if (key or '').startswith(PRODUCT_KEY_PREFIX):
+            continue
+        if PRODUCT_KEY_PREFIX + fingerprint(ingredients, category) != analysis_key:
+            continue
+        name = name or (row_name or '')
+        brand = brand or (row_brand or '')
+        stale.append(entry_id)
+    for entry_id in stale:
+        wallet._execute(
+            'DELETE FROM analysis_history WHERE account_id = ? AND entry_id = ?',
+            (account_id, entry_id), commit=True)
+    return name, brand
+
+
 def record(account_id, analysis_key, result, request_data, was_paid):
     """Save or update one analysis. Never raises into the request path.
 
@@ -88,13 +132,20 @@ def record(account_id, analysis_key, result, request_data, was_paid):
         ensure_schema()
         wallet = _wallet()
 
-        price_analysis = result.get('price_analysis') or {}
-        entry_id = 'hist_%s' % abs(hash((account_id, analysis_key)))
+        entry_id = 'hist_' + hashlib.sha256(
+            ('%s:%s' % (account_id, analysis_key)).encode('utf-8')).hexdigest()[:24]
+
+        name = (request_data.get('product_name') or '').strip()
+        brand = (request_data.get('brand') or '').strip()
+        if analysis_key.startswith(PRODUCT_KEY_PREFIX):
+            old_name, old_brand = _absorb_legacy_rows(wallet, account_id, analysis_key)
+            name = name or old_name
+            brand = brand or old_brand
 
         row = (
             entry_id, account_id, analysis_key,
-            (request_data.get('product_name') or '')[:200],
-            (request_data.get('brand') or '')[:120],
+            name[:200],
+            brand[:120],
             (request_data.get('category') or '')[:60],
             int(result.get('formulation_score') or result.get('main_worth_score') or 0),
             # main_worth_tier is the engine's own spelling; the other is
@@ -121,17 +172,20 @@ def record(account_id, analysis_key, result, request_data, was_paid):
         except Exception as exc:
             if not _is_duplicate(exc):
                 raise
-            # Seen this product before: refresh the score and bring it to the
-            # top of the list rather than adding a second row.
+            # Seen this product before: refresh it and bring it to the top of
+            # the list rather than adding a second row. A blank name or brand
+            # never overwrites one that was entered earlier.
             wallet._execute(
-                'UPDATE analysis_history SET score = ?, tier = ?, price = ?, '
-                'size_ml = ?, was_paid = ?, created_at = ?, ingredients = ?, '
-                'product_name = CASE WHEN ? = \'\' THEN product_name ELSE ? END, '
-                'brand = CASE WHEN ? = \'\' THEN brand ELSE ? END '
+                'UPDATE analysis_history SET '
+                'product_name = CASE WHEN ? <> \'\' THEN ? ELSE product_name END, '
+                'brand = CASE WHEN ? <> \'\' THEN ? ELSE brand END, '
+                'score = ?, tier = ?, price = ?, size_ml = ?, currency = ?, '
+                'skin_type = ?, concerns = ?, ingredients = ?, was_paid = ?, '
+                'created_at = ? '
                 'WHERE account_id = ? AND analysis_key = ?',
-                (row[6], row[7], row[8], row[9],
-                 1 if was_paid else 0, row[15], row[13],
-                 row[3], row[3], row[4], row[4],
+                (row[3], row[3], row[4], row[4],
+                 row[6], row[7], row[8], row[9], row[10], row[11], row[12],
+                 row[13], 1 if was_paid else 0, row[15],
                  account_id, analysis_key),
                 commit=True)
 

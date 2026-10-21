@@ -109,6 +109,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
 </div>
 
 <div id="warnings-container"></div>
+<div id="dash-error" class="warning-banner" style="display:none"></div>
 
 <div class="tabs">
   <div class="tab active" data-tab="today"><i class="fa-solid fa-sun"></i> Today</div>
@@ -132,7 +133,7 @@ tr.row-green{background:#f0fdf4}tr.row-yellow{background:#fefce8}tr.row-red{back
     <div class="section-title"><i class="fa-solid fa-user"></i> People who signed in</div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>Signed in</th><th>Email</th><th>Credits left</th></tr></thead>
+        <thead><tr><th>Signed in</th><th>Email</th><th>Credits remaining</th></tr></thead>
         <tbody id="people-body"></tbody>
       </table>
     </div>
@@ -351,7 +352,17 @@ document.querySelectorAll('.tab').forEach(tab => {
 async function api(path) {
   const r = await fetch(API + path);
   if (r.status === 401) { window.location = API + '/login'; return null; }
-  return r.json();
+  let data = null;
+  try { data = await r.json(); } catch (e) { data = null; }
+  if (!r.ok) {
+    const box = document.getElementById('dash-error');
+    if (box) {
+      box.style.display = 'flex';
+      box.textContent = (data && data.error) || 'This part of the dashboard could not be loaded.';
+    }
+    return null;
+  }
+  return data;
 }
 function destroyChart(id) {
   if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
@@ -439,10 +450,11 @@ function indiaTime(value) {
 async function loadToday() {
   const d = await api('/today');
   if (!d) return;
+  const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
   const cards = [
-    ['Analyses', d.analyses],
-    ['New sign-ins', d.signins],
-    ['Comparisons', d.comparisons],
+    ['Analyses', n(d.analyses)],
+    ['New sign-ins', n(d.signins)],
+    ['Comparisons', n(d.comparisons)],
   ];
   document.getElementById('today-stats').innerHTML = cards.map(([label, n]) =>
     `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${n}</div></div>`).join('');
@@ -451,14 +463,18 @@ async function loadToday() {
 async function loadPeople() {
   const d = await api('/accounts');
   const body = document.getElementById('people-body');
-  if (!d || !d.accounts || !d.accounts.length) {
+  if (!d) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-state">Credits could not be loaded. Refresh the page.</td></tr>';
+    return;
+  }
+  if (!d.accounts || !d.accounts.length) {
     body.innerHTML = '<tr><td colspan="3" class="empty-state">No one has signed in yet.</td></tr>';
     return;
   }
   body.innerHTML = d.accounts.map(a => `<tr>
     <td style="white-space:nowrap;font-size:0.72rem">${indiaTime(a.created_at)}</td>
     <td>${esc(a.email)}</td>
-    <td>${a.balance}</td>
+    <td>${Number.isFinite(Number(a.balance)) ? a.balance : 0}</td>
   </tr>`).join('');
 }
 
@@ -740,6 +756,7 @@ _loaded['today']=true;
 
 setInterval(() => {
   if (document.getElementById('sec-today').classList.contains('active')) loadToday();
+  if (document.getElementById('sec-people').classList.contains('active')) loadPeople();
   if (document.getElementById('sec-fetching').classList.contains('active')) loadFetching();
 }, 60000);
 // Refresh flagged count every 5 minutes

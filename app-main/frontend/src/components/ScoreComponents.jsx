@@ -1,150 +1,37 @@
-import { getScoreColor, getBarColor, CONCERNS_LIST } from "../constants";
+import React from "react";
 
-export function ScoreCircle({ score }) {
-  const r = 54, c = 2 * Math.PI * r;
-  const off = c - (score / 100) * c;
-  const col = getScoreColor(score);
-  return (
-    <div className="score-circle-wrap" data-testid="score-circle">
-      <svg width="140" height="140" viewBox="0 0 140 140">
-        <circle cx="70" cy="70" r={r} fill="none" stroke="var(--border)" strokeWidth="10" />
-        <circle cx="70" cy="70" r={r} fill="none" stroke={col} strokeWidth="10"
-          strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round"
-          transform="rotate(-90 70 70)" style={{ transition: "stroke-dashoffset 1.2s ease" }} />
-      </svg>
-      <div className="score-number" style={{ color: col }}>{score}<span className="score-total">/100</span></div>
-    </div>
-  );
+import { ConcernBadge } from "../lib/concernIcons";
+import { ScoreRing, scoreTone } from "./ds";
+
+export function fitLevel(score) {
+  if (score >= 80) return "Strong fit";
+  if (score >= 60) return "Good fit";
+  if (score >= 40) return "Moderate fit";
+  if (score >= 20) return "Low fit";
+  return "Very low fit";
 }
 
-export function ProgressBar({ pct, label }) {
-  return (
-    <div className="progress-bar-wrap" data-testid={`progress-${label}`}>
-      <div className="progress-bar-bg">
-        <div className="progress-bar-fill" style={{ width: `${Math.min(100, pct)}%`, background: getBarColor(pct), transition: "width 0.8s ease" }} />
-      </div>
-    </div>
-  );
-}
-
-export function TierBadge({ tier, score }) {
-  const c = getScoreColor(score);
-  return <span className="tier-badge" style={{ background: c + "22", color: c, borderColor: c }} data-testid="tier-badge">{tier}</span>;
-}
-
-export function BreakdownRow({ icon, label, score, max, details }) {
-  const pct = (score / max) * 100;
-  // Show score out of its max AND as a % of the 100pt total
-  const ptsLabel = max === 100 ? `${score} / 100` : `${score} pts  (max ${max})`;
-  return (
-    <div className="bd-row" data-testid={`breakdown-${label.replace(/\s+/g, "-").toLowerCase()}`}>
-      <div className="bd-header">
-        <i className={icon}></i>
-        <span className="bd-label">{label}</span>
-        <span className="bd-score">{ptsLabel}</span>
-      </div>
-      <ProgressBar pct={pct} label={label} />
-      {details?.length > 0 && (
-        <ul className="bd-details">
-          {details.map((d, i) => <li key={i}>{d}</li>)}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function getFitLevel(score) {
-  if (score >= 80) return { label: 'Strong fit', bars: 5 };
-  if (score >= 60) return { label: 'Good fit',   bars: 4 };
-  if (score >= 40) return { label: 'Moderate fit', bars: 3 };
-  if (score >= 20) return { label: 'Low fit',    bars: 2 };
-  return              { label: 'Very Low fit', bars: 1 };
-}
-
-function FitBars({ bars, color }) {
-  return (
-    <span style={{ letterSpacing: '2px', fontSize: '13px' }}>
-      {[1,2,3,4,5].map(i => (
-        <span key={i} style={{ color: i <= bars ? color : 'var(--border)', fontWeight: 700 }}>▮</span>
-      ))}
-    </span>
-  );
-}
-
+/** One concern: how well this product treats it, and why. */
 export function ConcernCard({ concern, data }) {
-  const ic = CONCERNS_LIST.find(c => c.key === concern)?.icon || "fa-solid fa-circle";
-
-  const displayScore = data.score;
-  const fit      = getFitLevel(displayScore);
-  const barColor = getBarColor(displayScore);
-
+  const score = Number(data.score) || 0;
+  const tone = scoreTone(score);
   return (
-    <div className="concern-result" data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
-      <div className="concern-header">
-        <div className="concern-left">
-          <i className={ic}></i>
-          <span className="concern-cname">{concern}</span>
-          <FitBars bars={fit.bars} color={barColor} />
-          <span style={{ fontSize: '0.75rem', color: barColor, fontWeight: 600, marginLeft: '4px' }}>{fit.label}</span>
-        </div>
-      </div>
-      <ProgressBar pct={displayScore} label={concern} />
-      <div className="concern-detail open">
-
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', fontStyle: 'italic', marginBottom: '6px' }}>
-          {displayScore}/100 = {fit.label.toLowerCase()} for this concern, compared with other products of this type, based on the actives this product actually contains and whether they are at doses shown to work.
+    <div className="concern" data-testid={`concern-result-${concern.replace(/\s+/g, "-").toLowerCase()}`}>
+      <ScoreRing score={score} size="sm" animate={false} label={`${concern} fit`} />
+      <div className="concern__body">
+        <p className="concern__head">
+          <ConcernBadge name={concern} size="sm" />
+          <span className="t-heading-s">{concern}</span>
+          <span className="concern__level" style={{ color: `var(--score-${tone})` }}>{fitLevel(score)}</span>
         </p>
-
-        <ul className="concern-explain">
-          {data.explanation?.map((e, i) => <li key={i}>{e}</li>)}
-        </ul>
-        {data.supporting_ingredients?.length > 0 && (
-          <p className="concern-support"><strong>Supporting:</strong> {data.supporting_ingredients.join(", ")}</p>
+        {data.explanation?.length > 0 && (
+          <ul className="concern__why">{data.explanation.map((e, i) => <li key={i}>{e}</li>)}</ul>
         )}
-        <p className="concern-advisory"><strong>Advisory:</strong> {data.advisory}</p>
+        {data.supporting_ingredients?.length > 0 && (
+          <p className="t-body-s c-secondary"><strong className="c-primary">Doing the work:</strong> {data.supporting_ingredients.join(", ")}</p>
+        )}
+        {data.advisory && <p className="t-body-s c-secondary"><strong className="c-primary">Worth knowing:</strong> {data.advisory}</p>}
       </div>
-    </div>
-  );
-}
-
-export function SkinTypeDetails({ details, score, betterSuited, formNotes }) {
-  return (
-    <div className="skin-type-details" data-testid="skin-type-details">
-      {details?.why_bullets?.length > 0 && (
-        <div className="st-section">
-          <h4><i className="fa-solid fa-circle-info"></i> Why this score?</h4>
-          <ul>{details.why_bullets.map((b, i) => <li key={i} className={b.startsWith("Warning") ? "warning" : "good"}>{b}</li>)}</ul>
-        </div>
-      )}
-      {details?.helpful_ingredients?.length > 0 && (
-        <div className="st-section">
-          <h4><i className="fa-solid fa-thumbs-up"></i> Helpful Ingredients</h4>
-          <ul>{details.helpful_ingredients.map((h, i) => <li key={i}>{h}</li>)}</ul>
-        </div>
-      )}
-      {details?.look_for?.length > 0 && (
-        <div className="st-section">
-          <h4><i className="fa-solid fa-lightbulb"></i> Look For</h4>
-          <p>{details.look_for[0]}</p>
-        </div>
-      )}
-      {formNotes?.length > 0 ? (
-        <div className="st-section form-notes" data-testid="formulation-notes">
-          <h4><i className="fa-solid fa-triangle-exclamation"></i> Potential Sensitivity Risks</h4>
-          <p style={{ fontSize: "0.78rem", color: "var(--text-sub)", marginBottom: "8px", lineHeight: 1.5 }}>
-            These ingredients are safe for many people but can cause issues for acne-prone or sensitive skin. Review based on your own history.
-          </p>
-          <ul>{formNotes.map((n, i) => <li key={i}>{n}</li>)}</ul>
-        </div>
-      ) : (
-        <div className="st-section form-notes-clean" data-testid="formulation-notes-clean">
-          <h4><i className="fa-solid fa-circle-check"></i> Formulation Notes</h4>
-          <p>No major irritation or pore-clogging risks detected.</p>
-        </div>
-      )}
-      {score < 50 && betterSuited?.length > 0 && (
-        <p className="better-suited"><i className="fa-solid fa-arrow-right"></i> Better suited for: {betterSuited.join(", ")} skin</p>
-      )}
     </div>
   );
 }
