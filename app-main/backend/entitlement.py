@@ -80,6 +80,7 @@ PAID_KEYS = {
 # are produced by the personal layer.
 ALWAYS_FREE_ADVISORIES = {
     'pregnancy',            # safety, and the highest-stakes information here
+    'pregnancy_unreviewed', # a missing warning is not a clearance
     'declared_allergen',    # the user told us they react to it - withholding
                             # that would be indefensible
 }

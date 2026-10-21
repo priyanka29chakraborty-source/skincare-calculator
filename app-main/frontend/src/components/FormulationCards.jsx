@@ -237,6 +237,11 @@ export function AdvisoryFlags({ flags }) {
               {f.items.map((it, j) => (
                 <li key={j} style={{ marginBottom: 3 }}>
                   <strong>{it.ingredient}</strong> — {it.guidance}
+                  {it.signed === false && (
+                    <span style={{ display: "block", fontSize: 11, color: "#6b7f99" }}>
+                      Unsigned database note
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

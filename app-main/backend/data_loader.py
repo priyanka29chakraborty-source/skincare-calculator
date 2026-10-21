@@ -188,6 +188,17 @@ _CANONICAL_LOOKUP = {
     'l-ascorbic acid': 'ascorbic acid',
     'hyaluronic acid': 'sodium hyaluronate',
     'ha': 'sodium hyaluronate',
+    'avobenzone': 'butyl methoxydibenzoylmethane',
+    'octinoxate': 'ethylhexyl methoxycinnamate',
+    'octyl methoxycinnamate': 'ethylhexyl methoxycinnamate',
+    'omc': 'ethylhexyl methoxycinnamate',
+    'retinaldehyde': 'retinal',
+    'alpha arbutin': 'alpha-arbutin',
+    'centella extract': 'centella asiatica extract',
+    'cica': 'centella asiatica extract',
+    'parfum': 'fragrance',
+    'perfume': 'fragrance',
+    'aroma': 'fragrance',
 }
 
 
@@ -658,7 +669,13 @@ class DataLoader:
     def get_moa(self, ingredient_data):
         if not ingredient_data:
             return None
-        return ingredient_data.get('_moa', None)
+        text = ingredient_data.get('_moa', None)
+        if not text:
+            return None
+        if re.search(r'superstar|holy grail|miracle ingredient|game-?changer',
+                     str(text), re.I):
+            return None
+        return text
 
     def get_activity_tier_label(self, ingredient_data):
         if not ingredient_data:

@@ -196,9 +196,9 @@ def test_over_max_does_not_score_below_the_ceiling_dose():
         "Aqua, Niacinamide, Phenoxyethanol", known={"niacinamide": 15})
     assert _component(above, "actives") >= _component(ceiling, "actives")
     assert _component(above, "tolerability") < _component(ceiling, "tolerability")
-    assert any(f["type"] == "above_published_ceiling" for f in above["flags"])
-    assert "ceiling" in _notes(above, "tolerability")
-    assert not any(f["type"] == "above_published_ceiling" for f in ceiling["flags"])
+    assert any(f["type"] == "above_recorded_maximum" for f in above["flags"])
+    assert "recorded" in _notes(above, "tolerability")
+    assert not any(f["type"] == "above_recorded_maximum" for f in ceiling["flags"])
 
 
 # --- 6. 3-O-ethyl ascorbic acid --------------------------------------------

@@ -1241,6 +1241,23 @@ def detect_red_flags(ingredient_list, concentrations, category):
     return flags, penalty
 
 
+_FRAGRANCE_INCI = {
+    'fragrance', 'parfum', 'perfume', 'aroma', 'parfume',
+}
+
+
+def _is_fragrance_label(name, data=None):
+    """Parfum is an allergen. It is not a comedogenic oil."""
+    n = re.sub(r'\([^)]*\)', '', str(name or '')).strip().lower()
+    if n in _FRAGRANCE_INCI:
+        return True
+    if data:
+        inci = str(data.get('INCI_Name') or '').strip().lower()
+        if inci in _FRAGRANCE_INCI:
+            return True
+    return False
+
+
 def detect_formulation_notes(ingredient_list):
     """Generate formulation sensitivity notes — population-specific, non-alarmist."""
     notes = []
@@ -1249,7 +1266,7 @@ def detect_formulation_notes(ingredient_list):
         data = data_loader.get_ingredient_data(ing)
 
         # Comedogenic warnings — contextual, not absolute
-        if data:
+        if data and not _is_fragrance_label(ing, data):
             try:
                 c_rating = float(data.get('Comedogenicity_0_5', 0) or 0)
                 if c_rating >= 4:
@@ -1305,13 +1322,21 @@ def detect_formulation_notes(ingredient_list):
     return list(dict.fromkeys(notes))[:8]
 
 
-def _get_evidence_weight(evidence_strength):
-    """Map Evidence_Strength string to numeric weight per spec."""
-    ev = str(evidence_strength).strip().lower() if evidence_strength else ''
-    if 'strong' in ev:    return 8
-    if 'moderate' in ev:  return 6
-    if 'limited' in ev:   return 3
-    return 3  # default
+def _get_evidence_weight(evidence):
+    """Map the same evidence source the badge uses to a numeric weight.
+
+    Passing a row dict uses Evidence_Level_Normalized / Evidence_Factor.
+    A bare string is treated as Evidence_Strength for older callers.
+    """
+    if isinstance(evidence, dict):
+        factor = get_evidence_factor(evidence)
+    else:
+        factor = get_evidence_factor({'Evidence_Strength': evidence})
+    if factor >= 0.9:
+        return 8
+    if factor >= 0.7:
+        return 6
+    return 3
 
 def _get_role_weight(ingredient_data):
     """Get role weight from DB row, falling back to role_weight_table, then defaults."""
@@ -1370,7 +1395,7 @@ def _calc_impact_score(ingredient_name, position, ingredient_list, known_concent
     # Activity_Tier_Weight from new DB column (0.1–1.0)
     tier_weight = data_loader.get_activity_tier_weight(data)
 
-    ev_weight   = _get_evidence_weight(data.get('Evidence_Strength', ''))
+    ev_weight   = _get_evidence_weight(data)
     role_weight = _get_role_weight(data)
 
     # Synergy multiplier from synergy_partners_map
@@ -1917,7 +1942,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             and data_loader.get_activity_tier_weight(d) >= 0.8  # Tier 1 or Tier 2 only
         ]
         below_evidence = sum(
-            _get_evidence_weight(d.get('Evidence_Strength','')) * 0.6
+            _get_evidence_weight(d) * 0.6
             for _, pos, s, d in _tier12_below
         )
         active_potency = min(40, above_impact / 40 + below_evidence)
@@ -1927,7 +1952,7 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
                 f"Trace floor credit applied: {len(_tier12_below)} Tier 1/2 active(s) below 1% threshold"
             )
 
-        ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength','')) for _, _, _, d in all_impact
+        ev_sum = sum(_get_evidence_weight(d) for _, _, _, d in all_impact
                      if str(d.get('Ingredient_Class','')).lower() == 'active')
         active_count_for_ev = max(1, sum(1 for _, _, _, d in all_impact
                                          if str(d.get('Ingredient_Class','')).lower() == 'active'))
@@ -2193,11 +2218,11 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             and data_loader.get_activity_tier_weight(d) >= 0.8
         ]
         below_evidence = sum(
-            _get_evidence_weight(d.get('Evidence_Strength', '')) * 0.6
+            _get_evidence_weight(d) * 0.6
             for _, pos, s, d in _tier12_below_ec
         )
         active_potency = min(40, above_impact / 40 + below_evidence)
-        ev_sum = sum(_get_evidence_weight(d.get('Evidence_Strength', ''))
+        ev_sum = sum(_get_evidence_weight(d)
                      for _, _, _, d in all_impact
                      if str(d.get('Ingredient_Class', '')).lower() in _ACTIVE_CLASSES)
         active_count_ev = max(1, sum(1 for _, _, _, d in all_impact
@@ -2901,7 +2926,7 @@ _BANNED_FILTERS = {
     'Aminobenzoic Acid':           'Banned EU; high sensitization risk',
     'Oxybenzone':                  'Banned Hawaii; endocrine/reef concerns',
     '3-Benzylidene Camphor':       'Endocrine concerns; avoided in modern formulas',
-    '4-Methylbenzylidene Camphor': 'Endocrine review; restricted use',
+    '4-Methylbenzylidene Camphor': 'Prohibited in the EU (Reg. (EU) 2024/858)',
 }
 
 
@@ -4152,7 +4177,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
         ing_lower = ing.lower()
         data = data_loader.get_ingredient_data(ing)
 
-        if data:
+        if data and not _is_fragrance_label(ing, data):
             try:
                 c_rating = float(data.get('Comedogenicity_0_5', 0) or 0)
                 if c_rating >= 3:
@@ -4203,7 +4228,7 @@ def calculate_skin_type_compatibility(ingredient_list, skin_type, category='seru
                         helpful_ingredients.append(enriched)
 
         if skin_type == 'oily':
-            if data:
+            if data and not _is_fragrance_label(ing, data):
                 # DB-driven comedogenicity (always from database)
                 try:
                     comedogenicity = float(data.get('Comedogenicity_0_5', 0) or 0)

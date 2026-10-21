@@ -309,21 +309,29 @@ def _dose_sentence(name, estimate, known=False):
             return None
 
     lo, hi = _num('Min_Effective_%'), _num('Max_Safe_%')
+    eu = _num('Max_Allowed_EU_%')
 
     if _is_story_ingredient(name) and not known:
         return ("The label names {} and does not state an amount. "
                 "Its place in the list is not a measured dose.".format(name))
+    if known and eu is not None and estimate > eu:
+        return ("The label states {:g}%. Published EU ceiling for this "
+                "ingredient is about {:g}%.".format(estimate, eu))
     if known and hi is not None and estimate > hi:
-        return ("The label states {:g}%. Published ceiling for this "
-                "ingredient is about {:g}%.".format(estimate, hi))
+        return ("The label states {:g}%. Recorded maximum in this database "
+                "is about {:g}%.".format(estimate, hi))
+    if eu is not None and estimate > eu:
+        return ("{} is high on the list. Published EU ceiling is about {:g}%. "
+                "The label does not give the exact amount.".format(name, eu))
     if hi is not None and estimate > hi:
-        return ("{} is high on the list. Usual ceiling is about {:g}%. "
-                "The label does not give the exact amount.".format(name, hi))
+        return ("{} is high on the list. Recorded maximum in this database "
+                "is about {:g}%. The label does not give the exact amount."
+                .format(name, hi))
     if lo is not None and estimate < lo:
         return ("{} is estimated at {:.1f}%, below the usual starting dose "
                 "of about {:g}%.".format(name, estimate, lo))
     if lo is not None and hi is not None:
-        return ("{} at an estimated {:.1f}% (within its evidenced range of "
+        return ("{} at an estimated {:.1f}% (within its recorded range of "
                 "{:g}-{:g}%)".format(name, estimate, lo, hi))
     return "{} at an estimated {:.1f}%".format(name, estimate)
 
@@ -344,24 +352,32 @@ def dose_band_label(name, estimate, known=False):
             return None
 
     lo, hi = _num('Min_Effective_%'), _num('Max_Safe_%')
+    eu = _num('Max_Allowed_EU_%')
     try:
         estimate = float(estimate)
     except (TypeError, ValueError):
         return "Estimated from its place in the list."
     if _is_story_ingredient(name) and not known:
         return "Named on the label. No amount is stated."
+    if known and eu is not None and estimate > eu:
+        return ("The label states {:g}%. Published EU ceiling for this "
+                "ingredient is about {:g}%.".format(estimate, eu))
     if known and hi is not None and estimate > hi:
-        return ("The label states {:g}%. Published ceiling for this "
-                "ingredient is about {:g}%.".format(estimate, hi))
+        return ("The label states {:g}%. Recorded maximum in this database "
+                "is about {:g}%.".format(estimate, hi))
+    if eu is not None and estimate > eu:
+        return ("High on the list. Published EU ceiling is about {:g}%. "
+                "The label does not give the exact amount.".format(eu))
     if hi is not None and estimate > hi:
-        return ("High on the list. Usual ceiling is about {:g}%. "
-                "The label does not give the exact amount.".format(hi))
+        return ("High on the list. Recorded maximum in this database is "
+                "about {:g}%. The label does not give the exact amount.".format(hi))
     if lo is not None and estimate < lo:
-        return "Under the published starting dose of about {:g}%.".format(lo)
+        return "Under the recorded starting dose of about {:g}%.".format(lo)
     if lo is not None and hi is not None:
         if known:
-            return "Stated at {:g}%, within the published range of {:g}–{:g}%.".format(estimate, lo, hi)
-        return "Within the published range of {:g}–{:g}%.".format(lo, hi)
+            return ("Stated at {:g}%, within the recorded range of "
+                    "{:g}–{:g}%.".format(estimate, lo, hi))
+        return "Within the recorded range of {:g}–{:g}%.".format(lo, hi)
     if known:
         return "Stated at {:g}%.".format(estimate)
     return "Estimated from its place in the list."
@@ -659,25 +675,41 @@ def _score_integrity(ingredient_list, max_pts, category):
     return round(min(max_pts, total), 1), explanations, flags
 
 
-def _published_ceiling(data):
-    """Lowest positive published maximum on the row, if one is recorded."""
+def _positive_float(data, field):
+    raw = (data or {}).get(field)
+    if raw is None or str(raw).strip() in ("", "nan", "None"):
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(value) or value <= 0:
+        return None
+    return value
+
+
+def _eu_allowed(data):
+    """Sourced EU legal cap, or None if this database has not recorded one."""
+    return _positive_float(data, "Max_Allowed_EU_%")
+
+
+def _recorded_max(data):
+    """Database use/safety ceiling. Not a published legal limit."""
     ceilings = []
     for field in ("Typical_Use_Max_Pct", "Max_Safe_%"):
-        raw = data.get(field)
-        if raw is None or str(raw).strip() in ("", "nan", "None"):
-            continue
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
-            continue
-        if math.isnan(value) or value <= 0:
-            continue
-        ceilings.append(value)
+        value = _positive_float(data, field)
+        if value is not None:
+            ceilings.append(value)
     return min(ceilings) if ceilings else None
 
 
+def _published_ceiling(data):
+    """EU cap when we have one, otherwise the recorded database maximum."""
+    return _eu_allowed(data) if _eu_allowed(data) is not None else _recorded_max(data)
+
+
 def _declared_above_ceiling(ingredient_list, known_concentrations):
-    """Declared doses that sit above the row's own published ceiling."""
+    """Declared doses above an EU cap or the recorded database maximum."""
     known = {_norm(k): v for k, v in (known_concentrations or {}).items()}
     hits = []
     for ing in ingredient_list:
@@ -689,9 +721,12 @@ def _declared_above_ceiling(ingredient_list, known_concentrations):
         except (TypeError, ValueError):
             continue
         data = data_loader.get_ingredient_data(ing) or {}
-        ceiling = _published_ceiling(data)
-        if ceiling is not None and declared > ceiling:
-            hits.append((ing, declared, ceiling))
+        eu = _eu_allowed(data)
+        recorded = _recorded_max(data)
+        if eu is not None and declared > eu:
+            hits.append((ing, declared, eu, "eu"))
+        elif recorded is not None and declared > recorded:
+            hits.append((ing, declared, recorded, "recorded"))
     return hits
 
 
@@ -774,19 +809,38 @@ def _score_tolerability(ingredient_list, max_pts, occlusive_context=False,
         # One modest deduction. The active still scores as the ceiling dose;
         # going further is an irritation concern, not a weaker active.
         pts -= max_pts * 0.12
-        named = ", ".join(
-            "{} at {:g}% (published ceiling about {:g}%)".format(ing, dose, ceiling)
-            for ing, dose, ceiling in over[:3]
-        )
-        explanations.append(
-            "Stated above the published ceiling: {}.".format(named))
-        flags.append({
-            'type': 'above_published_ceiling',
-            'severity': 'info',
-            'message': "Stated above the published ceiling: {}. "
-                       "That can increase irritation. It is not scored as a "
-                       "weaker active than the dose at the ceiling.".format(named),
-        })
+        eu_hits = [h for h in over if h[3] == "eu"]
+        recorded_hits = [h for h in over if h[3] != "eu"]
+        if eu_hits:
+            named = ", ".join(
+                "{} at {:g}% (published EU ceiling about {:g}%)".format(
+                    ing, dose, ceiling)
+                for ing, dose, ceiling, _kind in eu_hits[:3]
+            )
+            explanations.append(
+                "Stated above the published EU ceiling: {}.".format(named))
+            flags.append({
+                'type': 'above_published_ceiling',
+                'severity': 'info',
+                'message': "Stated above the published EU ceiling: {}. "
+                           "That can increase irritation. It is not scored as a "
+                           "weaker active than the dose at the ceiling.".format(named),
+            })
+        if recorded_hits:
+            named = ", ".join(
+                "{} at {:g}% (recorded maximum about {:g}%)".format(
+                    ing, dose, ceiling)
+                for ing, dose, ceiling, _kind in recorded_hits[:3]
+            )
+            explanations.append(
+                "Stated above the recorded maximum in this database: {}.".format(named))
+            flags.append({
+                'type': 'above_recorded_maximum',
+                'severity': 'info',
+                'message': "Stated above the recorded maximum in this database: {}. "
+                           "That can increase irritation. It is not scored as a "
+                           "weaker active than the dose at the recorded maximum.".format(named),
+            })
 
     if periocular and (frag or eos):
         flags.append({
@@ -1783,6 +1837,19 @@ def is_pregnancy_caution(raw):
     return True
 
 
+_UNSIGNED_PREGNANCY_CLASSES = (
+    'active', 'retinoid', 'brightening active', 'peptide', 'mineral uv filter',
+)
+
+
+def _pregnancy_review_signed(name):
+    try:
+        import evidence
+    except ImportError:
+        return False
+    return evidence.review_for(name) is not None
+
+
 def build_advisory_flags(ingredient_list):
     """Contextual advisories that depend on the PERSON, not the product.
 
@@ -1791,8 +1858,12 @@ def build_advisory_flags(ingredient_list):
     pregnancy - it is simply not for that user right now. These are surfaced as
     information and used by the personal Fit score; they never reduce the
     formulation score.
+
+    Unsigned database notes are labelled as unsigned. A missing warning is
+    not a clearance.
     """
     pregnancy = []
+    unsigned_active = False
     for ing in ingredient_list:
         if _norm(ing) in _CONCEPT_RECORDS:
             continue
@@ -1800,15 +1871,26 @@ def build_advisory_flags(ingredient_list):
         if not data:
             continue
         raw = str(data.get('Pregnancy_Safety', '') or '').strip()
+        if not raw:
+            continue
+        klass = str(data.get('Ingredient_Class') or '').strip().lower()
+        inci = str(data.get('INCI_Name') or ing)
+        signed = _pregnancy_review_signed(inci)
+        if klass in _UNSIGNED_PREGNANCY_CLASSES and not signed:
+            unsigned_active = True
         if not is_pregnancy_caution(raw):
             continue
         low = raw.lower()
         severity = 'high' if ('avoid' in low or 'contraindicated' in low) \
             else 'info'
+        guidance = raw if signed else (
+            "Database note (not independently reviewed): " + raw
+        )
         pregnancy.append({
             'ingredient': ing,
             'severity': severity,
-            'guidance': raw,
+            'guidance': guidance,
+            'signed': signed,
         })
 
     flags = []
@@ -1821,9 +1903,10 @@ def build_advisory_flags(ingredient_list):
             'title': "If you are pregnant or breastfeeding",
             'message': (
                 "{} ingredient{} in this product {} guidance for pregnancy. "
-                "This does not affect the product's quality score - it depends "
-                "entirely on your circumstances. Talk to your doctor or midwife "
-                "before using it."
+                "These notes have not been independently reviewed unless a "
+                "source is shown. This does not affect the product's quality "
+                "score - it depends entirely on your circumstances. Talk to "
+                "your doctor or midwife before using it."
             ).format(
                 len(pregnancy),
                 "s" if len(pregnancy) != 1 else "",
@@ -1831,6 +1914,20 @@ def build_advisory_flags(ingredient_list):
             ),
             'items': pregnancy[:8],
             'strict_count': len(strict),
+        })
+    elif unsigned_active:
+        flags.append({
+            'type': 'pregnancy_unreviewed',
+            'severity': 'info',
+            'affects_score': False,
+            'title': "If you are pregnant or breastfeeding",
+            'message': (
+                "No independently reviewed pregnancy assessment is on file "
+                "for the actives in this formula. A missing warning is not "
+                "a clearance. Talk to your doctor or midwife before using it."
+            ),
+            'items': [],
+            'strict_count': 0,
         })
     return flags
 
