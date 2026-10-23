@@ -243,13 +243,27 @@ def test_scoring_engine_never_reads_pregnancy_data():
             .format(fn.__name__))
 
 
-def test_pregnancy_advisory_catches_insufficient_data_wording():
-    """The old substring check matched only 'avoid'/'restrict', missing
-    "Insufficient data; consult doctor before use in pregnancy" - about a
-    quarter of the ingredient database."""
-    from formulation import _PREGNANCY_CAUTION
-    phrase = "insufficient data; consult doctor before use in pregnancy"
-    assert any(c in phrase for c in _PREGNANCY_CAUTION)
+def test_pregnancy_advisory_does_not_treat_missing_studies_as_a_warning():
+    from formulation import is_pregnancy_caution
+    assert is_pregnancy_caution("Cannot be used — retinoid")
+    assert is_pregnancy_caution("Can be used in limited amounts")
+    assert is_pregnancy_caution("Avoid pregnancy")
+    assert not is_pregnancy_caution("Can be used")
+    assert not is_pregnancy_caution("Safe")
+    assert not is_pregnancy_caution("")
+    assert not is_pregnancy_caution(
+        "Insufficient data; consult doctor before use in pregnancy")
+    assert not is_pregnancy_caution("Avoid - IARC Group 1 carcinogen")
+    assert not is_pregnancy_caution("Avoid leave-on; rinse-off only")
+    assert not is_pregnancy_caution("Avoid in children")
+
+
+def test_empty_pregnancy_fields_do_not_open_the_caution_box():
+    from formulation import build_advisory_flags
+    flags = build_advisory_flags(parse_ingredients(
+        "Aqua, Acetyl Tetrapeptide-3, Palmitoyl Tripeptide-5, "
+        "Cyanocobalamin, Niacinamide, Phenoxyethanol"))
+    assert not any(f["type"] == "pregnancy" for f in flags)
 
 
 # --- Category logic must reflect what the product is for --------------------

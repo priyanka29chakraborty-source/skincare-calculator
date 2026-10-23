@@ -150,6 +150,12 @@ _INGREDIENT_ALIASES = {
     "ectoin": "ectoine", "beta glucan": "beta-glucan",
     "licorice": "glycyrrhiza glabra root extract",
     "licorice extract": "glycyrrhiza glabra root extract",
+    # PDRN is polydeoxyribonucleotide. Labels often print the parent
+    # molecule, deoxyribonucleic acid, instead of the trade name.
+    # Sodium DNA stays its own record.
+    "deoxyribonucleic acid": "pdrn",
+    "dna": "pdrn",
+    "polydeoxyribonucleotide": "pdrn",
 }
 
 def _technology_target(normalized):
@@ -199,6 +205,8 @@ _CANONICAL_LOOKUP = {
     'parfum': 'fragrance',
     'perfume': 'fragrance',
     'aroma': 'fragrance',
+    # CIR retired this INCI: it was palmitoyl tripeptide-1 or palmitoyl hexapeptide-12.
+    'palmitoyl oligopeptide': 'palmitoyl tripeptide-1',
 }
 
 

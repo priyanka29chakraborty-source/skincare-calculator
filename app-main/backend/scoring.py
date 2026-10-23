@@ -1238,6 +1238,34 @@ def detect_red_flags(ingredient_list, concentrations, category):
             penalty -= 3
             break  # flag once is enough
 
+    # 5. Sourced safety restrictions that are not pregnancy notes.
+    # IARC classifications, prohibited ingredients, and FDA child limits.
+    _SHOW = (
+        'iarc group 1', 'iarc group 2b', 'not allowed as a cosmetic',
+        'not an allowed cosmetic', 'children under 2',
+        'endocrine-activity',
+    )
+    seen_safety = set()
+    for ing in ingredient_list:
+        data = data_loader.get_ingredient_data(ing)
+        if not data:
+            continue
+        flag = str(data.get('Red_Flag_Tags') or '').strip()
+        if not flag or flag == 'nan':
+            continue
+        low = flag.lower()
+        if not any(token in low for token in _SHOW):
+            continue
+        key = str(data.get('INCI_Name') or ing).lower()
+        if key in seen_safety:
+            continue
+        seen_safety.add(key)
+        flags.append(f"{ing} — {flag}")
+        if 'iarc group 1' in low:
+            penalty -= 8
+        else:
+            penalty -= 3
+
     return flags, penalty
 
 
@@ -1315,7 +1343,7 @@ def detect_formulation_notes(ingredient_list):
         if data:
             flag = str(data.get('Red_Flag_Tags', '') or '')
             if flag and flag != 'nan':
-                allergen_keywords = ['allergen', 'sensitiz', 'barrier damage', 'stinging']
+                allergen_keywords = ['allergen', 'sensitiz', 'barrier damage', 'sting']
                 if any(kw in flag.lower() for kw in allergen_keywords):
                     notes.append(f"{ing}: {flag}")
 
@@ -2332,11 +2360,12 @@ def calculate_main_worth_score(ingredient_list, price, size_ml, category, countr
             elif irr in ('medium','moderate'):
                 safety_score -= 0.5
             preg = str(data.get('Pregnancy_Safety','') or '')
+            preg_low = preg.lower()
             if (is_pregnancy_caution(preg)
-                    and ('avoid' in preg.lower() or 'restrict' in preg.lower())
+                    and ('cannot be used' in preg_low or 'avoid' in preg_low)
                     and _preg_ded < 4):
                 _preg_ded += 1
-                safety_details.append(f"{ing} — caution if pregnant (check with your doctor)")
+                safety_details.append(f"{ing} — cannot be used if pregnant")
     safety_score = round(max(0, min(10, safety_score)), 1)
 
     # Claim accuracy (Component C)
@@ -4614,7 +4643,502 @@ def _upgrade_already_present(suggestion, ingredient_list):
     return False
 
 
-def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=None):
+# Delivery form for an alternative, by how heavy it can sit on this skin in
+# this climate. The active stays the same; the words cream, balm, and oil are
+# the part that changes. High humidity, combination skin, and oily skin stay
+# with gels, essences, and suspensions.
+_VEHICLE_FORMS = {
+    'light': {
+        'azelaic acid': '10% azelaic acid suspension',
+        'alpha arbutin': 'Water-based alpha arbutin essence',
+        'panthenol': 'Gel-textured panthenol',
+        'polyglutamic acid': 'Watery polyglutamic acid serum',
+        'adapalene': 'Adapalene gel',
+        'niacinamide': 'Niacinamide gel',
+        'retinol': 'Retinol gel',
+        'retinoids': 'Retinol gel',
+        'salicylic acid': 'Salicylic acid gel',
+        'glycolic acid': 'Glycolic acid toner',
+        'lactic acid': 'Lactic acid toner',
+        'mandelic acid': 'Mandelic acid toner',
+        'centella asiatica': 'Centella gel',
+        'ceramides': 'Light ceramide gel',
+        'ascorbic acid': 'Water-based vitamin C essence',
+        'vitamin c': 'Water-based vitamin C essence',
+        'tranexamic acid': 'Water-based tranexamic acid essence',
+        'hyaluronic acid': 'Watery hyaluronic acid essence',
+        'multi-mw hyaluronic acid': 'Watery hyaluronic acid essence',
+        'bakuchiol': 'Bakuchiol gel',
+        'caffeine': 'Caffeine gel',
+        'ferulic acid': 'Water-based antioxidant essence',
+        'tetrahexyldecyl ascorbate': 'Water-based vitamin C essence',
+        'tocopherol': 'Gel-textured vitamin E',
+        'uv filters': 'Lightweight sunscreen',
+    },
+    'medium': {
+        'azelaic acid': '10% azelaic acid suspension',
+        'alpha arbutin': 'Alpha arbutin essence',
+        'panthenol': 'Panthenol serum',
+        'polyglutamic acid': 'Polyglutamic acid serum',
+        'adapalene': 'Adapalene gel',
+        'niacinamide': 'Niacinamide serum',
+        'retinol': 'Retinol serum',
+        'retinoids': 'Retinol serum',
+        'salicylic acid': 'Salicylic acid serum',
+        'glycolic acid': 'Glycolic acid toner',
+        'lactic acid': 'Lactic acid toner',
+        'mandelic acid': 'Mandelic acid toner',
+        'centella asiatica': 'Centella serum',
+        'ceramides': 'Ceramide moisturiser',
+        'ascorbic acid': 'Vitamin C serum',
+        'vitamin c': 'Vitamin C serum',
+        'tranexamic acid': 'Tranexamic acid serum',
+        'hyaluronic acid': 'Hyaluronic acid serum',
+        'multi-mw hyaluronic acid': 'Hyaluronic acid serum',
+        'bakuchiol': 'Bakuchiol serum',
+        'caffeine': 'Caffeine serum',
+        'ferulic acid': 'Ferulic acid serum',
+        'tetrahexyldecyl ascorbate': 'Vitamin C serum',
+        'tocopherol': 'Vitamin E serum',
+        'uv filters': 'Broad spectrum sunscreen',
+    },
+    'rich': {
+        'azelaic acid': 'Azelaic acid cream',
+        'alpha arbutin': 'Alpha arbutin cream',
+        'panthenol': 'Panthenol cream',
+        'polyglutamic acid': 'Polyglutamic acid cream',
+        'adapalene': 'Adapalene cream',
+        'niacinamide': 'Niacinamide cream',
+        'retinol': 'Retinol cream',
+        'retinoids': 'Retinol cream',
+        'salicylic acid': 'Salicylic acid serum',
+        'glycolic acid': 'Glycolic acid toner',
+        'lactic acid': 'Lactic acid cream',
+        'mandelic acid': 'Mandelic acid cream',
+        'centella asiatica': 'Centella cream',
+        'ceramides': 'Ceramide cream',
+        'ascorbic acid': 'Vitamin C serum',
+        'vitamin c': 'Vitamin C serum',
+        'tranexamic acid': 'Tranexamic acid cream',
+        'hyaluronic acid': 'Hyaluronic acid cream',
+        'multi-mw hyaluronic acid': 'Hyaluronic acid cream',
+        'bakuchiol': 'Bakuchiol cream',
+        'caffeine': 'Caffeine cream',
+        'ferulic acid': 'Ferulic acid serum',
+        'tetrahexyldecyl ascorbate': 'A facial oil with tetrahexyldecyl ascorbate',
+        'tocopherol': 'A facial oil with vitamin E',
+        'squalane': 'Squalane oil',
+        'urea': 'Low-strength urea cream',
+        'uv filters': 'Moisturising sunscreen',
+    },
+}
+_VEHICLE_KEYS = tuple(sorted(
+    {key for forms in _VEHICLE_FORMS.values() for key in forms},
+    key=len, reverse=True,
+))
+_HEAVY_VEHICLE = re.compile(
+    r'\b(creams?|balms?|butters?|ointments?|petrolatum|oils?)\b', re.I)
+_EXFOLIANT_MARKERS = (
+    'glycolic', 'lactic acid', 'mandelic', 'salicylic', 'aha', 'bha',
+)
+_RETINOID_MARKERS = (
+    'retinol', 'retinal', 'adapalene', 'tretinoin', 'retinyl', 'retinoid',
+)
+_TREATMENT_CONCERN_KEYS = (
+    'pigment', 'pih', 'dark spot', 'melasma', 'dull', 'tan', 'acne',
+    'aging', 'ageing', 'wrinkle', 'texture', 'pore', 'scar',
+)
+_UNDERDOSE_PHRASES = (
+    'too low', 'below the concentration', 'low in the ingredient',
+    'missing the strongest', 'no key active', 'limited active',
+    'without a treatment-strength',
+)
+
+
+def _climate_row(climate):
+    try:
+        from personalization import CLIMATE
+    except ImportError:
+        return {}
+    return CLIMATE.get(climate) or {}
+
+
+def _is_humid(climate):
+    row = _climate_row(climate)
+    if row.get('humidity') == 'high' or row.get('occlusion_pref') == 'light':
+        return True
+    return climate in ('tropical_humid', 'humid_subtropical')
+
+
+def _is_rich_air(climate):
+    row = _climate_row(climate)
+    return row.get('occlusion_pref') == 'rich' or row.get('humidity') == 'low'
+
+
+def _delivery_weight(skin, climate, category):
+    """How heavy an added product can be for this person.
+
+    Humidity and oil-prone skin decide first: a cream that is fine in a cold
+    dry climate congests combination skin in the tropics. Dry skin in dry air
+    can take a cream. A facial oil stays an oil.
+    """
+    cat = (category or '').strip().lower().replace('moisturiser', 'moisturizer')
+    if cat in ('oil', 'facial oil'):
+        return 'oil'
+    skin = (skin or '').strip().lower()
+    if _is_humid(climate) or skin in ('oily', 'combination'):
+        return 'light'
+    if skin == 'dry' or (_is_rich_air(climate) and skin != 'sensitive'):
+        return 'rich'
+    return 'medium'
+
+
+def _vehicle_key(text):
+    blob = str(text or '').lower()
+    blob = re.sub(r'\([^)]*\)', ' ', blob)
+    for key in _VEHICLE_KEYS:
+        if key in blob:
+            return key
+    return ''
+
+
+def _plain_urea(text):
+    t = str(text or '').lower()
+    return ('urea' in t and 'hydroxyethyl' not in t
+            and 'imidazolidinyl' not in t and 'diazolidinyl' not in t)
+
+
+def _light_humectant(ing_blob):
+    blob = ing_blob or ''
+    if 'panthenol' not in blob and 'dexpanthenol' not in blob:
+        return 'Panthenol', 'Gel-textured panthenol'
+    if 'polyglutamic' not in blob:
+        return 'Polyglutamic acid', 'Watery polyglutamic acid serum'
+    return None, None
+
+
+def _humectant_reason(skin, climate):
+    if _is_humid(climate) and skin in ('combination', 'oily'):
+        return (
+            "Gel-textured panthenol stays light on %s skin when the air is "
+            "humid. A cream, balm, or heavy oil congests that skin, and urea "
+            "feels sticky in wet air." % skin
+        )
+    if skin in ('combination', 'oily'):
+        return (
+            "Gel-textured panthenol stays light on %s skin. A cream, balm, or "
+            "heavy oil congests the oilier areas, and urea feels sticky there."
+            % skin
+        )
+    if _is_humid(climate):
+        return (
+            "A watery gel humectant for humid weather. Urea feels sticky when "
+            "the air is already wet, and a cream or oil sits heavily."
+        )
+    return (
+        "A serum humectant. Urea is a better fit in a cream for dry skin than "
+        "as a bare ingredient."
+    )
+
+
+def _shape_vehicle(suggestion, weight, skin, climate, ing_blob):
+    """Name the product form. A bare 'Urea' is not a recommendation."""
+    if weight == 'oil':
+        return suggestion
+    active_blob = '%s %s' % (
+        suggestion.get('suggested_active') or '', suggestion.get('upgrade') or '')
+    if weight in ('light', 'medium') and _plain_urea(active_blob):
+        if weight == 'light':
+            active, phrase = _light_humectant(ing_blob)
+            if not active:
+                return None
+        else:
+            active, phrase = 'Panthenol', 'Panthenol serum'
+        return {
+            'builds_on': suggestion.get('builds_on'),
+            'suggested_active': active,
+            'upgrade': phrase,
+            'reason': _humectant_reason(skin, climate),
+            'concern': suggestion.get('concern'),
+        }
+    key = _vehicle_key(active_blob)
+    forms = _VEHICLE_FORMS.get(weight) or {}
+    phrase = forms.get(key) if key else None
+    if phrase:
+        suggestion['upgrade'] = phrase
+    else:
+        name = str(suggestion.get('suggested_active') or suggestion.get('upgrade') or '').strip()
+        name = re.sub(r'\s*\([^)]*\)', '', name).strip()
+        if name and not re.search(
+                r'\b(serum|gel|essence|cream|suspension|toner|oil|moisturi[sz]er|lotion|sunscreen)\b',
+                str(suggestion.get('upgrade') or ''), re.I):
+            suffix = {'light': 'gel', 'rich': 'cream', 'medium': 'serum'}.get(weight, 'serum')
+            suggestion['upgrade'] = '%s %s' % (name, suffix)
+    upgrade = str(suggestion.get('upgrade') or '')
+    if weight == 'light' and _HEAVY_VEHICLE.search(upgrade):
+        active, phrase = _light_humectant(ing_blob)
+        if key and forms.get(key) and not _HEAVY_VEHICLE.search(forms[key]):
+            suggestion['upgrade'] = forms[key]
+        elif active:
+            suggestion['suggested_active'] = active
+            suggestion['upgrade'] = phrase
+            suggestion['reason'] = _humectant_reason(skin, climate)
+        else:
+            return None
+    if weight == 'rich' and key == 'urea':
+        suggestion['suggested_active'] = 'Urea'
+    return suggestion
+
+
+def _concern_rows(concern_fit):
+    data = concern_fit or {}
+    if isinstance(data, dict) and isinstance(data.get('concerns'), dict):
+        data = data['concerns']
+    if not isinstance(data, dict):
+        return []
+    rows = []
+    for name, payload in data.items():
+        if isinstance(payload, (int, float)):
+            payload = {'score': payload, 'present_actives': [], 'explanation': []}
+        if not isinstance(payload, dict):
+            continue
+        score = payload.get('score')
+        if not isinstance(score, (int, float)):
+            continue
+        expl = payload.get('explanation') or []
+        if isinstance(expl, str):
+            expl = [expl]
+        rows.append({
+            'name': str(name),
+            'score': score,
+            'present': [str(p) for p in (payload.get('present_actives') or [])],
+            'explanation': ' '.join(str(x) for x in expl),
+        })
+    rows.sort(key=lambda row: row['score'])
+    return rows
+
+
+def _is_treatment_concern(name):
+    n = str(name or '').lower()
+    return any(key in n for key in _TREATMENT_CONCERN_KEYS)
+
+
+def _concern_failed(row):
+    text = row['explanation'].lower()
+    return row['score'] < 50 or any(phrase in text for phrase in _UNDERDOSE_PHRASES)
+
+
+def _concerns_match(left, right):
+    a = str(left or '').lower()
+    b = str(right or '').lower()
+    return bool(a and b and (a in b or b in a))
+
+
+def _is_hydration_gap(suggestion):
+    concern = str(suggestion.get('concern') or '').lower()
+    if any(key in concern for key in ('hydrat', 'dry skin', 'dryness')):
+        return True
+    return _plain_urea(suggestion.get('suggested_active'))
+
+
+def _pigmentation_goal(concern, blob):
+    has_nia = 'niacinamide' in blob
+    if 'azelaic' in blob:
+        active = 'Alpha arbutin'
+        reason = (
+            "Azelaic acid is already in this product. Alpha arbutin is a "
+            "separate brightening step for the pigmentation this formula "
+            "does not cover."
+        )
+    else:
+        active = 'Azelaic acid'
+        if has_nia:
+            reason = (
+                "Niacinamide is in this product, but it sits too low in the "
+                "list to treat pigmentation. Azelaic acid is the dedicated "
+                "next step for that gap."
+            )
+        else:
+            reason = (
+                "This product does not treat pigmentation. Azelaic acid is "
+                "the dedicated next step for that gap."
+            )
+    return {
+        'builds_on': 'Niacinamide' if has_nia and 'azelaic' not in blob else None,
+        'suggested_active': active,
+        'upgrade': active,
+        'reason': reason,
+        'concern': concern,
+    }
+
+
+def _goal_for_failed(row, ing_blob):
+    """The alternative for the concern this product actually failed."""
+    name = row['name']
+    n = name.lower()
+    blob = '%s %s' % (ing_blob or '', ' '.join(row['present']).lower())
+    if any(key in n for key in ('pigment', 'pih', 'dark spot', 'melasma')):
+        return _pigmentation_goal(name, blob)
+    table = (
+        ('dull', 'Ascorbic acid',
+         "This product does not treat dullness at a useful dose. A separate vitamin C step does."),
+        ('tan', 'Alpha arbutin',
+         "This product does not fade a tan on its own. Alpha arbutin is a separate brightening step."),
+        ('texture', 'Glycolic acid',
+         "This product does not smooth texture. A leave-on glycolic acid step does."),
+        ('aging', 'Retinol',
+         "This product does not treat lines. A retinol step is the dedicated next treatment."),
+        ('ageing', 'Retinol',
+         "This product does not treat lines. A retinol step is the dedicated next treatment."),
+        ('wrinkle', 'Retinol',
+         "This product does not treat lines. A retinol step is the dedicated next treatment."),
+        ('acne', 'Azelaic acid',
+         "This product does not treat acne at a useful dose. Azelaic acid is a dedicated next step."),
+        ('pore', 'Retinol',
+         "This product does not refine pores at a useful dose. A retinol step is the dedicated next treatment."),
+        ('scar', 'Azelaic acid',
+         "This product does not treat marks at a useful dose. Azelaic acid is a dedicated next step."),
+    )
+    for key, active, reason in table:
+        if key in n:
+            builds_on = 'Niacinamide' if 'niacinamide' in blob and active.lower() != 'niacinamide' else None
+            return {
+                'builds_on': builds_on,
+                'suggested_active': active,
+                'upgrade': active,
+                'reason': reason,
+                'concern': name,
+            }
+    return None
+
+
+def _prefer_failed_goal(suggestions, concern_fit, ing_blob):
+    """A weak treatment goal outranks a humectant picked to fill a gap."""
+    failed = [
+        row for row in _concern_rows(concern_fit)
+        if _is_treatment_concern(row['name']) and _concern_failed(row)
+    ]
+    if not failed:
+        return suggestions
+    kept = [s for s in suggestions if not _is_hydration_gap(s)]
+    ordered = []
+    used = []
+    for row in failed:
+        matched = [
+            s for s in kept
+            if s not in used and _concerns_match(s.get('concern'), row['name'])
+        ]
+        blob = '%s %s' % (ing_blob or '', ' '.join(row['present']).lower())
+        weak_niacinamide = (
+            any(key in row['name'].lower() for key in ('pigment', 'pih', 'dark spot', 'melasma'))
+            and 'niacinamide' in blob
+        )
+        if weak_niacinamide:
+            used.extend(matched)
+            if any('azelaic' in str(s.get('suggested_active') or '').lower() for s in matched):
+                ordered.extend(matched)
+            else:
+                goal = _pigmentation_goal(row['name'], blob)
+                if goal is not None:
+                    ordered.append(goal)
+            continue
+        if matched:
+            ordered.extend(matched)
+            used.extend(matched)
+            continue
+        goal = _goal_for_failed(row, ing_blob)
+        if goal is not None:
+            ordered.append(goal)
+    rest = [s for s in kept if s not in used]
+    return ordered + rest
+
+
+def _routine_families(routine):
+    if not routine:
+        return set()
+    try:
+        from personalization import parse_routine
+    except ImportError:
+        return set()
+    return parse_routine(routine)
+
+
+def _clashes_with_routine(text, families):
+    load = families & {'retinoid', 'bha', 'aha'}
+    if not load:
+        return False
+    blob = str(text or '').lower()
+    acid = any(marker in blob for marker in _EXFOLIANT_MARKERS)
+    retinoid = any(marker in blob for marker in _RETINOID_MARKERS)
+    return acid or retinoid
+
+
+def _barrier_alternative(weight, ing_blob, families):
+    blob = ing_blob or ''
+    has_centella = any(token in blob for token in ('centella', 'cica', 'madecass'))
+    has_ceramide = 'ceramide' in blob
+    load = []
+    if 'retinoid' in families:
+        load.append('a retinoid')
+    if 'bha' in families:
+        load.append('a beta hydroxy acid')
+    if 'aha' in families:
+        load.append('an alpha hydroxy acid')
+    if len(load) == 1:
+        have = load[0]
+    elif len(load) == 2:
+        have = '%s and %s' % (load[0], load[1])
+    else:
+        have = '%s, %s, and %s' % (load[0], load[1], load[2])
+    if weight == 'rich' and not has_ceramide:
+        active, phrase = 'Ceramides', 'Ceramide cream'
+        support = 'Ceramides repair the barrier under that load.'
+    elif not has_centella:
+        phrase = {'light': 'Centella gel', 'medium': 'Centella serum',
+                  'rich': 'Centella cream', 'oil': 'Centella serum'}.get(weight, 'Centella serum')
+        active = 'Centella asiatica'
+        support = 'Centella supports the barrier under that load.'
+    elif not has_ceramide:
+        phrase = {'light': 'Light ceramide gel', 'medium': 'Ceramide moisturiser',
+                  'rich': 'Ceramide cream', 'oil': 'Ceramide moisturiser'}.get(
+                      weight, 'Ceramide moisturiser')
+        active = 'Ceramides'
+        support = 'Ceramides repair the barrier under that load.'
+    else:
+        return None
+    return {
+        'builds_on': None,
+        'suggested_active': active,
+        'upgrade': phrase,
+        'reason': (
+            "Your routine already includes %s. An exfoliating acid would "
+            "stack on that. %s" % (have, support)
+        ),
+        'concern': 'Barrier support',
+    }
+
+
+def _drop_routine_clashes(suggestions, families, weight, ing_blob):
+    if not (families & {'retinoid', 'bha', 'aha'}):
+        return suggestions
+    kept = []
+    blocked = False
+    for suggestion in suggestions:
+        blob = '%s %s' % (suggestion.get('upgrade') or '', suggestion.get('suggested_active') or '')
+        if _clashes_with_routine(blob, families):
+            blocked = True
+            continue
+        kept.append(suggestion)
+    if not blocked:
+        return kept
+    support = _barrier_alternative(weight, ing_blob, families)
+    if support is not None:
+        kept.insert(0, support)
+    return kept
+
+
+def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=None,
+                            climate=None, concern_fit=None, routine=None):
     suggestions = []
     upgrade_map = data_loader.active_upgrade_map
     ing_lower_list = [i.lower() for i in ingredient_list]
@@ -4722,6 +5246,11 @@ def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=
             seen.add(key)
 
     skin = (skin_type or '').strip().lower()
+    weight = _delivery_weight(skin, climate, cat)
+    ing_blob = ' '.join(ing_lower_list)
+    unique_suggestions = _prefer_failed_goal(unique_suggestions, concern_fit, ing_blob)
+    unique_suggestions = _drop_routine_clashes(
+        unique_suggestions, _routine_families(routine), weight, ing_blob)
 
     def _text(s):
         return ' '.join(str(s.get(k) or '') for k in ('upgrade', 'suggested_active', 'reason')).lower()
@@ -4768,13 +5297,23 @@ def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=
                     if key in c_lower:
                         unique_suggestions.append({**upgrade, 'concern': c})
                         break
-    kept = []
-    dropped = []
+    shaped = []
     for suggestion in unique_suggestions:
+        formed = _shape_vehicle(suggestion, weight, skin, climate, ing_blob)
+        if formed is not None:
+            shaped.append(formed)
+    kept = []
+    seen_actives = set()
+    for suggestion in shaped:
         if _upgrade_already_present(suggestion, ing_lower_list):
-            dropped.append(suggestion)
-        else:
-            kept.append(suggestion)
+            continue
+        active_key = _vehicle_key(
+            '%s %s' % (suggestion.get('suggested_active') or '', suggestion.get('upgrade') or ''))
+        if active_key and active_key in seen_actives:
+            continue
+        if active_key:
+            seen_actives.add(active_key)
+        kept.append(suggestion)
     return kept[:3]
 
 
@@ -5011,13 +5550,6 @@ def analyze_product(product_data):
         category=product_data.get("category", "serum")
     )
 
-    upgrade_suggestions = get_upgrade_suggestions(
-        ingredient_list,
-        product_data.get("concerns", []),
-        skin_type=product_data.get("skin_type"),
-        category=product_data.get("category"),
-    )
-
     concern_dict = concern_fit.get('concerns', {})
     am_pm = concern_fit.get('am_pm', 'Suitable for: AM & PM')
 
@@ -5035,6 +5567,17 @@ def analyze_product(product_data):
                        "us you react to.")
             elif isinstance(_v, (int, float)):
                 concern_dict[_c] = max(0, round(_v - _pen))
+
+    profile = product_data.get("user_profile") or {}
+    upgrade_suggestions = get_upgrade_suggestions(
+        ingredient_list,
+        product_data.get("concerns", []),
+        skin_type=product_data.get("skin_type"),
+        category=product_data.get("category"),
+        climate=profile.get("climate"),
+        concern_fit=concern_fit,
+        routine=profile.get("current_routine"),
+    )
 
     # New analyses — 1% marker, conflicts, pH, delivery systems
     marker_idx, marker_name = _find_one_percent_marker(ingredient_list)

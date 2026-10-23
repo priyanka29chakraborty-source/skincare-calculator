@@ -12,7 +12,6 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from data_loader import data_loader  # noqa: E402
-from evidence import _unsigned_names  # noqa: E402
 from formulation import (  # noqa: E402
     CATEGORY_RUBRICS,
     _EXTRA_PRESERVATIVES,
@@ -25,6 +24,7 @@ from scoring import (  # noqa: E402
     get_concentration_factor,
     get_evidence_factor,
     get_evidence_label,
+    get_upgrade_suggestions,
     parse_ingredients,
 )
 
@@ -239,12 +239,11 @@ def test_pregnancy_actives_still_raise_an_advisory(ingredients):
     assert any(f["type"] == "pregnancy" for f in flags)
 
 
-def test_pregnancy_unsigned_keeps_hydroquinone_when_text_says_safety():
+def test_hydroquinone_pregnancy_text_is_cannot_use():
     data = data_loader.get_ingredient_data("Hydroquinone")
     text = str(data.get("Pregnancy_Safety") or "").lower()
-    assert "safe" in text
-    pregnancy, _actives = _unsigned_names()
-    assert any(name.lower() == "hydroquinone" for name in pregnancy)
+    assert "cannot be used" in text
+    assert "safe" not in text.replace("safety", "")
 
 
 def test_salicylic_acid_is_not_the_preservative_system():
@@ -302,3 +301,157 @@ def test_formulation_weights_and_evidence_ladder_stay():
     assert get_evidence_factor({"Evidence_Level_Normalized": "Strong"}) == 0.9
     assert get_evidence_factor({"Evidence_Level_Normalized": "Moderate"}) == 0.7
     assert get_evidence_factor({"Evidence_Level_Normalized": "Limited"}) == 0.55
+
+
+def test_deoxyribonucleic_acid_is_the_pdrn_on_the_label():
+    listed = data_loader.get_ingredient_data("Deoxyribonucleic Acid")
+    named = data_loader.get_ingredient_data("PDRN")
+    sodium = data_loader.get_ingredient_data("Sodium DNA")
+    assert listed is named
+    assert listed["INCI_Name"] == "PDRN"
+    assert sodium["INCI_Name"] == "Sodium DNA"
+    result = score_formulation(
+        parse_ingredients(
+            "Aqua, Glycerin, Niacinamide, Disodium EDTA, "
+            "Deoxyribonucleic Acid, Cyanocobalamin, Phenoxyethanol"
+        ),
+        {},
+        "serum",
+        product_name="PDRN Pink Peptide Face Serum",
+    )
+    notes = " ".join(
+        note for comp in result["components"] for note in (comp.get("notes") or [])
+    ).lower()
+    assert "does not name" not in notes
+    roles = [f["message"].lower() for f in result["flags"] if f["type"] == "ingredient_role"]
+    assert any("pink" in message and "b12" in message for message in roles)
+
+
+def _upgrade_text(rows):
+    return " ".join(
+        " ".join(str(row.get(key) or "") for key in (
+            "upgrade", "suggested_active", "reason"))
+        for row in rows
+    ).lower()
+
+
+def _product_text(row):
+    return "%s %s" % (row.get("upgrade") or "", row.get("suggested_active") or "")
+
+
+def test_vehicle_follows_skin_and_climate_instead_of_naming_a_bare_ingredient():
+    formula = ["Aqua", "Glycerin", "Phenoxyethanol"]
+    heavy = ("cream", "balm", "butter", "oil")
+
+    def products(rows):
+        assert rows
+        return [_product_text(row).lower() for row in rows]
+
+    for skin in ("combination", "oily"):
+        for climate in (None, "tropical_humid"):
+            named = products(get_upgrade_suggestions(
+                formula, ["Hydration"], skin_type=skin, climate=climate))
+            for name in named:
+                assert "urea" not in name
+                assert not any(word in name for word in heavy)
+                assert any(word in name for word in ("gel", "essence", "serum", "suspension"))
+    humid = products(get_upgrade_suggestions(
+        formula, ["Hydration"], skin_type="combination", climate="tropical_humid"))
+    assert any("panthenol" in name or "polyglutamic" in name for name in humid)
+
+    dry = products(get_upgrade_suggestions(
+        formula, ["Hydration"], skin_type="dry", climate="cold_dry"))
+    assert any("cream" in name for name in dry)
+
+    normal = products(get_upgrade_suggestions(
+        formula, ["Hydration"], skin_type="normal", climate="temperate"))
+    assert all("urea" not in name for name in normal)
+    assert any("serum" in name for name in normal)
+
+    bright = products(get_upgrade_suggestions(
+        formula, ["Tanning"], skin_type="combination", climate="tropical_humid"))
+    assert any("water-based alpha arbutin essence" in name for name in bright)
+
+
+def test_weak_niacinamide_for_pigmentation_recommends_azelaic_not_a_humectant():
+    formula = ["Aqua", "Glycerin", "Disodium EDTA", "Niacinamide", "Phenoxyethanol"]
+    fit = {
+        "concerns": {
+            "Pigmentation": {
+                "score": 18,
+                "present_actives": ["Niacinamide"],
+                "explanation": [
+                    "Contains Niacinamide, but it appears low in the ingredient "
+                    "list, so it is likely below the concentration shown to work "
+                    "for this concern."
+                ],
+            },
+            "Hydration": {
+                "score": 62,
+                "present_actives": ["Glycerin"],
+                "explanation": ["Contains Glycerin — well suited to this concern."],
+            },
+        }
+    }
+    rows = get_upgrade_suggestions(
+        formula, ["Pigmentation", "Hydration"],
+        skin_type="combination", climate="tropical_humid", concern_fit=fit,
+    )
+    assert rows
+    lead = rows[0]
+    assert "azelaic" in lead["suggested_active"].lower()
+    assert lead["upgrade"].lower() == "10% azelaic acid suspension"
+    assert "niacinamide" in lead["reason"].lower()
+    assert "pigmentation" in lead["reason"].lower()
+    for row in rows:
+        assert "hydration" not in str(row.get("concern") or "").lower()
+        assert "urea" not in _product_text(row).lower()
+        assert not any(word in row["upgrade"].lower() for word in ("cream", "balm", "oil"))
+
+    both = dict(fit)
+    both["concerns"] = dict(fit["concerns"])
+    both["concerns"]["Dullness"] = {
+        "score": 13,
+        "present_actives": ["Niacinamide"],
+        "explanation": ["Contains Niacinamide. The dose is too low to treat this on its own."],
+    }
+    rows = get_upgrade_suggestions(
+        formula, ["Pigmentation", "Dullness", "Hydration"],
+        skin_type="combination", climate="tropical_humid", concern_fit=both,
+    )
+    names = [_product_text(row).lower() for row in rows]
+    assert any("10% azelaic acid suspension" in name for name in names)
+    assert any("water-based vitamin c essence" in name for name in names)
+    assert all("urea" not in name and "cream" not in name for name in names)
+
+    only_pigment = get_upgrade_suggestions(
+        formula, ["Pigmentation"],
+        skin_type="dry", climate="cold_dry", concern_fit=fit,
+    )
+    assert only_pigment
+    assert "azelaic" in only_pigment[0]["suggested_active"].lower()
+    assert "tranexamic" not in _product_text(only_pigment[0]).lower()
+    assert "cream" in only_pigment[0]["upgrade"].lower()
+
+
+def test_retinol_or_bha_in_the_routine_blocks_glycolic():
+    formula = ["Aqua", "Glycerin", "Phenoxyethanol"]
+
+    def blocked(routine, skin, climate):
+        rows = get_upgrade_suggestions(
+            formula, ["Texture"], skin_type=skin, climate=climate, routine=routine)
+        assert rows
+        for row in rows:
+            product = _product_text(row).lower()
+            assert "glycolic" not in product
+            assert "salicylic" not in product
+            assert "retinol" not in product
+        return _upgrade_text(rows)
+
+    humid = blocked("The Ordinary retinol 0.5%", "combination", "tropical_humid")
+    assert "centella" in humid
+    assert "gel" in humid
+    assert "cream" not in humid
+
+    dry = blocked("salicylic acid toner", "dry", "cold_dry")
+    assert "ceramide" in dry or "centella" in dry

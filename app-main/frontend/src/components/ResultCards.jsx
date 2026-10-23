@@ -328,6 +328,7 @@ export function IngredientsCard({ result, category }) {
   const showOnePct = isSerum || isTreatment || isMoisturizer || isToner;
   const anyStated = actives.some((a) => a.concentration_known);
   const count = result.ingredient_count;
+  const roles = (result.formulation_flags || []).filter((f) => f.type === "ingredient_role");
 
   return (
     <Card eyebrow="Ingredients" title={isFacialOil ? "Botanicals, ranked by evidence" : "Actives, ranked by evidence"}
@@ -335,6 +336,9 @@ export function IngredientsCard({ result, category }) {
             : "Amounts are estimated from each ingredient’s place in the list."}
           aside={count ? <Badge>{count} ingredients</Badge> : null}
           data-testid="ingredients-card">
+      {roles.map((f, i) => (
+        <p key={i} className="t-body-s c-secondary" data-testid="ingredient-role">{f.message}</p>
+      ))}
       {actives.length > 0 ? (
         <div className="itable" role="table" aria-label="Identified actives">
           <div className="itable__head" role="row">

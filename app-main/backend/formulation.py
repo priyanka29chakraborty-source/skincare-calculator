@@ -1525,10 +1525,12 @@ def _name_claim_gaps(ingredient_list, product_name):
             "The name says exosome, and the ingredient list does not name "
             "an exosome or extracellular vesicle.")
     if re.search(r'\bpdrn\b', name) and not any(
-            k in blob for k in ('sodium dna', 'pdrn', 'polydeoxyribonucleotide')):
+            k in blob for k in (
+                'sodium dna', 'pdrn', 'polydeoxyribonucleotide',
+                'deoxyribonucleic')) and not re.search(r'\bdna\b', blob):
         notes.append(
             "The name says PDRN, and the ingredient list does not name "
-            "sodium DNA or PDRN.")
+            "DNA, sodium DNA, or PDRN.")
     if any(k in name for k in ('microneedle', 'micro-needle', 'micro needle')):
         notes.append(
             "This is a dissolving microneedle patch. The score covers the "
@@ -1665,6 +1667,17 @@ def score_formulation(ingredient_list, concentrations, category,
             })
 
     claim_notes = _name_claim_gaps(ingredient_list, product_name)
+    for ing in ingredient_list:
+        if _norm(ing) in ('cyanocobalamin', 'vitamin b12'):
+            all_flags.append({
+                'type': 'ingredient_role',
+                'severity': 'info',
+                'message': (
+                    "Cyanocobalamin is vitamin B12. It is naturally pink, "
+                    "which is what gives a pink serum its colour."
+                ),
+            })
+            break
     if claim_notes:
         placed = False
         for comp in components:
@@ -1797,57 +1810,50 @@ def score_value(price, size_ml, category, country='India'):
 
 # --- Advisory flags (informational only - never affect any score) ------------
 
-# Phrases that indicate the database is signalling caution, uncertainty, or a
-# restriction. The previous engine matched only 'avoid'/'restrict', which missed
-# "Insufficient data; consult doctor before use in pregnancy" - roughly a
-# quarter of the database.
+# Only sourced restrictions surface in the product report: cannot-use, or
+# use-in-limited-amounts. An empty pregnancy field, or "Can be used", is not
+# a warning. Missing reproductive studies are not a pregnancy caution.
 _PREGNANCY_CAUTION = (
-    'avoid', 'restrict', 'caution', 'insufficient data', 'consult',
-    'not recommended', 'contraindicated', 'limited data', 'unknown',
+    'cannot be used', 'do not use', 'not recommended', 'contraindicated',
+    'avoid', 'limited amount', 'limited area', 'sparingly',
 )
-_PREGNANCY_CLEAR = ('safe',)
+_PREGNANCY_CLEAR = ('safe', 'can be used')
 
 
 def is_pregnancy_caution(raw):
-    """True when the database note is about pregnancy, not a different avoid.
+    """True only for a pregnancy restriction the customer needs to see.
 
-    'Avoid sun exposure', 'avoid on acne-prone skin' and 'avoid on
-    barrier-damaged skin' are use notes. Retinoids and hydroquinone stay
-    warnings because they name a teratogen, ACOG, or pregnancy itself.
+    Empty, 'Can be used', and 'Safe' are not warnings. Generic 'Avoid'
+    notes (carcinogen, leave-on, children, acne-prone skin) are not
+    pregnancy cautions. Retinoids and hydroquinone still match because
+    they say cannot-be-used.
     """
     low = str(raw or '').strip().lower()
     if not low:
         return False
+    if low.startswith('safe') and 'cannot' not in low:
+        return False
+    if (low.startswith('can be used')
+            and 'limited' not in low and 'sparingly' not in low):
+        return False
+    if 'cannot be used' in low:
+        return True
+    if any(p in low for p in ('limited amount', 'limited area', 'sparingly')):
+        return True
     scoped = any(w in low for w in (
         'pregnan', 'breast', 'nurs', 'foetal', 'fetal', 'teratogen',
         'acog', 'embryopath',
     ))
-    if 'sensitive' in low and not scoped:
-        return False
-    if any(w in low for w in ('region', 'not permitted', 'prohibited')) and not scoped:
+    if not scoped:
         return False
     if any(p in low for p in (
             'sun exposure', 'sunlight', 'acne-prone', 'acne prone',
-            'barrier-damaged', 'barrier damaged')) and not scoped:
+            'barrier-damaged', 'barrier damaged')):
         return False
-    if not any(c in low for c in _PREGNANCY_CAUTION):
-        return False
-    if low.startswith('safe') and 'caution' not in low and 'avoid' not in low:
-        return False
-    return True
-
-
-_UNSIGNED_PREGNANCY_CLASSES = (
-    'active', 'retinoid', 'brightening active', 'peptide', 'mineral uv filter',
-)
-
-
-def _pregnancy_review_signed(name):
-    try:
-        import evidence
-    except ImportError:
-        return False
-    return evidence.review_for(name) is not None
+    return any(c in low for c in (
+        'avoid', 'do not use', 'not recommended', 'contraindicated',
+        'cannot be used',
+    ))
 
 
 def build_advisory_flags(ingredient_list):
@@ -1859,11 +1865,10 @@ def build_advisory_flags(ingredient_list):
     information and used by the personal Fit score; they never reduce the
     formulation score.
 
-    Unsigned database notes are labelled as unsigned. A missing warning is
-    not a clearance.
+    Only sourced cannot-use and limited-use notes are shown. An empty
+    field, or "Can be used", is not a warning.
     """
     pregnancy = []
-    unsigned_active = False
     for ing in ingredient_list:
         if _norm(ing) in _CONCEPT_RECORDS:
             continue
@@ -1871,63 +1876,47 @@ def build_advisory_flags(ingredient_list):
         if not data:
             continue
         raw = str(data.get('Pregnancy_Safety', '') or '').strip()
-        if not raw:
-            continue
-        klass = str(data.get('Ingredient_Class') or '').strip().lower()
-        inci = str(data.get('INCI_Name') or ing)
-        signed = _pregnancy_review_signed(inci)
-        if klass in _UNSIGNED_PREGNANCY_CLASSES and not signed:
-            unsigned_active = True
-        if not is_pregnancy_caution(raw):
+        if not raw or not is_pregnancy_caution(raw):
             continue
         low = raw.lower()
-        severity = 'high' if ('avoid' in low or 'contraindicated' in low) \
-            else 'info'
-        guidance = raw if signed else (
-            "Database note (not independently reviewed): " + raw
-        )
+        severity = 'high' if (
+            'cannot be used' in low or 'avoid' in low
+            or 'contraindicated' in low or 'do not use' in low
+        ) else 'info'
         pregnancy.append({
             'ingredient': ing,
             'severity': severity,
-            'guidance': guidance,
-            'signed': signed,
+            'guidance': raw,
         })
 
     flags = []
     if pregnancy:
         strict = [p for p in pregnancy if p['severity'] == 'high']
+        limited = [p for p in pregnancy if p['severity'] != 'high']
+        if strict and not limited:
+            message = (
+                "Do not use this product if you are pregnant or breastfeeding. "
+                "This does not affect the product's quality score."
+            )
+        elif limited and not strict:
+            message = (
+                "These ingredients can be used during pregnancy only in "
+                "limited amounts. This does not affect the product's quality score."
+            )
+        else:
+            message = (
+                "Some ingredients in this product cannot be used during "
+                "pregnancy; others only in limited amounts. This does not "
+                "affect the product's quality score."
+            )
         flags.append({
             'type': 'pregnancy',
             'severity': 'info',
             'affects_score': False,
             'title': "If you are pregnant or breastfeeding",
-            'message': (
-                "{} ingredient{} in this product {} guidance for pregnancy. "
-                "These notes have not been independently reviewed unless a "
-                "source is shown. This does not affect the product's quality "
-                "score - it depends entirely on your circumstances. Talk to "
-                "your doctor or midwife before using it."
-            ).format(
-                len(pregnancy),
-                "s" if len(pregnancy) != 1 else "",
-                "carry" if len(pregnancy) != 1 else "carries",
-            ),
+            'message': message,
             'items': pregnancy[:8],
             'strict_count': len(strict),
-        })
-    elif unsigned_active:
-        flags.append({
-            'type': 'pregnancy_unreviewed',
-            'severity': 'info',
-            'affects_score': False,
-            'title': "If you are pregnant or breastfeeding",
-            'message': (
-                "No independently reviewed pregnancy assessment is on file "
-                "for the actives in this formula. A missing warning is not "
-                "a clearance. Talk to your doctor or midwife before using it."
-            ),
-            'items': [],
-            'strict_count': 0,
         })
     return flags
 

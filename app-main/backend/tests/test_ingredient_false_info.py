@@ -17,6 +17,7 @@ from scoring import (  # noqa: E402
     _get_evidence_weight,
     calculate_skin_type_compatibility,
     detect_formulation_notes,
+    detect_red_flags,
     get_evidence_factor,
     get_evidence_label,
     parse_ingredients,
@@ -27,26 +28,25 @@ def _flags(ingredients):
     return build_advisory_flags(parse_ingredients(ingredients))
 
 
-# --- 1. Unsigned pregnancy notes are not signed advice ---------------------
+# --- 1. Pregnancy warnings are sourced can / cannot / limited-use ---------
 
 
-def test_unsigned_pregnancy_caution_is_labelled_unsigned():
+def test_retinol_pregnancy_guidance_is_plain_cannot_use():
     flags = [f for f in _flags("Aqua, Retinol, Phenoxyethanol") if f["type"] == "pregnancy"]
     assert flags
     item = flags[0]["items"][0]
-    assert item["signed"] is False
-    assert "not independently reviewed" in item["guidance"].lower()
+    text = (item["guidance"] + " " + flags[0]["message"]).lower()
+    assert "cannot be used" in item["guidance"].lower()
+    assert "independently reviewed" not in text
+    assert "database note" not in text
+    assert "unsigned" not in text
 
 
-def test_unsigned_safe_active_is_not_a_pregnancy_clearance():
-    flags = _flags("Aqua, Niacinamide, Phenoxyethanol")
+def test_can_be_used_actives_do_not_raise_a_pregnancy_warning():
+    flags = _flags("Aqua, Niacinamide, Ascorbic Acid, Cyanocobalamin, Phenoxyethanol")
     kinds = {f["type"] for f in flags}
     assert "pregnancy" not in kinds
-    unreviewed = [f for f in flags if f["type"] == "pregnancy_unreviewed"]
-    assert unreviewed
-    message = unreviewed[0]["message"].lower()
-    assert "not a clearance" in message
-    assert "independently reviewed" in message
+    assert "pregnancy_unreviewed" not in kinds
 
 
 def test_retinol_and_hydroquinone_still_raise_pregnancy_cautions():
@@ -81,10 +81,35 @@ def test_pdrn_and_sodium_dna_do_not_invent_opposite_pregnancy_answers():
     pdrn = data_loader.get_ingredient_data("PDRN")
     dna = data_loader.get_ingredient_data("Sodium DNA")
     assert pdrn["INCI_Name"] != dna["INCI_Name"]
-    for row in (pdrn, dna):
-        text = str(row.get("Pregnancy_Safety") or "").lower()
-        assert "insufficient data" in text
-        assert text.strip() != "safe"
+    texts = [
+        str(pdrn.get("Pregnancy_Safety") or "").strip().lower(),
+        str(dna.get("Pregnancy_Safety") or "").strip().lower(),
+    ]
+    assert texts[0] == texts[1]
+    for text in texts:
+        assert "insufficient data" not in text
+        assert text not in ("safe", "can be used", "cannot be used")
+
+
+def test_screenshot_peptides_are_not_pregnancy_warnings():
+    flags = _flags(
+        "Aqua, Acetyl Tetrapeptide-3, Palmitoyl Tripeptide-5, "
+        "Palmitoyl Oligopeptide, Cyanocobalamin, Phenoxyethanol"
+    )
+    kinds = {f["type"] for f in flags}
+    assert "pregnancy" not in kinds
+    oligo = data_loader.get_ingredient_data("Palmitoyl Oligopeptide")
+    assert oligo["INCI_Name"] == "Palmitoyl Tripeptide-1"
+
+
+def test_benzoyl_peroxide_is_limited_use_not_avoid():
+    row = data_loader.get_ingredient_data("Benzoyl Peroxide")
+    text = str(row.get("Pregnancy_Safety") or "").lower()
+    assert "can be used in limited amounts" in text
+    assert not text.startswith("avoid")
+    flags = [f for f in _flags("Aqua, Benzoyl Peroxide") if f["type"] == "pregnancy"]
+    assert flags
+    assert "limited" in flags[0]["message"].lower()
 
 
 def test_centella_plant_and_extract_stay_distinct_incis():
@@ -228,3 +253,37 @@ def test_parfum_does_not_raise_a_comedogenic_warning_on_a_gel():
     why = " ".join(compat.get("why_bullets") or []).lower()
     assert "comedogenic" not in why
     assert "allergen" in notes or "fragrance" in notes
+
+
+def test_iarc_group_1_ingredients_show_as_safety_flags_not_pregnancy():
+    for name in ("Benzene", "Formaldehyde", "Coal Tar"):
+        row = data_loader.get_ingredient_data(name)
+        assert "IARC Group 1" in str(row.get("Red_Flag_Tags") or "")
+        assert not str(row.get("Pregnancy_Safety") or "").strip()
+        flags, _ = detect_red_flags(["Aqua", name, "Phenoxyethanol"], {}, "serum")
+        assert any("IARC Group 1" in f for f in flags), flags
+        kinds = {f["type"] for f in _flags(f"Aqua, {name}, Phenoxyethanol")}
+        assert "pregnancy" not in kinds
+
+
+def test_dioxane_is_iarc_2b_and_still_shown():
+    row = data_loader.get_ingredient_data("1,4-Dioxane")
+    tags = str(row.get("Red_Flag_Tags") or "")
+    assert "2B" in tags
+    assert "Group 1" not in tags
+    flags, _ = detect_red_flags(["Aqua", "1,4-Dioxane"], {}, "serum")
+    assert any("2B" in f for f in flags)
+
+
+def test_isopropyl_alcohol_is_not_rinse_off_only():
+    row = data_loader.get_ingredient_data("Isopropyl Alcohol")
+    text = str(row.get("Pregnancy_Safety") or "").lower()
+    assert "rinse-off only" not in text
+    flags, _ = detect_red_flags(["Aqua", "Isopropyl Alcohol"], {}, "serum")
+    assert not any("rinse-off" in f.lower() for f in flags)
+
+
+def test_camphor_child_limit_is_shown():
+    flags, _ = detect_red_flags(["Aqua", "Camphor"], {}, "serum")
+    assert any("children under 2" in f.lower() for f in flags)
+    assert "pregnancy" not in {f["type"] for f in _flags("Aqua, Camphor")}

@@ -47,7 +47,11 @@ export function FormulationFlags({ flags }) {
  * never read as "safe for everyone".
  */
 export function AdvisoryFlags({ flags }) {
-  const list = (flags || []).filter((f) => f.type !== "climate_texture");
+  const list = (flags || []).filter((f) => {
+    if (f.type === "climate_texture") return false;
+    if (f.type === "pregnancy" && !(f.items && f.items.length)) return false;
+    return true;
+  });
   if (!list.length) return null;
   return (
     <>
@@ -59,11 +63,6 @@ export function AdvisoryFlags({ flags }) {
               {f.items.map((it, j) => (
                 <li key={j}>
                   <strong>{it.ingredient}</strong> — {it.guidance}
-                  {it.signed === false && (
-                    <span className="t-caption c-tertiary" style={{ display: "block" }}>
-                      Unsigned database note
-                    </span>
-                  )}
                 </li>
               ))}
             </ul>
