@@ -156,6 +156,10 @@ _INGREDIENT_ALIASES = {
     "deoxyribonucleic acid": "pdrn",
     "dna": "pdrn",
     "polydeoxyribonucleotide": "pdrn",
+    # A mandarin peel on a label is this INCI. It is not ascorbic acid.
+    "mandarin extract": "citrus nobilis peel extract",
+    "mandarin peel extract": "citrus nobilis peel extract",
+    "citrus nobilis peel (mandarin) extract": "citrus nobilis peel extract",
 }
 
 def _technology_target(normalized):
@@ -769,6 +773,10 @@ class DataLoader:
             return None
         if tech and tech in self.ingredient_lookup:
             return self.ingredient_lookup[tech]
+        # A cell-culture medium shares the plant's name and is not the extract.
+        if any(k in normalized for k in (
+                'callus', 'conditioned media', 'stem cell', 'stem-cell')):
+            return None
         # Fuzzy fallback (same threshold as before). A longer name that adds
         # vesicle, sponge, or milt is not the shorter ingredient it contains.
         matches = process.extract(

@@ -20,6 +20,7 @@ from formulation import (  # noqa: E402
 )
 from scoring import (  # noqa: E402
     analyze_product,
+    bind_declared_concentrations,
     estimate_concentration,
     get_concentration_factor,
     get_evidence_factor,
@@ -455,3 +456,95 @@ def test_retinol_or_bha_in_the_routine_blocks_glycolic():
 
     dry = blocked("salicylic acid toner", "dry", "cold_dry")
     assert "ceramide" in dry or "centella" in dry
+
+
+_HYPHEN = (
+    "Aqua (Water), Coco-Caprylate, Citrus Nobilis Peel (Mandarin) Extract, "
+    "Glycerin, Propanediol, Niacinamide, Sodium Polyglutamate Crosspolymer, "
+    "Hippophae Rhamnoides (Sea Buckthorn) Oil, Psoralea Corylifolia (Bakuchiol), "
+    "Rosa Canina Seed (Rose Hip) Oil, Centella Asiatica Callus Conditioned Media "
+    "(Cica Stem Cell), Saccharide Isomerate, Sodium Levulinate, p-Anisic Acid, "
+    "Xanthan Gum, Citric Acid, Phenoxyethanol"
+)
+_HYPHEN_CLAIMS = (
+    "18% Brightening Complex: A blend of 11% Mandarin Extract, 5% Niacinamide, "
+    "2% Polyglutamic Acid (PGA). 20% Collagen Complex: Bakuchiol, Rosehip Oil, "
+    "Coco-Caprylate."
+)
+
+
+def _active(result, fragment):
+    return next(
+        row for row in result["identified_actives"]
+        if fragment in row["name"].lower()
+    )
+
+
+def test_a_common_name_in_brackets_does_not_replace_the_inci():
+    parsed = parse_ingredients(_HYPHEN)
+    assert "Citrus Nobilis Peel Extract" in parsed
+    assert "Mandarin" not in parsed
+    media = data_loader.get_ingredient_data(
+        "Centella Asiatica Callus Conditioned Media")
+    plain = data_loader.get_ingredient_data("Centella Asiatica")
+    assert media["INCI_Name"] == "Centella Asiatica Callus Conditioned Media"
+    assert media["INCI_Name"] != plain["INCI_Name"]
+    assert str(media.get("Evidence_Level_Normalized", "")).lower() != "strong"
+
+
+def test_brand_claims_override_list_order_only_for_the_named_ingredient():
+    parsed = parse_ingredients(_HYPHEN)
+    bound = bind_declared_concentrations(parsed, {
+        "vitamin c": 15,
+        "brightening complex": 18,
+        "collagen complex": 20,
+    })
+    assert 15 not in bound.values()
+    assert 18 not in bound.values()
+    assert 20 not in bound.values()
+
+    bare = analyze_product({
+        "ingredients": _HYPHEN, "price": 699, "size_ml": 50,
+        "category": "Serum", "country": "India",
+        "concerns": ["Pigmentation"], "skin_type": "normal",
+    })
+    named = analyze_product({
+        "ingredients": _HYPHEN, "description": _HYPHEN_CLAIMS,
+        "price": 699, "size_ml": 50, "category": "Serum", "country": "India",
+        "concerns": ["Pigmentation"], "skin_type": "normal",
+    })
+    assert _active(bare, "niacinamide")["concentration_known"] is False
+    assert _active(named, "niacinamide")["concentration_pct"] == 5
+    assert _active(named, "citrus nobilis")["concentration_pct"] == 11
+    assert _active(named, "polyglutamate")["concentration_pct"] == 2
+    assert _active(named, "bakuchiol")["concentration_known"] is False
+    present = [p.lower() for p in named["skin_concern_fit"]["Pigmentation"]["present_actives"]]
+    assert any("citrus nobilis" in p for p in present)
+    assert any("niacinamide" in p for p in present)
+    notes = " ".join(flag["message"].lower() for flag in named["formulation_flags"])
+    assert "two-phase" in notes
+    assert "not ascorbic acid" in notes
+    assert "cell-culture" in notes
+
+
+def test_an_emulsified_cream_is_not_called_two_phase():
+    result = score_formulation(
+        parse_ingredients(
+            "Aqua, Glycerin, Cetearyl Alcohol, Glyceryl Stearate, "
+            "Caprylic/Capric Triglyceride, Phenoxyethanol"),
+        {},
+        "moisturizer",
+    )
+    notes = " ".join(flag["message"].lower() for flag in result["flags"])
+    assert "two-phase" not in notes
+
+
+def test_an_ungraded_extract_above_the_one_percent_line_is_named():
+    result = score_formulation(
+        ["Aqua", "Fictionalis Exemplaris Peel Extract", "Glycerin", "Xanthan Gum"],
+        {},
+        "serum",
+    )
+    notes = " ".join(flag["message"].lower() for flag in result["flags"])
+    assert "fictionalis exemplaris peel extract" in notes
+    assert "does not include" in notes

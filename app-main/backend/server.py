@@ -161,6 +161,7 @@ class AnalyzeRequest(BaseModel):
     url_provided: Optional[bool] = False
     fetch_type: Optional[str] = None  # "url" | "barcode" | "manual" — set by frontend
     active_concentrations: Optional[dict] = None  # scraped from product page
+    description: Optional[str] = None  # product-page claims, not the INCI list
     # Optional personal context, asked AFTER a first result rather than as a
     # wall in front of it. Every field is optional; omitting them reproduces
     # the previous behaviour exactly. These refine the Fit score and produce
@@ -571,6 +572,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
             'currency': _sanitize(req.currency) or "INR",
             'product_name': _sanitize(req.product_name or ''),
             'active_concentrations': req.active_concentrations or {},
+            'description': _sanitize(req.description or '')[:4000],
             'user_profile': req.user_profile or {},
         }
 
@@ -779,6 +781,7 @@ async def fetch_from_url(url: str):
                 "message": "Some fields could not be fetched. Please fill in the missing fields manually." if not (result.get('product_name') and has_ingredients) else None,
                 "country_message": "Could not detect country automatically. Please select your country." if country_uncertain else None,
                 "active_concentrations": result.get('active_concentrations', {}),
+                "description": result.get('description') or "",
                 "bundle_warning": result.get('bundle_warning', False),
             }
         return JSONResponse(status_code=502, content={

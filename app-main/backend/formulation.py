@@ -208,6 +208,114 @@ def is_anhydrous(ingredient_list):
     return not any(_has_water(i) for i in ingredient_list)
 
 
+_LIGHT_PHASE = (
+    'coco-caprylate', 'coco caprylate', 'caprylic/capric triglyceride',
+    'caprylic capric triglyceride', 'isoamyl laurate', 'dicaprylyl ether',
+    'c13-15 alkane', 'c15-19 alkane', 'squalane', 'hemisqualane',
+    'isopropyl myristate', 'isopropyl palmitate', 'ethylhexyl palmitate',
+)
+_EMULSIFIER_MARKERS = (
+    'glyceryl stearate', 'cetearyl alcohol', 'cetyl alcohol', 'stearyl alcohol',
+    'cetearyl glucoside', 'polysorbate', 'peg-', 'ceteareth', 'steareth',
+    'sorbitan', 'lecithin', 'polyglyceryl', 'coco-glucoside',
+    'sodium stearoyl', 'glyceryl oleate', 'olive oil peg', 'cetyl peg',
+    'arachidyl glucoside', 'behenyl alcohol', 'inulin lauryl',
+)
+
+
+def _light_oil_name(name):
+    n = _norm(name)
+    if any(marker in n for marker in _LIGHT_PHASE):
+        return True
+    return n.endswith(' oil') or ' seed oil' in n or ' fruit oil' in n
+
+
+def _has_emulsifier(ingredient_list):
+    blob = ' '.join(_norm(ing) for ing in ingredient_list)
+    return any(marker in blob for marker in _EMULSIFIER_MARKERS)
+
+
+def _format_notes(ingredient_list):
+    """Format facts read from the list itself.
+
+    A water ingredient with a lightweight oil straight after it, and no
+    emulsifier anywhere, is a two-phase mix. An extract that sits above the
+    1% line and is not in the database is named, rather than skipped quietly.
+    Neither note changes the score.
+    """
+    notes = []
+    if (ingredient_list and _has_water(ingredient_list[0])
+            and len(ingredient_list) > 1
+            and _light_oil_name(ingredient_list[1])
+            and not _has_emulsifier(ingredient_list)):
+        oil = ingredient_list[1]
+        notes.append({
+            'type': 'formula_format',
+            'severity': 'medium',
+            'message': (
+                "Water is listed with %s straight after it, and the list "
+                "names no emulsifier. That is a two-phase formula: a watery "
+                "layer and a lightweight oil that sit apart until they are "
+                "shaken together. The oil is a large part of the texture."
+                % oil
+            ),
+        })
+    cutoff = one_percent_line(ingredient_list)
+    missed = []
+    for ing in ingredient_list[:cutoff]:
+        n = _norm(ing)
+        if data_loader.get_ingredient_data(ing):
+            continue
+        if not any(token in n for token in (
+                'extract', ' oil', 'butter', 'juice', 'callus', 'stem cell')):
+            continue
+        missed.append(ing)
+    if missed:
+        shown = ", ".join(missed[:2])
+        if len(missed) == 1:
+            sentence = (
+                "%s sits above the 1%% line and is not in the graded database, "
+                "so this score does not include it." % shown
+            )
+        else:
+            sentence = (
+                "%s sit above the 1%% line and are not in the graded database, "
+                "so this score does not include them." % shown
+            )
+        notes.append({
+            'type': 'ungraded_ingredient',
+            'severity': 'medium',
+            'message': sentence,
+        })
+    for ing in ingredient_list:
+        n = _norm(ing)
+        if 'citrus nobilis' in n or n == 'mandarin peel extract':
+            notes.append({
+                'type': 'ingredient_role',
+                'severity': 'info',
+                'message': (
+                    "Citrus nobilis peel extract is mandarin peel. It supplies "
+                    "citrus flavonoids. It is not ascorbic acid, so it is not "
+                    "a vitamin C active."
+                ),
+            })
+            break
+    for ing in ingredient_list:
+        n = _norm(ing)
+        if 'callus' in n or 'conditioned media' in n or 'stem cell' in n:
+            notes.append({
+                'type': 'ingredient_role',
+                'severity': 'info',
+                'message': (
+                    "%s is a cell-culture medium. It is not the plant extract "
+                    "of the same species, so it is not scored as that extract."
+                    % ing
+                ),
+            })
+            break
+    return notes
+
+
 def one_percent_line(ingredient_list):
     """Index of the first ingredient that reliably sits at or below 1%.
 
@@ -1665,6 +1773,9 @@ def score_formulation(ingredient_list, concentrations, category,
                            "glass. Its overall score is capped for that reason "
                            "even though it performs on UVB.",
             })
+
+    for note in _format_notes(ingredient_list):
+        all_flags.append(note)
 
     claim_notes = _name_claim_gaps(ingredient_list, product_name)
     for ing in ingredient_list:
