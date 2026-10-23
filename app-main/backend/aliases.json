@@ -10,5 +10,8 @@
   "cica": "centella asiatica extract",
   "ceramide": "ceramide np",
   "peptide": "palmitoyl dipeptide-7",
-  "matrixyl": "palmitoyl pentapeptide"
+  "matrixyl": "palmitoyl pentapeptide",
+  "deoxyribonucleic acid": "pdrn",
+  "dna": "pdrn",
+  "polydeoxyribonucleotide": "pdrn"
 }
