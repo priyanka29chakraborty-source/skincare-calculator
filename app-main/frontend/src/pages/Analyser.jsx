@@ -47,6 +47,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
   const [productName, setProductName] = useState("");
   const [brand, setBrand] = useState("");
   const [activeConcentrations, setActiveConcentrations] = useState({});
+  const [claimsText, setClaimsText] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -166,6 +167,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
         country, currency,
         product_name: productName || "", brand: brand || "",
         active_concentrations: activeConcentrations || {},
+        description: claimsText || "",
         size_defaulted: !String(size).trim(),
         user_profile: profile,
       });
@@ -173,7 +175,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
     } catch (e) { setError(describeError(e)); }
     finally { setPersonalising(false); }
   }, [result, ingredients, price, size, sizeUnit, category, concerns, skinType,
-      country, currency, productName, brand, activeConcentrations]);
+      country, currency, productName, brand, activeConcentrations, claimsText]);
 
   const handleAnalyze = useCallback(async () => {
     if (!ingredients.trim()) { setError("Add the ingredient list — paste it from the pack or the product page."); return; }
@@ -193,6 +195,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
         product_name: productName || "",
         brand: brand || "",
         active_concentrations: activeConcentrations || {},
+        description: claimsText || "",
         size_defaulted: !String(size).trim(),
         user_profile: userProfile,
       });
@@ -216,7 +219,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
     } catch (e) { setError(describeError(e)); }
     finally { setLoading(false); }
   }, [ingredients, price, size, sizeUnit, category, skinType, concerns, country, currency, fetchInput,
-      productUrl, productName, brand, activeConcentrations, userProfile, fetchAlts, fetchBestPrice, openUnlock]);
+      productUrl, productName, brand, activeConcentrations, claimsText, userProfile, fetchAlts, fetchBestPrice, openUnlock]);
 
   // After a purchase, re-run so the person sees what they paid for.
   useEffect(() => {
@@ -280,7 +283,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
     const url = kind === "url" ? (raw.startsWith("http") ? raw : `https://${raw}`) : "";
     // Reset the product before filling it from a new page.
     setIngredients(""); setPrice(""); setSize(""); setSizeUnit("ml");
-    setProductName(""); setBrand(""); setActiveConcentrations({});
+    setProductName(""); setBrand(""); setActiveConcentrations({}); setClaimsText("");
     setResult(null); setAlternatives(null); setBestPrice(null);
     setProductUrl(url);
     try {
@@ -295,6 +298,7 @@ export default function Analyser({ route, account, openUnlock, onPurchasedRef })
       if (data.product_name) { setProductName(data.product_name); got.add("product_name"); }
       if (data.category) { setCategory(data.category); got.add("category"); }
       if (data.active_concentrations) setActiveConcentrations(data.active_concentrations);
+      if (data.description) setClaimsText(data.description);
       setFetched(got);
 
       if (data.bundle_warning) {

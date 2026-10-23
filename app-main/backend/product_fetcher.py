@@ -1349,8 +1349,13 @@ def _extract_metadata_body(html, url):
         return True
 
     _conc_patterns = [
-        # "10% Niacinamide" or "10 % niacinamide"
-        re.compile(r'([\d]+\.?\d*)\s*%\s+([a-zA-Z][a-zA-Z0-9 \-\/\(\)]{2,40}?)(?=\s*[,\.\|+&\n<]|$)', re.I),
+        # "10% Niacinamide" and "11% Mandarin Extract 5% Niacinamide" with
+        # no comma between claims. The name stops at the next percentage.
+        re.compile(
+            r'([\d]+\.?\d*)\s*%\s+'
+            r'([a-zA-Z][a-zA-Z\-]{1,30}(?:\s+[a-zA-Z][a-zA-Z\-]{1,30}){0,4})'
+            r'(?=\s+\d+\.?\d*\s*%|\s*[,\.\|+&\n<]|$)',
+            re.I),
         # "Niacinamide 10%" or "Niacinamide (10%)"
         re.compile(r'([a-zA-Z][a-zA-Z0-9 \-\/\(\)]{2,40}?)\s+\(?(\d+\.?\d*)\s*%\)?', re.I),
     ]
@@ -1467,6 +1472,9 @@ def _extract_metadata_body(html, url):
         'currency': currency,
         'country_uncertain': country_uncertain,
         'active_concentrations': active_concentrations,  # e.g. {'niacinamide': 10.0, 'retinol': 0.3}
+        # Claim text, kept apart from the INCI so a later analysis can
+        # bind "5% niacinamide" to the ingredient it names.
+        'description': (priority_text or text[:1500])[:1500],
     }
 
 

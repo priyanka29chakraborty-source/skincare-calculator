@@ -72,7 +72,11 @@ def _listed_ingredient_name(segment):
             readable = inner
     outer = data_loader.get_ingredient_data(bare) if bare else None
     if not outer and not chosen and readable:
-        chosen = readable
+        # "Citrus Nobilis Peel (Mandarin) Extract" is the peel extract.
+        # The word in brackets is a common name, not a shorter ingredient.
+        # Use that shorter name only when the outside is not the longer INCI.
+        if len(bare.split()) <= len(readable.split()):
+            chosen = readable
     if chosen and not outer:
         return chosen
     return bare
@@ -94,6 +98,10 @@ def extract_concentrations_from_inci(ingredient_list_str):
     # A percentage written on the same entry as the ingredient, including
     # values above 60. Aloe at 90% was dropped by the old ceiling.
     for part in _split_ingredient_text(ingredient_list_str):
+        # A marketing sentence can hold several percentages. Those are read
+        # by the patterns below. This pass is for one percentage on one entry.
+        if part.count('%') != 1 or len(part) > 80:
+            continue
         match = re.search(r'(\d+\.?\d*)\s*%', part)
         if not match:
             continue
@@ -110,8 +118,13 @@ def extract_concentrations_from_inci(ingredient_list_str):
         if key not in found:
             found[key] = pct
     patterns = [
-        # "10% Niacinamide" — number precedes name
-        re.compile(r'([\d]+\.?\d*)\s*%\s*\(?\s*([a-zA-Z][a-zA-Z0-9 \-\/]{2,40}?)\s*\)?(?=[,;\n\|+&\.]|$)', re.I),
+        # "10% Niacinamide" and "11% Mandarin Extract 5% Niacinamide" with
+        # no comma between the claims. The name stops at the next percentage.
+        re.compile(
+            r'([\d]+\.?\d*)\s*%\s*\(?\s*'
+            r'([a-zA-Z][a-zA-Z\-]{1,30}(?:\s+[a-zA-Z][a-zA-Z\-]{1,30}){0,4})'
+            r'(?:\s*\([^)]*\))?\s*(?=\s+\d+\.?\d*\s*%|[,;:\n\|+&\.]|$)',
+            re.I),
         # "Niacinamide 10%" or "Niacinamide (10%)"
         re.compile(r'([a-zA-Z][a-zA-Z0-9 \-\/]{2,40}?)\s+\(?(\d+\.?\d*)\s*%\)?', re.I),
     ]
@@ -135,6 +148,90 @@ def extract_concentrations_from_inci(ingredient_list_str):
             except (ValueError, IndexError):
                 pass
     return found
+
+
+# A claim name has to name one ingredient. These pairs connect a common
+# name to the INCI that would be holding it. "Vitamin C" is not here:
+# a citrus peel is not ascorbic acid.
+_DECLARED_FAMILIES = (
+    (('mandarin', 'mandarin extract', 'mandarin peel', 'mandarin peel extract',
+      'citrus nobilis'),
+     ('citrus nobilis', 'citrus reticulata', 'mandarin')),
+    (('pga', 'polyglutamic', 'polyglutamic acid', 'polyglutamate',
+      'sodium polyglutamate'),
+     ('polyglutam',)),
+    (('sea buckthorn', 'sea buckthorn oil'),
+     ('hippophae', 'sea buckthorn')),
+    (('rosehip', 'rose hip', 'rosehip oil', 'rose hip oil'),
+     ('rosa canina', 'rosehip', 'rose hip')),
+    (('bakuchiol',),
+     ('bakuchiol', 'psoralea corylifolia')),
+    (('vitamin b3', 'nicotinamide'),
+     ('niacinamide',)),
+)
+
+
+def bind_declared_concentrations(ingredient_list, known):
+    """Attach each stated percentage to the one ingredient it names.
+
+    '5% niacinamide' lands on niacinamide. '11% mandarin extract' lands on
+    citrus nobilis peel extract when that is the only mandarin peel in the
+    list. '2% PGA' lands on the one polyglutamate in the list. '18%
+    brightening complex' is a group total and is not given to any single
+    ingredient. A percentage with two possible homes is left unused.
+    """
+    listed = []
+    for ing in ingredient_list or []:
+        low = re.sub(r'\s+', ' ', str(ing).strip().lower())
+        if low:
+            listed.append(low)
+    if not listed or not known:
+        return {}
+
+    def _one(markers):
+        hits = []
+        for low in listed:
+            if any(marker in low for marker in markers):
+                hits.append(low)
+        hits = list(dict.fromkeys(hits))
+        if len(hits) == 1:
+            return hits[0]
+        return None
+
+    bound = {}
+    for raw, pct in known.items():
+        try:
+            pct = float(pct)
+        except (TypeError, ValueError):
+            continue
+        if not (0 < pct <= 100):
+            continue
+        key = re.sub(r'\([^)]*\)', ' ', str(raw).lower())
+        key = re.sub(r'\s+', ' ', key).strip(' .-/,')
+        if len(key) < 2:
+            continue
+        words = key.split()
+        grouped = any(word in words for word in ('complex', 'blend', 'cocktail'))
+        if key in listed and not grouped:
+            bound.setdefault(key, pct)
+            continue
+        if grouped:
+            continue
+        data = data_loader.get_ingredient_data(key)
+        inci = str((data or {}).get('INCI_Name') or '').strip().lower()
+        if inci:
+            home = _one((inci,))
+            if home:
+                bound.setdefault(home, pct)
+                continue
+        home = None
+        for phrases, markers in _DECLARED_FAMILIES:
+            if key in phrases or any(phrase in key for phrase in phrases if len(phrase) > 3):
+                home = _one(markers)
+                break
+        if home:
+            bound.setdefault(home, pct)
+    return bound
 
 
 def parse_ingredients(ingredient_list_str):
@@ -3829,7 +3926,15 @@ def calculate_skin_concern_fit(ingredient_list, concerns, known_concentrations=N
             # Only add conc_info bullet for true clinical actives, not support ingredients.
             # Support ingredients (humectants, emollients, etc.) don't need a % judgment.
             if not is_support_ingredient(data):
-                if conc_factor >= 1.0:
+                has_range = (
+                    _parse_min_effective(data.get('Min_Effective_%', 0)) > 0
+                    or _parse_optimal(data.get('Optimal_%', 0), data.get('Min_Effective_%', 0)) > 0
+                )
+                if not has_range:
+                    # No published dose is stored. A high listed percentage
+                    # is not evidence that the ingredient is underdosed.
+                    pass
+                elif conc_factor >= 1.0:
                     conc_info.append(f"{info['inci']} — at or above effective concentration")
                 elif conc_factor >= 0.7:
                     conc_info.append(f"{info['inci']} — likely within effective range")
@@ -5477,15 +5582,20 @@ def analyze_product(product_data):
     # 2. Parsed from INCI string itself (e.g. "Niacinamide 10%, Zinc PCA 1%")
     # 3. Parsed from product name (e.g. "10% Niacinamide Serum")
     product_name = product_data.get("product_name", "") or ""
+    description = product_data.get("description", "") or ""
     known_from_name = _parse_concentrations_from_name(product_name)
     known_from_inci = extract_concentrations_from_inci(raw_ingredients_str)
+    known_from_description = extract_concentrations_from_inci(description)
     scraped_conc = product_data.get("active_concentrations") or {}  # from product_fetcher
-    # Merge: scraped > inci-inline > name-parsed  (later keys overwrite earlier ones)
-    known_concentrations = {
+    # Merge: scraped > inci-inline > name > description. A group claim such
+    # as "18% brightening complex" is dropped while binding, and a common
+    # name is attached only when one ingredient in this list can hold it.
+    known_concentrations = bind_declared_concentrations(ingredient_list, {
+        **known_from_description,
         **known_from_name,
         **known_from_inci,
         **{k.lower(): v for k, v in scraped_conc.items()},
-    }
+    })
 
     main_score = calculate_main_worth_score(
         ingredient_list,
