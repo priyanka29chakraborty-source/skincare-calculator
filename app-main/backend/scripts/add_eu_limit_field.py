@@ -29,7 +29,22 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-JSON_PATH = os.path.join(HERE, 'database', 'ingredients.json')
+_DB_DIR = os.path.join(HERE, 'database')
+
+
+def _resolve_db_path():
+    for name in (
+        'Urancal Ingredient Database.json',
+        'urancal_ingredient_database.json',
+        'ingredients.json',
+    ):
+        path = os.path.join(_DB_DIR, name)
+        if os.path.exists(path):
+            return path
+    return os.path.join(_DB_DIR, 'Urancal Ingredient Database.json')
+
+
+JSON_PATH = _resolve_db_path()
 
 # INCI key -> (Min_Effective_%, Optimal_%, Max_Safe_%, Max_Allowed_EU_%, note)
 #
