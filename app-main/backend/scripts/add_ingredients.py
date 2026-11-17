@@ -34,7 +34,22 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BACKEND = os.path.dirname(HERE)
-DB_PATH = os.path.join(BACKEND, 'database', 'ingredients.json')
+_DB_DIR = os.path.join(BACKEND, 'database')
+
+
+def _resolve_db_path():
+    for name in (
+        'Urancal Ingredient Database.json',
+        'urancal_ingredient_database.json',
+        'ingredients.json',
+    ):
+        path = os.path.join(_DB_DIR, name)
+        if os.path.exists(path):
+            return path
+    return os.path.join(_DB_DIR, 'Urancal Ingredient Database.json')
+
+
+DB_PATH = _resolve_db_path()
 
 SOURCE = "Added 2026-09: INCI function per standard cosmetic chemistry references"
 

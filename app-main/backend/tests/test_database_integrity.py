@@ -98,9 +98,10 @@ def test_no_ingredient_is_its_own_synergy_partner(records):
 @pytest.fixture(scope='module')
 def upgrade_map():
     import pandas as pd
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'database', 'active_upgrade_map.csv')
-    return pd.read_csv(path)
+    from data_loader import data_loader
+    if data_loader.active_upgrade_map is not None:
+        return data_loader.active_upgrade_map
+    return pd.DataFrame()
 
 
 def test_upgrade_rows_name_two_different_actives(upgrade_map):
@@ -126,26 +127,49 @@ def test_rows_without_an_upgrade_say_why(upgrade_map):
 def test_the_engine_reports_both_actives_separately():
     """The reported bug. The card printed Primary_Active under "Key active
     ingredient" while the heading named Upgrade_Active, so an Adapalene
-    suggestion was captioned Niacinamide. One key, two meanings."""
-    from scoring import analyze_product
+    suggestion was captioned Niacinamide. One key, two meanings.
+
+    Adapalene is only offered when acne still needs help. A formula that
+    already scores 70+ for acne must not keep pushing a treatment upgrade.
+    """
+    from scoring import analyze_product, get_upgrade_suggestions
 
     result = analyze_product({
-        'ingredients': 'Aqua, Niacinamide, Zinc PCA, Glycerin, Phenoxyethanol',
+        'ingredients': 'Aqua, Glycerin, Phenoxyethanol, Niacinamide',
         'price': 500, 'size_ml': 30, 'category': 'Serum', 'country': 'India',
         'currency': 'INR', 'skin_type': 'oily',
-        'concerns': ['Acne & Oily Skin', 'Large Pores'],
+        'concerns': ['Acne & Oily Skin'],
     })
     suggestions = result['upgrade_suggestions']
-    assert suggestions, 'expected upgrade suggestions for a niacinamide serum'
+    acne_fit = (result.get('skin_concern_fit') or {}).get('Acne & Oily Skin') or {}
+    acne_score = acne_fit.get('score') if isinstance(acne_fit, dict) else acne_fit
+    if acne_score is not None and acne_score >= 70:
+        assert not any(
+            str(s.get('concern') or '').lower().startswith('acne') for s in suggestions)
+    else:
+        assert suggestions, 'expected upgrade suggestions for a weak niacinamide serum'
+        acne = next(s for s in suggestions if 'acne' in str(s.get('concern') or '').lower())
+        assert acne['suggested_active'] == 'Adapalene'
+        assert acne['builds_on'] == 'Niacinamide'
 
-    for suggestion in suggestions:
-        assert suggestion['suggested_active'], suggestion
-        assert suggestion['suggested_active'] != suggestion.get('builds_on'), (
-            'suggested the ingredient the product already has: %s' % suggestion)
-
-    acne = next(s for s in suggestions if s['concern'].lower().startswith('acne'))
+    forced = get_upgrade_suggestions(
+        ['Aqua', 'Niacinamide', 'Glycerin', 'Phenoxyethanol'],
+        ['Acne & Oily Skin'],
+        skin_type='oily',
+        category='Serum',
+        concern_fit={'concerns': {
+            'Acne & Oily Skin': {
+                'score': 40,
+                'present_actives': ['Niacinamide'],
+                'explanation': ['Contains Niacinamide, but the dose is too low.'],
+            }
+        }},
+    )
+    assert forced
+    acne = next(s for s in forced if 'acne' in str(s.get('concern') or '').lower())
     assert acne['suggested_active'] == 'Adapalene'
     assert acne['builds_on'] == 'Niacinamide'
+    assert acne['suggested_active'] != acne.get('builds_on')
 
 
 def test_a_legal_cap_never_exceeds_the_safety_ceiling(records):

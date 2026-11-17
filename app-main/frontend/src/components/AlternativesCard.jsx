@@ -19,18 +19,20 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
   const isFacialOil = cat === "facial oil" || cat === "oil";
   const scoreOf = (v) => (typeof v === "object" ? v.score : v);
 
-  const weak = Object.entries(concernFit).filter(([, v]) => scoreOf(v) < 75)
+  const weak = Object.entries(concernFit).filter(([, v]) => scoreOf(v) < 70)
     .map(([k, v]) => `${k} (${scoreOf(v)}/100)`);
   const hasWeak = weak.length > 0 && concerns.length > 0;
   const allFit = concerns.length > 0 && concerns.every((c) => {
     const v = concernFit[c];
-    return typeof v === "object" ? v.score >= 75 : typeof v === "number" && v >= 75;
+    return typeof v === "object" ? v.score >= 70 : typeof v === "number" && v >= 70;
   });
-  const excellent = allFit && result.main_worth_score >= 75;
+  const excellent = allFit && result.main_worth_score >= 70;
+  const upgrades = (result.upgrade_suggestions || []).filter((s) => s.kind !== "add_to_routine");
+  const routineAdds = (result.upgrade_suggestions || []).filter((s) => s.kind === "add_to_routine");
 
   const head = { eyebrow: "Alternatives", title: "Worth adding to your routine" };
 
-  if (!hasWeak) {
+  if (!hasWeak && !routineAdds.length) {
     return (
       <Card {...head} data-testid="card-alternatives-great">
         {concerns.length === 0 ? (
@@ -38,12 +40,12 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
             <p className="callout__text">Choose your concerns and we’ll suggest what would help alongside this.</p>
           </Callout>
         ) : (
-          <Callout tone="positive" icon={CircleCheck} title="Nothing worth adding for these concerns"
+          <Callout tone="positive" icon={CircleCheck} title="No upgrade needed"
                    data-testid={excellent ? "excellent-message" : "great-value-message"}>
             <p className="callout__text">
               {excellent
-                ? `This ${isFacialOil ? "oil" : "product"} already covers everything you chose — ${result.main_worth_score}/100 overall, and every concern scores 75 or better.`
-                : "Every concern you chose already scores 75 or better here."}
+                ? `This ${isFacialOil ? "oil" : "product"} already covers everything you chose — ${result.main_worth_score}/100 overall, and every concern scores 70 or better.`
+                : "Every concern you chose already scores 70 or better here."}
             </p>
           </Callout>
         )}
@@ -54,25 +56,42 @@ export default function AlternativesCard({ result, concerns, alternatives, altLo
   const scored = alternatives?.scored_alternatives || [];
   const basic = alternatives?.basic_alternatives || [];
 
+  const renderSuggestion = (sug, i, label) => (
+    <div key={`${label}-${i}`} className="upgrade" data-testid={`upgrade-suggestion-${label}-${i}`}>
+      <div className="row-between">
+        <p className="t-heading-s row" style={{ "--row-gap": "8px" }}>
+          <Plus aria-hidden="true" className="c-accent" style={{ width: 16, height: 16 }} />
+          {label}: {sug.upgrade}
+        </p>
+        <Badge tone="accent">{sug.concern}</Badge>
+      </div>
+      <p className="t-body-s c-secondary">{sug.reason}</p>
+      {sug.suggested_active && <p className="t-body-s c-secondary">Active to look for: <strong className="c-primary">{sug.suggested_active}</strong></p>}
+      {sug.builds_on && <p className="t-body-s c-secondary">Steps up from the <strong className="c-primary">{sug.builds_on}</strong> already in your product.</p>}
+      <p className="t-caption c-tertiary row" style={{ "--row-gap": "6px" }}><Info aria-hidden="true" style={{ width: 14, height: 14 }} />
+        {label === "Add to routine"
+          ? `A leave-on step for ${sug.concern}. It is not an upgrade of this rinse-off product.`
+          : isFacialOil
+            ? `Use this alongside your oil for ${sug.concern} — not a replacement.`
+            : `An addition for ${sug.concern}, not a replacement for what you have.`}
+      </p>
+    </div>
+  );
+
   return (
-    <Card {...head} sub={`For ${weak.join(", ")}, a separate step can do more of that job. Use it with this product, not instead of it.`}
+    <Card {...head} sub={hasWeak
+      ? `For ${weak.join(", ")}, a separate step can do more of that job. Use it with this product, not instead of it.`
+      : "This rinse-off product is not upgraded with leave-on actives. Add those as a separate step."}
           data-testid="card-alternatives">
-      {result.upgrade_suggestions?.length > 0 && (
+      {upgrades.length > 0 && (
         <div className="stack" style={{ "--stack-gap": "12px" }}>
-          {result.upgrade_suggestions.map((sug, i) => (
-            <div key={i} className="upgrade" data-testid={`upgrade-suggestion-${i}`}>
-              <div className="row-between">
-                <p className="t-heading-s row" style={{ "--row-gap": "8px" }}><Plus aria-hidden="true" className="c-accent" style={{ width: 16, height: 16 }} />Add: {sug.upgrade}</p>
-                <Badge tone="accent">{sug.concern}</Badge>
-              </div>
-              <p className="t-body-s c-secondary">{sug.reason}</p>
-              {sug.suggested_active && <p className="t-body-s c-secondary">Active to look for: <strong className="c-primary">{sug.suggested_active}</strong></p>}
-              {sug.builds_on && <p className="t-body-s c-secondary">Steps up from the <strong className="c-primary">{sug.builds_on}</strong> already in your product.</p>}
-              <p className="t-caption c-tertiary row" style={{ "--row-gap": "6px" }}><Info aria-hidden="true" style={{ width: 14, height: 14 }} />
-                {isFacialOil ? `Use this alongside your oil for ${sug.concern} — not a replacement.` : `An addition for ${sug.concern}, not a replacement for what you have.`}
-              </p>
-            </div>
-          ))}
+          {upgrades.map((sug, i) => renderSuggestion(sug, i, "Add"))}
+        </div>
+      )}
+      {routineAdds.length > 0 && (
+        <div className="stack" style={{ "--stack-gap": "12px", marginTop: upgrades.length ? 16 : 0 }}>
+          <p className="t-eyebrow c-tertiary">Add to routine</p>
+          {routineAdds.map((sug, i) => renderSuggestion(sug, i, "Add to routine"))}
         </div>
       )}
 

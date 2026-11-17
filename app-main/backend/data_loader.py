@@ -244,6 +244,44 @@ def _trailing_number_conflict(query, matched):
     )
 
 
+# Incomplete rows that steal fuzzy matches from real INCIs.
+_FUZZY_STUB_KEYS = frozenset({
+    'sodium laureth',
+    'glycol',
+    'butter',
+    'zinc',
+    'pca',
+    'ionone',
+})
+
+# Soft words that may trail a plant or extract name. Anything else left in
+# the query after the matched name is another ingredient glued on by a
+# missing comma.
+_SOFT_QUERY_EXTRAS = frozenset({
+    'extract', 'oil', 'leaf', 'seed', 'root', 'fruit', 'flower', 'bark',
+    'butter', 'wax', 'juice', 'water', 'aqua', 'acid', 'ferment', 'filtrate',
+    'crosspolymer', 'polymer', 'powder', 'gum', 'callus', 'conditioned',
+    'media', 'stem', 'cell', 'complex', 'blend', 'peptide', 'protein',
+    'hydrate', 'hydrates', 'solution', 'suspension', 'emulsion',
+})
+
+
+def _leftover_substance_tokens(query, matched):
+    """Tokens still in the query after the matched name is removed.
+
+    'centella leaf extract' → 'centella extract' keeps only soft words.
+    'propanediol butyl methoxydibenzoylmethane' → 'propanediol' still has
+    another substance name, so that match is rejected.
+    """
+    query_tokens = set(re.findall(r'[a-z0-9]+', query or ''))
+    match_tokens = set(re.findall(r'[a-z0-9]+', matched or ''))
+    leftover = query_tokens - match_tokens
+    return {
+        token for token in leftover
+        if len(token) > 2 and not token.isdigit() and token not in _SOFT_QUERY_EXTRAS
+    }
+
+
 _INGREDIENT_FAMILY_MAP = {
     "hydrolyzed hyaluronic acid": "sodium hyaluronate",
     "sodium hyaluronate crosspolymer": "sodium hyaluronate",
@@ -292,25 +330,33 @@ class DataLoader:
         self.surfactant_db = {}
         self.role_weight_table = {}
         self.role_sets = {}
+        self._tables = {}
+        self._metadata = {}
         self.load_data()
 
+    def _resolve_db_path(self):
+        """Prefer the consolidated Urancal database file."""
+        for name in (
+            'Urancal Ingredient Database.json',
+            'urancal_ingredient_database.json',
+            'ingredients.json',
+        ):
+            path = os.path.join(self.database_path, name)
+            if os.path.exists(path):
+                return path
+        return None
+
     def load_data(self):
-        # ── Load ingredients.json (replaces ingredient_database_fixed5.csv) ──
-        json_path = os.path.join(self.database_path, 'ingredients.json')
-        if os.path.exists(json_path):
-            self._load_json_db(json_path)
-        else:
-            # Fallback: try old CSV if JSON not present yet
-            self._load_csv_fallback()
+        json_path = self._resolve_db_path()
+        if not json_path:
+            logger.error(
+                "No ingredient database found. Expected "
+                "'Urancal Ingredient Database.json' in %s", self.database_path)
+            return
+        self._load_json_db(json_path)
+        self._load_upgrade_map()
 
-        try:
-            upgrade_path = os.path.join(self.database_path, 'active_upgrade_map.csv')
-            if os.path.exists(upgrade_path):
-                self.active_upgrade_map = pd.read_csv(upgrade_path)
-        except Exception as e:
-            logger.error(f"Error loading upgrade map: {e}")
-
-        # Load extra aliases from aliases.json
+        # Optional local alias overrides beside the consolidated file.
         try:
             aliases_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aliases.json')
             if os.path.exists(aliases_path):
@@ -321,6 +367,8 @@ class DataLoader:
                     alias_lower = alias_key.strip().lower()
                     target_lower = target_inci.strip().lower()
                     if target_lower in self.ingredient_lookup and alias_lower not in self.ingredient_lookup:
+                        if alias_lower in _FUZZY_STUB_KEYS or target_lower in _FUZZY_STUB_KEYS:
+                            continue
                         self.ingredient_lookup[alias_lower] = self.ingredient_lookup[target_lower]
                         added += 1
                 logger.info(f"Loaded {added} extra aliases from aliases.json")
@@ -335,16 +383,21 @@ class DataLoader:
         self._build_role_sets()
 
     def _load_json_db(self, json_path):
-        """Load ingredients.json — main ingredient database."""
+        """Load the consolidated Urancal ingredient database."""
         try:
             with open(json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
             self._json_db = data.get('ingredients', {})
             self._json_aliases = data.get('aliases', {})
+            self._tables = data.get('tables', {}) or {}
+            self._metadata = data.get('metadata', {}) or {}
 
-            # Populate ingredient_lookup (unified O(1) store)
+            # Populate ingredient_lookup (unified O(1) store). Stub rows stay
+            # out of the lookup so they cannot win exact or fuzzy matches.
             for key, entry in self._json_db.items():
+                if key in _FUZZY_STUB_KEYS:
+                    continue
                 self.ingredient_lookup[key] = entry
                 inci_name = entry.get('INCI_Name', '')
                 if inci_name:
@@ -352,61 +405,33 @@ class DataLoader:
 
             # Register aliases: alias_lower -> same entry as their canonical INCI
             for alias_lower, inci_lower in self._json_aliases.items():
+                if alias_lower in _FUZZY_STUB_KEYS or inci_lower in _FUZZY_STUB_KEYS:
+                    continue
                 if inci_lower in self.ingredient_lookup and alias_lower not in self.ingredient_lookup:
                     self.ingredient_lookup[alias_lower] = self.ingredient_lookup[inci_lower]
 
-            logger.info(f"Loaded {len(self._json_db)} ingredients from ingredients.json "
-                        f"({len(self._json_aliases)} aliases registered)")
+            logger.info(
+                "Loaded %s ingredients from %s (%s aliases, %s tables)",
+                len(self._json_db),
+                os.path.basename(json_path),
+                len(self._json_aliases),
+                len(self._tables),
+            )
         except Exception as e:
-            logger.error(f"Error loading ingredients.json: {e}")
+            logger.error(f"Error loading ingredient database: {e}")
 
-    def _load_csv_fallback(self):
-        """Fallback loader for old CSV — used only if ingredients.json not found."""
-        import csv as _csv
-        csv_path = os.path.join(self.database_path, 'ingredient_database_fixed5.csv')
-        if not os.path.exists(csv_path):
-            logger.error("Neither ingredients.json nor ingredient_database_fixed5.csv found")
-            return
+    def _load_upgrade_map(self):
+        """Upgrade pathways live in the consolidated tables block."""
         try:
-            with open(csv_path, encoding='utf-8-sig') as f:
-                reader = _csv.DictReader(f)
-                for row in reader:
-                    inci = row.get('INCI_Name', '').strip()
-                    if not inci or inci == 'nan':
-                        continue
-                    entry = dict(row)
-                    # Pre-compute same fields as JSON builder does
-                    atw = entry.get('Activity_Tier_Weight', '')
-                    try:
-                        entry['_activity_tier_weight'] = float(atw) if str(atw).strip() not in ('', 'nan') else 0.5
-                    except (ValueError, TypeError):
-                        entry['_activity_tier_weight'] = 0.5
-                    mw = entry.get('MW_Daltons', '')
-                    try:
-                        entry['_mw_daltons'] = float(mw) if str(mw).strip() not in ('', 'nan') else None
-                    except (ValueError, TypeError):
-                        entry['_mw_daltons'] = None
-                    moa = str(entry.get('Mechanism_of_Action', '') or '').strip()
-                    if not moa or moa.lower() in ('nan', 'none', ''):
-                        moa = str(entry.get('Biological_Action', '') or '').strip()
-                    entry['_moa'] = moa if moa and moa.lower() not in ('nan', 'none') else None
-                    sc_raw = entry.get('Skin_Concerns', '')
-                    entry['_skin_concerns_parsed'] = (
-                        [t.strip().lower() for t in str(sc_raw).split(';') if t.strip()]
-                        if sc_raw and str(sc_raw).lower() not in ('nan', '') else []
-                    )
-                    key = inci.lower()
-                    self.ingredient_lookup[key] = entry
-                    self.all_inci_names.append(inci)
-                    aliases_col = str(entry.get('Aliases', '') or '')
-                    if aliases_col and aliases_col not in ('nan', ''):
-                        for alias in aliases_col.split(';'):
-                            alias = alias.strip()
-                            if alias and alias.lower() not in self.ingredient_lookup:
-                                self.ingredient_lookup[alias.lower()] = entry
-            logger.info(f"Fallback: loaded {len(self.all_inci_names)} ingredients from CSV")
+            rows = self._tables.get('active_upgrade_map') or []
+            if rows:
+                self.active_upgrade_map = pd.DataFrame(rows)
+                logger.info("Loaded %s upgrade-map rows from consolidated DB", len(rows))
+                return
+            self.active_upgrade_map = None
         except Exception as e:
-            logger.error(f"CSV fallback failed: {e}")
+            logger.error(f"Error loading upgrade map: {e}")
+            self.active_upgrade_map = None
 
     def _add_synergy_pair(self, ing1, ing2, seen_pairs, all_synergies):
         pair_key = tuple(sorted([ing1, ing2]))
@@ -426,24 +451,19 @@ class DataLoader:
         self.synergy_partners_map[ing2].add(ing1)
 
     def _load_synergy_registry(self):
-        """Load synergy pairs from synergy table CSV AND main JSON DB's Synergistic_Ingredients."""
+        """Load synergy pairs from the consolidated table and per-ingredient fields."""
         try:
             seen_pairs = set()
             all_synergies = []
 
-            # Source 1: dedicated synergy table CSV
-            syn_path = os.path.join(self.database_path, 'ingredient_synergy_table.csv')
-            if os.path.exists(syn_path):
-                df = pd.read_csv(syn_path)
-                for _, row in df.iterrows():
-                    ing1 = str(row.get('INCI_Name', '')).strip().lower()
-                    partners_raw = str(row.get('Synergistic_Ingredients', ''))
-                    if not ing1 or ing1 == 'nan' or partners_raw == 'nan':
-                        continue
-                    for ing2 in [p.strip().lower() for p in partners_raw.split(';') if p.strip()]:
-                        self._add_synergy_pair(ing1, ing2, seen_pairs, all_synergies)
+            for row in self._tables.get('ingredient_synergy_table') or []:
+                ing1 = str(row.get('INCI_Name', '')).strip().lower()
+                partners_raw = str(row.get('Synergistic_Ingredients', ''))
+                if not ing1 or ing1 == 'nan' or partners_raw in ('nan', ''):
+                    continue
+                for ing2 in [p.strip().lower() for p in partners_raw.split(';') if p.strip()]:
+                    self._add_synergy_pair(ing1, ing2, seen_pairs, all_synergies)
 
-            # Source 2: Synergistic_Ingredients column in JSON DB
             for entry in self._json_db.values():
                 ing1 = str(entry.get('INCI_Name', '')).strip().lower()
                 partners_raw = str(entry.get('Synergistic_Ingredients', '') or '')
@@ -543,21 +563,19 @@ class DataLoader:
             'uvinul t 150': 'Ethylhexyl Triazone',
         }
         try:
-            uv_path = os.path.join(self.database_path, 'uv_sunscreen_tanning_database.csv')
-            if not os.path.exists(uv_path):
-                logger.warning("uv_sunscreen_tanning_database.csv not found")
+            rows = self._tables.get('uv_sunscreen_tanning_database') or []
+            if not rows:
+                logger.warning("uv_sunscreen_tanning_database missing from consolidated DB")
                 return
-            df = pd.read_csv(uv_path)
-            df.columns = df.columns.str.strip()
             count = 0
             common_name_claims = []
-            for _, row in df.iterrows():
+            for row in rows:
                 inci = str(row.get('INCI_Name', '')).strip()
                 if not inci or inci == 'nan':
                     continue
-                entry = row.to_dict()
+                entry = dict(row)
                 for k, v in entry.items():
-                    if pd.isna(v):
+                    if v is None or (isinstance(v, float) and pd.isna(v)):
                         entry[k] = ''
                 self.uv_sun_db[inci.lower()] = entry
                 count += 1
@@ -779,32 +797,39 @@ class DataLoader:
             return None
         # Fuzzy fallback (same threshold as before). A longer name that adds
         # vesicle, sponge, or milt is not the shorter ingredient it contains.
+        # A hyphen number (Polyquaternium-80 vs -7) is a different molecule.
+        # Two INCIs glued by a missing comma are not one shorter name.
+        if normalized in _FUZZY_STUB_KEYS:
+            return None
+        candidates = [
+            key for key in self.ingredient_lookup.keys()
+            if key not in _FUZZY_STUB_KEYS
+        ]
         matches = process.extract(
             normalized,
-            list(self.ingredient_lookup.keys()),
+            candidates,
             scorer=fuzz.token_set_ratio,
             score_cutoff=85,
             limit=8,
         ) or []
         for matched, _score, _idx in matches:
+            if _trailing_number_conflict(normalized, matched):
+                continue
             if _protected_tokens(normalized) - _protected_tokens(matched):
                 continue
             if _significant_extra_tokens(normalized, matched):
+                continue
+            if _leftover_substance_tokens(normalized, matched):
                 continue
             return self.ingredient_lookup[matched]
         return None
 
     def _load_surfactant_db(self):
         try:
-            path = os.path.join(self.database_path, 'surfactant_database.csv')
-            if not os.path.exists(path):
-                return
-            df = pd.read_csv(path)
-            df.columns = df.columns.str.strip()
-            for _, row in df.iterrows():
+            for row in self._tables.get('surfactant_database') or []:
                 inci = str(row.get('INCI_Name', '')).strip()
                 if inci and inci != 'nan':
-                    entry = row.to_dict()
+                    entry = dict(row)
                     for k, v in entry.items():
                         if isinstance(v, float) and pd.isna(v):
                             entry[k] = ''
@@ -815,12 +840,7 @@ class DataLoader:
 
     def _load_role_weight_table(self):
         try:
-            path = os.path.join(self.database_path, 'ingredient_role_weight_table.csv')
-            if not os.path.exists(path):
-                return
-            df = pd.read_csv(path)
-            df.columns = df.columns.str.strip()
-            for _, row in df.iterrows():
+            for row in self._tables.get('ingredient_role_weight_table') or []:
                 role = str(row.get('Role', '')).strip().lower()
                 if role and role != 'nan':
                     try:

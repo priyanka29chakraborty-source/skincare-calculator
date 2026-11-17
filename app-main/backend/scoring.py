@@ -5034,9 +5034,7 @@ def _concern_failed(row):
 
 
 def _concerns_match(left, right):
-    a = str(left or '').lower()
-    b = str(right or '').lower()
-    return bool(a and b and (a in b or b in a))
+    return _concerns_equivalent(left, right)
 
 
 def _is_hydration_gap(suggestion):
@@ -5242,38 +5240,285 @@ def _drop_routine_clashes(suggestions, families, weight, ing_blob):
     return kept
 
 
-def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=None,
-                            climate=None, concern_fit=None, routine=None):
-    suggestions = []
-    upgrade_map = data_loader.active_upgrade_map
-    ing_lower_list = [i.lower() for i in ingredient_list]
-    concerns_lower = [c.lower() for c in concerns]
+_UPGRADE_FIT_FLOOR = 70
 
-    if upgrade_map is not None and not upgrade_map.empty:
-        for _, row in upgrade_map.iterrows():
-            if str(row.get('Do_Not_Upgrade', '')).upper() == 'YES':
-                continue
-            primary = str(row.get('Primary_Active', '')).lower().strip()
-            concern = str(row.get('Skin_Concern', '')).lower().strip()
+_CONCERN_EQUIVALENTS = {
+    'pih': ('pih', 'pigmentation', 'dark spot', 'melasma', 'uneven tone', 'post blemish'),
+    'pigmentation': ('pih', 'pigmentation', 'dark spot', 'melasma', 'uneven tone', 'post blemish'),
+    'acne': ('acne', 'oily skin', 'blackhead', 'blemish'),
+    'aging': ('aging', 'ageing', 'wrinkle', 'fine line', 'anti-aging', 'anti-ageing'),
+    'barrier': ('barrier',),
+    'hydration': ('hydration', 'dehydrated', 'dryness', 'dry skin'),
+    'pores': ('pore', 'large pore'),
+    'dullness': ('dull', 'radiance'),
+    'texture': ('texture', 'rough'),
+    'sensitive': ('sensitive', 'redness', 'reactive'),
+    'sun': ('sun protection', 'uv damage', 'uv ', 'sunscreen'),
+    'uv': ('sun protection', 'uv damage', 'uv '),
+    'tanning': ('tan', 'tanning'),
+}
 
-            match_ing = any(primary in ing for ing in ing_lower_list)
-            match_concern = any(concern in uc or uc in concern for uc in concerns_lower)
+_EVIDENCE_RANK = {
+    'high': 3, 'strong': 3,
+    'medium': 2, 'moderate': 2,
+    'low': 1, 'limited': 1,
+    'unknown': 0, '': 0,
+}
 
-            if match_ing and match_concern:
-                suggestions.append({
-                    # builds_on is what the product already contains;
-                    # suggested_active is what to add. They were both called
-                    # "active" once, and the card showed the wrong one.
-                    'builds_on': row.get('Primary_Active'),
-                    'suggested_active': row.get('Upgrade_Active'),
-                    'upgrade': row.get('Upgrade_Active'),
-                    'reason': row.get('Upgrade_Reason'),
-                    'concern': row.get('Skin_Concern'),
-                })
+_TREATMENT_TIER_MARKERS = (
+    'adapalene', 'tretinoin', 'retinol', 'retinal', 'retinoid', 'retinyl',
+    'hydroquinone', 'benzoyl', 'salicylic', 'glycolic', 'lactic acid',
+    'mandelic', 'azelaic', 'tranexamic', 'ascorbic', 'vitamin c',
+    'alpha arbutin', 'bakuchiol',
+)
 
+_PREGNANCY_BLOCK_MARKERS = (
+    'adapalene', 'tretinoin', 'retinol', 'retinal', 'retinoid', 'retinyl',
+    'hydroquinone',
+)
+
+_STRONG_ACID_MARKERS = (
+    'glycolic', 'salicylic', 'lactic acid', 'mandelic', 'benzoyl',
+)
+
+
+def _do_not_upgrade(value):
+    token = str(value or '').strip().upper()
+    return token in ('TRUE', 'YES', 'Y', '1')
+
+
+def _evidence_rank(value):
+    return _EVIDENCE_RANK.get(str(value or '').strip().lower(), 0)
+
+
+def _concerns_equivalent(left, right):
+    a = str(left or '').lower().strip()
+    b = str(right or '').lower().strip()
+    if not a or not b:
+        return False
+    if a == b or a in b or b in a:
+        return True
+    for aliases in _CONCERN_EQUIVALENTS.values():
+        if any(alias in a for alias in aliases) and any(alias in b for alias in aliases):
+            return True
+    return False
+
+
+def _primary_in_formula(primary, ingredient_list):
+    """Whole-word match. Glycerin must not match Ethylhexylglycerin."""
+    needle = str(primary or '').lower().strip()
+    if not needle or len(needle) < 3:
+        return False
+    pattern = re.compile(
+        r'(?<![a-z0-9])%s(?![a-z0-9])' % re.escape(needle), re.I)
+    for ing in ingredient_list or []:
+        if pattern.search(str(ing or '')):
+            return True
+    return False
+
+
+def _weak_concern_names(concerns, concern_fit):
+    """Concerns that still need help. Empty means every chosen concern is fine."""
+    rows = _concern_rows(concern_fit)
+    if not rows:
+        return [str(c) for c in (concerns or [])]
+    by_name = {row['name'].lower(): row for row in rows}
+    weak = []
+    for concern in concerns or []:
+        row = by_name.get(str(concern).lower())
+        if row is None:
+            for key, candidate in by_name.items():
+                if _concerns_equivalent(key, concern):
+                    row = candidate
+                    break
+        if row is None or row['score'] < _UPGRADE_FIT_FLOOR or _concern_failed(row):
+            weak.append(concern)
+    return weak
+
+
+def _all_concerns_covered(concerns, concern_fit):
+    if not concerns:
+        return False
+    rows = _concern_rows(concern_fit)
+    if not rows:
+        return False
+    by_name = {row['name'].lower(): row for row in rows}
+    for concern in concerns:
+        row = by_name.get(str(concern).lower())
+        if row is None:
+            for key, candidate in by_name.items():
+                if _concerns_equivalent(key, concern):
+                    row = candidate
+                    break
+        if row is None or row['score'] < _UPGRADE_FIT_FLOOR or _concern_failed(row):
+            return False
+    return True
+
+
+def _is_treatment_tier(text):
+    blob = str(text or '').lower()
+    return any(marker in blob for marker in _TREATMENT_TIER_MARKERS)
+
+
+def _is_cleanser_friendly(text):
+    blob = str(text or '').lower()
+    if _is_treatment_tier(blob):
+        return False
+    return any(word in blob for word in (
+        'cleanser', 'wash', 'cleansing', 'foam', 'syndet',
+    )) or not any(word in blob for word in (
+        'serum', 'cream', 'treatment', 'gel', 'toner', 'mask', 'sunscreen',
+    ))
+
+
+def _profile_blocks_pregnancy_actives(profile):
+    profile = profile or {}
+    if profile.get('pregnant') or profile.get('pregnancy') or profile.get('trying_to_conceive'):
+        return True
+    status = str(profile.get('pregnancy_status') or '').lower()
+    return any(token in status for token in (
+        'pregnant', 'pregnancy', 'trying', 'conceive', 'breast', 'nursing',
+    ))
+
+
+def _profile_is_child(profile):
+    profile = profile or {}
+    if profile.get('under_12') or profile.get('is_child'):
+        return True
+    age = profile.get('age')
+    try:
+        return age is not None and float(age) < 12
+    except (TypeError, ValueError):
+        return False
+
+
+def _unsafe_for_profile(suggestion, profile, skin_type):
+    blob = ' '.join(str(suggestion.get(k) or '') for k in (
+        'upgrade', 'suggested_active', 'reason')).lower()
+    if (_profile_blocks_pregnancy_actives(profile) or _profile_is_child(profile)):
+        if any(marker in blob for marker in _PREGNANCY_BLOCK_MARKERS):
+            return True
+    if str(skin_type or '').strip().lower() == 'sensitive':
+        if any(marker in blob for marker in _STRONG_ACID_MARKERS):
+            return True
+    return False
+
+
+def _is_step_down(suggestion, ingredient_list):
+    """Do not suggest a weaker acne or pigment active than the bottle already has."""
+    blob = ' '.join(str(suggestion.get(k) or '') for k in (
+        'upgrade', 'suggested_active')).lower()
+    held = ' '.join(str(ing or '').lower() for ing in (ingredient_list or []))
+    if any(marker in held for marker in (
+            'adapalene', 'tretinoin', 'retinol', 'retinal', 'retinoid')):
+        if any(marker in blob for marker in (
+                'salicylic', 'tea tree', 'benzoyl', 'niacinamide')):
+            return True
+    if 'hydroquinone' in held and any(marker in blob for marker in (
+            'arbutin', 'licorice', 'niacinamide', 'vitamin c', 'ascorb')):
+        return True
+    if 'azelaic' in held and any(marker in blob for marker in (
+            'arbutin', 'licorice', 'niacinamide')):
+        return True
+    return False
+
+
+def _tag_placement(suggestion, category):
+    """Cleanser leave-ons are routine adds, not product upgrades."""
+    cat = (category or '').strip().lower().replace('moisturiser', 'moisturizer')
+    blob = '%s %s' % (suggestion.get('upgrade') or '', suggestion.get('suggested_active') or '')
+    out = dict(suggestion)
+    if cat == 'cleanser' and _is_treatment_tier(blob) and not _is_cleanser_friendly(blob):
+        out['kind'] = 'add_to_routine'
+        reason = str(out.get('reason') or '').strip()
+        note = 'Add this as a separate leave-on step. It is not an upgrade of the cleanser itself.'
+        if note.lower() not in reason.lower():
+            if reason and reason[-1] not in '.!?':
+                reason += '.'
+            out['reason'] = ('%s %s' % (reason, note)).strip()
+    else:
+        out.setdefault('kind', 'upgrade')
+    return out
+
+
+def _category_allows_suggestion(suggestion, category):
     cat = (category or '').strip().lower().replace('moisturiser', 'moisturizer')
     if cat in ('oil', 'facial oil'):
         cat = 'facial oil'
+    blob = '%s %s' % (suggestion.get('upgrade') or '', suggestion.get('suggested_active') or '')
+    concern = str(suggestion.get('concern') or '').lower()
+
+    if cat == 'sunscreen':
+        return any(key in concern for key in ('sun', 'uv')) or any(
+            key in blob.lower() for key in ('uv filter', 'spf', 'ferulic', 'antioxidant'))
+    if cat in ('toner', 'mask'):
+        return not _is_treatment_tier(blob)
+    if cat == 'facial oil':
+        if any(bad in blob.lower() for bad in (
+                'serum', 'cleanser', 'sunscreen', 'toner', 'wash')):
+            return False
+        return any(ok in blob.lower() for ok in (
+            'oil', 'squalane', 'tocopherol', 'vitamin e', 'retin',
+            'bakuchiol', 'tetrahexyldecyl', 'ferulic'))
+    if cat == 'cleanser':
+        # Leave-on actives are kept and tagged as add_to_routine later.
+        return True
+    return True
+
+
+def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=None,
+                            climate=None, concern_fit=None, routine=None,
+                            user_profile=None):
+    suggestions = []
+    upgrade_map = data_loader.active_upgrade_map
+    ing_lower_list = [i.lower() for i in ingredient_list]
+    concerns = list(concerns or [])
+    cat = (category or '').strip().lower().replace('moisturiser', 'moisturizer')
+    if cat in ('oil', 'facial oil'):
+        cat = 'facial oil'
+
+    if _all_concerns_covered(concerns, concern_fit):
+        return []
+
+    weak_concerns = _weak_concern_names(concerns, concern_fit)
+    if concerns and not weak_concerns:
+        return []
+    target_concerns = weak_concerns or concerns
+
+    if upgrade_map is not None and not upgrade_map.empty:
+        # Skip the permanent "no pathway" rows once. TRUE and YES both mean stop.
+        live = upgrade_map[
+            ~upgrade_map['Do_Not_Upgrade'].map(_do_not_upgrade)
+        ] if 'Do_Not_Upgrade' in upgrade_map.columns else upgrade_map
+        for _, row in live.iterrows():
+            primary = str(row.get('Primary_Active', '')).strip()
+            concern = str(row.get('Skin_Concern', '')).strip()
+            upgrade_active = str(row.get('Upgrade_Active', '') or '').strip()
+            if not primary or not upgrade_active:
+                continue
+            if not _primary_in_formula(primary, ing_lower_list):
+                continue
+            if not any(_concerns_equivalent(concern, c) for c in target_concerns):
+                continue
+            if _evidence_rank(row.get('Upgrade_Evidence_Level')) < _evidence_rank(
+                    row.get('Primary_Evidence_Level')):
+                continue
+            if cat == 'treatment' and _evidence_rank(
+                    row.get('Upgrade_Evidence_Level')) <= _evidence_rank(
+                    row.get('Primary_Evidence_Level')):
+                continue
+            matched_concern = next(
+                (c for c in target_concerns if _concerns_equivalent(concern, c)),
+                concern,
+            )
+            suggestions.append({
+                'builds_on': row.get('Primary_Active'),
+                'suggested_active': row.get('Upgrade_Active'),
+                'upgrade': row.get('Upgrade_Active'),
+                'reason': row.get('Upgrade_Reason'),
+                'concern': matched_concern,
+                'kind': 'upgrade',
+            })
 
     oil_words = ('oil', 'squalane', 'tocopherol', 'vitamin e', 'retin',
                  'bakuchiol', 'tetrahexyldecyl', 'ferulic')
@@ -5296,7 +5541,7 @@ def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=
             if 'oil' not in name.lower():
                 s['upgrade'] = 'A facial oil with %s' % name
 
-    if not suggestions and concerns:
+    if not suggestions and target_concerns:
         oil_upgrades = {
             'pigmentation': [{'upgrade': 'A facial oil with tetrahexyldecyl ascorbate', 'reason': 'An oil-soluble form of vitamin C, so it belongs in an oil.', 'suggested_active': 'Tetrahexyldecyl Ascorbate'}],
             'dullness': [{'upgrade': 'A facial oil with vitamin E', 'reason': 'Vitamin E is already at home in an oil. It is a separate oil from this one.', 'suggested_active': 'Tocopherol'}],
@@ -5324,23 +5569,39 @@ def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=
             'tanning': [{'upgrade': 'Alpha Arbutin 2% + Niacinamide', 'reason': 'Tyrosinase inhibition for effective de-tanning without irritation', 'suggested_active': 'Alpha Arbutin'}],
             'puffiness': [{'upgrade': 'Caffeine 5% Eye Serum', 'reason': 'Reduces puffiness by improving microcirculation around eyes', 'suggested_active': 'Caffeine'}],
         }
+        if cat in ('toner', 'mask'):
+            concern_upgrades = {
+                key: vals for key, vals in concern_upgrades.items()
+                if key in ('hydration', 'dry', 'dry skin', 'barrier', 'sensitive', 'dullness')
+            }
+        if cat == 'sunscreen':
+            concern_upgrades = {
+                key: vals for key, vals in concern_upgrades.items()
+                if key in ('sun', 'uv')
+            }
+        if cat == 'cleanser':
+            # Leave-on fallbacks are tagged as routine adds, not cleanser upgrades.
+            pass
         has_filter = False
         for ing in ingredient_list:
             uv = data_loader.get_uv_data(ing)
             if uv and 'uv filter' in str(uv.get('Ingredient_Category', '')).lower():
                 has_filter = True
                 break
-        for c in concerns:
+        for c in target_concerns:
             c_lower = c.lower()
             for key, upgrades in concern_upgrades.items():
-                if key in c_lower:
-                    # A sunscreen that already has filters should not be told
-                    # to go and find UV filters.
+                if key in c_lower or _concerns_equivalent(key, c):
                     if key == 'sun' and has_filter:
                         break
                     for u in upgrades:
-                        suggestions.append({**u, 'concern': c})
+                        suggestions.append({**u, 'concern': c, 'kind': 'upgrade'})
                     break
+
+    suggestions = [
+        s for s in suggestions
+        if _category_allows_suggestion(s, cat)
+    ]
 
     unique_suggestions = []
     seen = set()
@@ -5373,7 +5634,8 @@ def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=
 
     if skin in ('sensitive', 'oily', 'dry', 'combination'):
         unique_suggestions = [s for s in unique_suggestions if not _poor(_text(s))]
-        if not unique_suggestions and concerns:
+        if not unique_suggestions and target_concerns and cat not in (
+                'sunscreen', 'toner', 'mask'):
             gentle = {
                 'sensitive': {
                     'dullness': {'upgrade': 'Azelaic acid cream', 'reason': 'Brightens uneven tone with less sting than a strong vitamin C.', 'suggested_active': 'Azelaic acid'},
@@ -5396,17 +5658,23 @@ def get_upgrade_suggestions(ingredient_list, concerns, skin_type=None, category=
                     'acne': {'upgrade': 'Azelaic acid serum', 'reason': 'Clears congestion without a heavy occlusive.', 'suggested_active': 'Azelaic acid'},
                 },
             }.get(skin, {})
-            for c in concerns:
+            for c in target_concerns:
                 c_lower = c.lower()
                 for key, upgrade in gentle.items():
-                    if key in c_lower:
-                        unique_suggestions.append({**upgrade, 'concern': c})
+                    if key in c_lower or _concerns_equivalent(key, c):
+                        unique_suggestions.append({**upgrade, 'concern': c, 'kind': 'upgrade'})
                         break
     shaped = []
     for suggestion in unique_suggestions:
+        if _unsafe_for_profile(suggestion, user_profile, skin):
+            continue
+        if _is_step_down(suggestion, ing_lower_list):
+            continue
+        if not _category_allows_suggestion(suggestion, cat):
+            continue
         formed = _shape_vehicle(suggestion, weight, skin, climate, ing_blob)
         if formed is not None:
-            shaped.append(formed)
+            shaped.append(_tag_placement(formed, cat))
     kept = []
     seen_actives = set()
     for suggestion in shaped:
@@ -5687,6 +5955,7 @@ def analyze_product(product_data):
         climate=profile.get("climate"),
         concern_fit=concern_fit,
         routine=profile.get("current_routine"),
+        user_profile=profile,
     )
 
     # New analyses — 1% marker, conflicts, pH, delivery systems

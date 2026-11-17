@@ -21,7 +21,19 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-JSON_PATH = os.path.join(HERE, 'database', 'ingredients.json')
+DB_DIR = os.path.join(HERE, 'database')
+
+
+def _db_path():
+    for name in (
+        'Urancal Ingredient Database.json',
+        'urancal_ingredient_database.json',
+        'ingredients.json',
+    ):
+        path = os.path.join(DB_DIR, name)
+        if os.path.exists(path):
+            return path
+    raise FileNotFoundError('Urancal Ingredient Database.json not found in %s' % DB_DIR)
 
 
 def _num(value):
@@ -33,7 +45,7 @@ def _num(value):
 
 
 def load():
-    with open(JSON_PATH, encoding='utf-8') as handle:
+    with open(_db_path(), encoding='utf-8') as handle:
         return json.load(handle)['ingredients']
 
 
