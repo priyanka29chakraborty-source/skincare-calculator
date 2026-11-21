@@ -114,14 +114,22 @@ async def request_code(req: EmailRequest, request: Request):
     of a list of emails uses the product.
     """
     try:
-        email = identity.normalise_email(req.email)
+        email = identity.canonical_email(req.email)
     except identity.IdentityError as exc:
         return JSONResponse(status_code=400, content={'error': str(exc)})
 
+    # Lockout first, then the send counters. A locked inbox must not consume a
+    # resend slot, and a throttled request must not reach the mailer.
+    if identity.login_locked(email):
+        return JSONResponse(status_code=429, content={'error': identity.LOCK_MESSAGE})
+
     try:
+        identity.claim_send(email, identity.verified_client_ip(request.headers))
         code = identity.issue_code(email)
         transport = mailer.send_login_code(email, code)
         logger.info('login code sent via %s', transport)
+    except identity.IdentityError as exc:
+        return JSONResponse(status_code=429, content={'error': str(exc)})
     except mailer.MailNotConfigured:
         logger.error('cannot send login codes: no SMTP configured')
         return JSONResponse(status_code=503, content={
@@ -136,7 +144,13 @@ async def request_code(req: EmailRequest, request: Request):
 @accounts_router.post('/auth/verify-code')
 async def verify_code(req: VerifyRequest, request: Request):
     try:
-        account_id = identity.verify_code(req.email, req.code)
+        email = identity.canonical_email(req.email)
+    except identity.IdentityError:
+        return JSONResponse(status_code=400, content={
+            'error': 'That code is not right, or it has expired.'})
+    is_new = not wallet.account_exists(email)
+    try:
+        account_id = identity.verify_code(email, req.code)
     except identity.IdentityError as exc:
         # One message for every failure: wrong code, no code, expired, capped.
         # Distinguishing them tells an attacker which addresses are in use.
@@ -144,7 +158,9 @@ async def verify_code(req: VerifyRequest, request: Request):
         return JSONResponse(status_code=400, content={
             'error': 'That code is not right, or it has expired.'})
 
-    response = JSONResponse(content=_account_view(account_id))
+    view = _account_view(account_id)
+    view['is_new'] = is_new
+    response = JSONResponse(content=view)
     response.set_cookie(identity.SESSION_COOKIE,
                         identity.make_session(account_id),
                         **identity.session_cookie_kwargs())

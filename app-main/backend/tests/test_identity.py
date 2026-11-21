@@ -89,7 +89,7 @@ def test_a_code_for_one_address_does_not_work_for_another(ident):
 
 def test_guessing_is_capped(ident):
     """Six digits is a million guesses without a cap - minutes of scripted
-    traffic. After five wrong attempts the code is burned, not just refused."""
+    traffic. After five wrong attempts the real code is refused too."""
     code = ident.issue_code('buyer@example.com')
     for _ in range(ident.MAX_CODE_ATTEMPTS):
         with pytest.raises(ident.IdentityError):
@@ -161,6 +161,219 @@ def test_codes_are_not_stored_in_plain_text(ident):
     stored = cur.fetchone()[0]
     assert code not in stored
     assert len(stored) == 64
+
+
+# ---------------------------------------------------------------------------
+# Resend throttle, lockout, and the verified visitor IP
+# ---------------------------------------------------------------------------
+
+class _Headers:
+    def __init__(self, data):
+        self._data = {k.lower(): v for k, v in data.items()}
+
+    def get(self, key, default=''):
+        return self._data.get(str(key).lower(), default)
+
+
+class _Request:
+    def __init__(self, headers):
+        self.headers = _Headers(headers)
+
+
+def test_gmail_aliases_are_one_inbox(ident):
+    assert ident.canonical_email('A.B+promo@GoogleMail.com') == 'ab@gmail.com'
+    assert ident.canonical_email('first.last+tag@example.com') == 'first.last@example.com'
+    # Dots outside Gmail are a different address.
+    assert ident.canonical_email('first.last@example.com') == 'first.last@example.com'
+    with pytest.raises(ident.IdentityError):
+        ident.canonical_email('+tag@gmail.com')
+
+
+def test_gmail_aliases_share_one_code_and_one_attempt_count(ident):
+    code = ident.issue_code('a.b+tag@gmail.com')
+    with pytest.raises(ident.IdentityError):
+        ident.verify_code('ab@gmail.com', '000000')
+    assert ident.verify_code('ab@googlemail.com', code).startswith('acct_')
+
+
+def test_a_fresh_code_does_not_reset_the_attempt_count(ident):
+    """Requesting another code used to DELETE the row and start attempts at 0."""
+    import wallet
+    ident.issue_code('buyer@example.com')
+    for _ in range(4):
+        with pytest.raises(ident.IdentityError):
+            ident.verify_code('buyer@example.com', '000000')
+    fresh = ident.issue_code('buyer@example.com')
+    with pytest.raises(ident.IdentityError):
+        ident.verify_code('buyer@example.com', '000000')
+    with pytest.raises(ident.IdentityError):
+        ident.verify_code('buyer@example.com', fresh)
+    cur = wallet._execute(
+        'SELECT attempts FROM login_code WHERE email = ?', ('buyer@example.com',))
+    assert cur.fetchone()[0] == 5
+    with pytest.raises(ident.IdentityError, match='15 minutes'):
+        ident.issue_code('buyer@example.com')
+
+
+def test_the_lockout_ends_after_fifteen_minutes(ident, monkeypatch):
+    ident.issue_code('buyer@example.com')
+    for _ in range(5):
+        with pytest.raises(ident.IdentityError):
+            ident.verify_code('buyer@example.com', '000000')
+    with pytest.raises(ident.IdentityError):
+        ident.issue_code('buyer@example.com')
+    real = time.time
+    monkeypatch.setattr(
+        ident.time, 'time', lambda: real() + ident.FAILURE_WINDOW_SECONDS + 1)
+    code = ident.issue_code('buyer@example.com')
+    assert ident.verify_code('buyer@example.com', code).startswith('acct_')
+
+
+def test_a_guess_past_the_cap_does_not_increment(ident):
+    """The cap is in the UPDATE, so a sixth guess changes nothing."""
+    import wallet
+    ident.issue_code('buyer@example.com')
+    for _ in range(5):
+        with pytest.raises(ident.IdentityError):
+            ident.verify_code('buyer@example.com', '000000')
+    with pytest.raises(ident.IdentityError, match='too many attempts'):
+        ident.verify_code('buyer@example.com', '000000')
+    cur = wallet._execute(
+        'SELECT attempts FROM login_code WHERE email = ?', ('buyer@example.com',))
+    assert cur.fetchone()[0] == 5
+
+
+def test_parallel_guesses_stop_at_five(ident):
+    import wallet
+    ident.issue_code('buyer@example.com')
+    for _ in range(4):
+        with pytest.raises(ident.IdentityError):
+            ident.verify_code('buyer@example.com', '000000')
+    errors = []
+
+    def guess():
+        try:
+            ident.verify_code('buyer@example.com', '000000')
+        except ident.IdentityError as exc:
+            errors.append(str(exc))
+
+    threads = [threading.Thread(target=guess) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    cur = wallet._execute(
+        'SELECT attempts FROM login_code WHERE email = ?', ('buyer@example.com',))
+    assert cur.fetchone()[0] == 5
+    assert len(errors) == 8
+
+
+def test_resend_is_limited_per_inbox(ident, monkeypatch):
+    clock = {'t': time.time()}
+    monkeypatch.setattr(ident.time, 'time', lambda: clock['t'])
+    for _ in range(ident.MAX_CODES_PER_WINDOW):
+        ident.claim_send('a.b+x@gmail.com')
+        clock['t'] += ident.RESEND_COOLDOWN_SECONDS
+    # The dotted alias is the same Gmail inbox, so it shares the cap.
+    with pytest.raises(ident.IdentityError, match='15 minutes'):
+        ident.claim_send('ab@gmail.com')
+    clock['t'] += ident.SEND_WINDOW_SECONDS
+    ident.claim_send('ab@gmail.com')
+
+
+def test_a_second_request_inside_a_minute_does_not_send_mail(ident, monkeypatch):
+    import json
+    import accounts
+    monkeypatch.setattr(accounts, 'identity', ident)
+    sent = []
+    monkeypatch.setattr(
+        accounts.mailer, 'send_login_code', lambda email, code: sent.append(email) or 'test')
+
+    import asyncio
+    first = asyncio.run(accounts.request_code(
+        accounts.EmailRequest(email='flood@example.com'), _Request({})))
+    second = asyncio.run(accounts.request_code(
+        accounts.EmailRequest(email='flood@example.com'), _Request({})))
+    assert first == {'sent': True, 'expires_in': ident.CODE_TTL_SECONDS}
+    assert second.status_code == 429
+    assert json.loads(second.body)['error'] == ident.COOLDOWN_MESSAGE
+    assert sent == ['flood@example.com']
+
+
+def test_a_locked_inbox_is_not_emailed(ident, monkeypatch):
+    import json
+    import accounts
+    monkeypatch.setattr(accounts, 'identity', ident)
+    sent = []
+    monkeypatch.setattr(
+        accounts.mailer, 'send_login_code', lambda email, code: sent.append(email) or 'test')
+    ident.issue_code('buyer@example.com')
+    for _ in range(5):
+        with pytest.raises(ident.IdentityError):
+            ident.verify_code('buyer@example.com', '000000')
+
+    import asyncio
+    resp = asyncio.run(accounts.request_code(
+        accounts.EmailRequest(email='buyer@example.com'), _Request({})))
+    assert resp.status_code == 429
+    assert '15 minutes' in json.loads(resp.body)['error']
+    assert sent == []
+
+
+def test_an_unverified_ip_is_ignored(ident, monkeypatch):
+    """X-Forwarded-For on the raw Render URL is not a visitor IP."""
+    monkeypatch.setenv('CF_VISITOR_SECRET', 'shared-secret')
+    spoofed = _Headers({
+        'X-Forwarded-For': '203.0.113.8',
+        'X-Visitor-IP': '203.0.113.8',
+        'X-Visitor-Secret': 'not-the-secret',
+    })
+    assert ident.verified_client_ip(spoofed) is None
+    monkeypatch.delenv('CF_VISITOR_SECRET', raising=False)
+    matching = _Headers({
+        'X-Visitor-IP': '203.0.113.8',
+        'X-Visitor-Secret': 'shared-secret',
+        'X-Forwarded-For': '198.51.100.4',
+    })
+    # Secret not configured: do not block, and do not trust the header.
+    assert ident.verified_client_ip(matching) is None
+    ident.claim_send('direct@example.com', ident.verified_client_ip(matching))
+
+
+def test_a_verified_ip_is_capped_across_inboxes(ident, monkeypatch):
+    import json
+    import accounts
+    monkeypatch.setenv('CF_VISITOR_SECRET', 'shared-secret')
+    monkeypatch.setattr(accounts, 'identity', ident)
+    sent = []
+    monkeypatch.setattr(
+        accounts.mailer, 'send_login_code', lambda email, code: sent.append(email) or 'test')
+    headers = {
+        'X-Visitor-IP': '203.0.113.8',
+        'X-Visitor-Secret': 'shared-secret',
+    }
+    import asyncio
+    last = None
+    for n in range(ident.MAX_CODES_PER_IP + 1):
+        last = asyncio.run(accounts.request_code(
+            accounts.EmailRequest(email='person%d@example.com' % n),
+            _Request(headers)))
+    assert last.status_code == 429
+    assert json.loads(last.body)['error'] == ident.SEND_CAP_MESSAGE
+    assert len(sent) == ident.MAX_CODES_PER_IP
+
+
+def test_a_spoofed_forwarded_for_does_not_share_the_ip_cap(ident, monkeypatch):
+    """Same claimed IP, but the secret does not match, so each inbox is its own cap."""
+    monkeypatch.setenv('CF_VISITOR_SECRET', 'shared-secret')
+    for n in range(ident.MAX_CODES_PER_IP + 1):
+        ident.claim_send(
+            'other%d@example.com' % n,
+            ident.verified_client_ip(_Headers({
+                'X-Forwarded-For': '203.0.113.8',
+                'X-Visitor-IP': '203.0.113.8',
+                'X-Visitor-Secret': 'wrong',
+            })))
 
 
 # ---------------------------------------------------------------------------

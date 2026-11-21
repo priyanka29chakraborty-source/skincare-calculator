@@ -113,6 +113,13 @@ Without it the server generates a random secret at startup, which is safe but
 signs every customer out on every deploy. Changing it later has the same
 effect. Readiness reports this as `session_secret_persistent`.
 
+Login codes are also limited per visitor IP, but only when Cloudflare stamps
+the real IP with a shared secret. Set the same value as `CF_VISITOR_SECRET` on
+the Pages function and on the Render service. Until both sides have it, the
+API ignores claimed IPs (it does not read `X-Forwarded-For`) and still applies
+the per-email cooldown. Webhooks and health checks that hit Render directly
+keep working, because a missing secret is not a block.
+
 ---
 
 ## 3. Razorpay

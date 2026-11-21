@@ -281,6 +281,15 @@ def _new_id(prefix):
     return '%s_%s' % (prefix, secrets.token_urlsafe(16))
 
 
+def account_exists(email):
+    """True when this email already has an account. Does not create one."""
+    email = (email or '').strip().lower()
+    if not email:
+        return False
+    cur = _execute('SELECT 1 FROM wallet_account WHERE email = ?', (email,))
+    return cur.fetchone() is not None
+
+
 def get_or_create_account(email):
     """Return the account id for *email*, creating it if new.
 
